@@ -3,7 +3,6 @@
 Setup:
 
 ```sh
-cd dumb-searcher
 yarn install
 cp .env.example .env
 vim .env
