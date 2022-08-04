@@ -1,6 +1,7 @@
 import { Wallet } from "ethers"
 import fs from "fs/promises"
-import { WALLETS_PATH } from './helpers'
+
+const WALLETS_PATH = "src/output/wallets.json"
 
 async function main() {
     try {

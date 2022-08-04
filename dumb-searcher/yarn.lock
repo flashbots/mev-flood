@@ -348,6 +348,11 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-18.6.3.tgz#4e4a95b6fe44014563ceb514b2598b3e623d1c98"
   integrity sha512-6qKpDtoaYLM+5+AFChLhHermMQxc3TOEFIDzrZLPRGHPrLEwqFkkT5Kx3ju05g6X7uDPazz3jHbKPX0KzCjntg==
 
+"@types/readline-sync@^1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@types/readline-sync/-/readline-sync-1.4.4.tgz#8568292efe4ddd94d0ccee958b29cc3f4e0ea140"
+  integrity sha512-cFjVIoiamX7U6zkO2VPvXyTxbFDdiRo902IarJuPVxBhpDnXhwSaVE86ip+SCuyWBbEioKCkT4C88RNTxBM1Dw==
+
 aes-js@3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/aes-js/-/aes-js-3.0.0.tgz#e21df10ad6c2053295bcbb8dab40b09dbea87e4d"
@@ -463,6 +468,11 @@ minimalistic-crypto-utils@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/minimalistic-crypto-utils/-/minimalistic-crypto-utils-1.0.1.tgz#f6c00c1c0b082246e5c4d99dfb8c7c083b2b582a"
   integrity sha512-JIYlbt6g8i5jKfJ3xz7rF0LXmv2TkDxBLUkiBeZ7bAx4GnnNMr8xFpGnOxn6GhTEHx3SjRrZEoU+j04prX1ktg==
+
+readline-sync@^1.4.10:
+  version "1.4.10"
+  resolved "https://registry.yarnpkg.com/readline-sync/-/readline-sync-1.4.10.tgz#41df7fbb4b6312d673011594145705bf56d8873b"
+  integrity sha512-gNva8/6UAe8QYepIQH/jQ2qn91Qj0B9sYjMBBs3QOB8F2CXcKgLxQaJRP76sWVRQt+QU+8fAkCbCvjjMFu7Ycw==
 
 scrypt-js@3.0.1:
   version "3.0.1"
