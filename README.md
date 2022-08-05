@@ -2,7 +2,7 @@
 
 ## the game
 
-Call `bid`, sending the most ETH (set `value`) (which may be in _addition_ to others' bids in the block) before calling `claim`. The winner (the person who called bid with the highest `value`), upon calling `claim` gets the entire balance of the contract.
+Call `bid`, placing a bet by setting `value`, and send the highest bid (which may be in _addition_ to others' bids in the block) before calling `claim`. The winner (the person who called bid with the highest `value` this round), upon calling `claim` gets the entire balance of the contract. `claim` will also only pay out if you placed the _most recent_ bid.
 
 ## setup
 
