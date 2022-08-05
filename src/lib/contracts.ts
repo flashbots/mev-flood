@@ -3,7 +3,8 @@ import env from "../env"
 
 export default {
     LotteryMEV: {
-        address: env.CHAIN_ID === 11155111 ? "0x620A21EBdF8eE94dE372B5376CAD9f50305ED4f1" : "",
+        // 0x8463E99BB42b9134b22fe03B1898d85e06fAe6c8 // reverts when `claim` doesn't pay out
+        address: env.CHAIN_ID === 11155111 ? "0x620A21EBdF8eE94dE372B5376CAD9f50305ED4f1" : "", // never reverts
         abi: [
             {
                 "inputs": [],

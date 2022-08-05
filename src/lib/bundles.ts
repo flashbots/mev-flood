@@ -1,4 +1,4 @@
-import { BigNumber, Wallet } from "ethers"
+import { Wallet } from "ethers"
 
 import env from '../env'
 import { GWEI, PROVIDER } from '../scripts/helpers'

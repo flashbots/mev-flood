@@ -1,5 +1,5 @@
 import { Wallet } from "ethers"
-import readline from "readline-sync"
+// import readline from "readline-sync"
 
 import { createConflictingBundles } from './lib/bundles'
 import minionWallets from "./output/wallets.json"
