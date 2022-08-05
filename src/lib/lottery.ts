@@ -16,9 +16,9 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
         const bidReq = {
             ...bidTx,
             from: wallet.address,
-            value: GWEI.mul(2),
+            value: GWEI.mul(500).add(GWEI.mul(idx)),
             gasLimit: 300000,
-            gasPrice: GWEI.mul(13),
+            gasPrice: GWEI.mul(20),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx],
         }
@@ -26,7 +26,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             ...claimTx,
             from: wallet.address,
             gasLimit: 300000,
-            gasPrice: GWEI.mul(13),
+            gasPrice: GWEI.mul(20),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx] + 1,
         }
@@ -52,7 +52,7 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
             ...atomicLotteryDeployTx,
             chainId: env.CHAIN_ID,
             gasLimit: 300000,
-            gasPrice: GWEI.mul(12), // lower gas than dumb search txs to eat up more bids
+            gasPrice: GWEI.mul(50),
             nonce: nonces[idx],
         })
     }))

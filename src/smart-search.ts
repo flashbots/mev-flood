@@ -2,6 +2,7 @@ import { createSmartLotteryTxs } from './lib/lottery'
 import { getWalletSet } from './lib/wallets'
 import { PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
+import { useMempool } from './lib/cliArgs'
 
 // load wallets from disk
 const walletSet = getWalletSet("smart-search")
@@ -12,29 +13,44 @@ PROVIDER.on('block', async blockNum => {
     const signedTxs = await createSmartLotteryTxs(walletSet)
     console.log(signedTxs)
 
-    // simulate
-    try {
-        for (const tx of signedTxs) {
-            // each tx should be in its own bundle
-            const simResult = await simulateBundle([tx], blockNum)
-            console.log("sim result", simResult)
+    if (useMempool) {
+        console.warn("SENDING TXS TO MEMPOOL")
+        try {
+            for (const signedTx of signedTxs) {
+                const res = await PROVIDER.sendTransaction(signedTx)
+                console.log("tx result", res)
+            }
+        } catch (e) {
+            const err: any = e
+            console.error("backend error", err)
         }
-        // throws 500
-    } catch (e) {
-        const err: any = e
-        console.error("backend error", err.code)
+    } else {
+        console.warn("SENDING TXS TO FLASHBOTS")
+        // simulate
+        try {
+            for (const tx of signedTxs) {
+                // each tx should be in its own bundle
+                const simResult = await simulateBundle([tx], blockNum)
+                console.log("sim result", simResult)
+            }
+            // throws 500
+        } catch (e) {
+            const err: any = e
+            console.error("backend error", err.code)
+        }
+
+        //send
+        try {
+            const sentBundles = await Promise.all(signedTxs.map(async tx => {
+                return await sendBundle([tx], blockNum + 2)
+            }))
+            console.log("sent bundles", sentBundles.map(res => res.data))
+        } catch (e) {
+            const err: any = e
+            console.error("backend error", err.code)
+        }
     }
 
-    //send
-    try {
-        const sentBundles = await Promise.all(signedTxs.map(async tx => {
-            return await sendBundle([tx], blockNum + 1)
-        }))
-        console.log("sent bundles", sentBundles.map(res => res.data))
-    } catch (e) {
-        const err: any = e
-        console.error("backend error", err.code)
-    }
 
     // console.warn("aborting for debug")
     // process.exit(0)

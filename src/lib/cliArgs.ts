@@ -1,12 +1,15 @@
 
-const helpMessage = (program: string) => `Dumb-search on multiple wallets (defined in \`output/wallets.json\`)
+const helpMessage = (program: string) => `search on multiple wallets (defined in \`output/wallets.json\`)
 
 Usage:
-    yarn ${program} <first_wallet_index> <last_wallet_index>
+    yarn ${program} <first_wallet_index> <last_wallet_index> [mempool]
 
 Example:
-    # search with 25 wallets
+    # search with 25 wallets on flashbots
     yarn ${program} 0 25
+
+    # search with 4 wallets on mempool
+    yarn ${program} 0 25 mempool
 `
 
 export const getArgs = (programName: string) => {
@@ -24,3 +27,5 @@ export const getArgs = (programName: string) => {
     const [startIdx, endIdx] = process.argv.slice(2)
     return {startIdx, endIdx}
 }
+
+export const useMempool = process.argv.length > 4 && process.argv[4] == "mempool"
