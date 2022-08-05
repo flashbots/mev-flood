@@ -36,6 +36,6 @@ PROVIDER.on('block', async blockNum => {
         console.error("backend error", err.code)
     }
 
-    console.warn("aborting for debug")
-    process.exit(0)
+    // console.warn("aborting for debug")
+    // process.exit(0)
 })
