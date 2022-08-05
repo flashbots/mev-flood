@@ -10,6 +10,7 @@ contract LotteryMEV {
     constructor() {
         last_bid_block = block.number;
         highest_bid = 1e9;
+        winners[last_bid_block] = 0x0000000000000000000000000000000000000000;
     }
 
     function bid() public payable returns (uint256) {
@@ -17,15 +18,20 @@ contract LotteryMEV {
             winners[block.number] = msg.sender;
             last_bid_block = block.number;
             highest_bid = msg.value;
+            return msg.value;
         }
         return highest_bid;
     }
 
     function claim() public returns (uint256) {
         uint256 start_balance = address(this).balance;
-        if (msg.sender == winners[last_bid_block]) {
+        if (
+            msg.sender == winners[last_bid_block] ||
+            winners[last_bid_block] ==
+            0x0000000000000000000000000000000000000000
+        ) {
             highest_bid = 1e9;
-            msg.sender.call{value: address(this).balance}("");
+            msg.sender.call{value: start_balance}("");
         }
         return start_balance;
     }
