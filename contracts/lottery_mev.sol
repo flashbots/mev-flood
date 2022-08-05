@@ -5,25 +5,26 @@ contract LotteryMEV {
     // blocknum => winner_address
     mapping(uint256 => address) public winners;
     // blocknum => lottery_amount
-    uint256 private bid_pot;
+    uint256 private highest_bid;
     uint256 public last_bid_block;
 
     constructor() {
         last_bid_block = block.number;
-        bid_pot = 1e9;
+        highest_bid = 1e9;
     }
 
     function bid() public payable returns (uint256) {
-        if (msg.value > bid_pot) {
+        if (msg.value > highest_bid) {
             winners[block.number] = msg.sender;
             last_bid_block = block.number;
-            bid_pot += msg.value;
+            highest_bid = msg.value;
         }
-        return bid_pot;
+        return highest_bid;
     }
 
     function claim() public returns (uint256) {
         if (msg.sender == winners[last_bid_block]) {
+            highest_bid = 1e9;
             msg.sender.call{value: address(this).balance}("");
         }
         return address(this).balance;
