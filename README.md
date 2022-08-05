@@ -1,6 +1,10 @@
 # mev-flood
 
-Setup:
+## the game
+
+Call `bid`, sending the most ETH (set `value`) (which may be in _addition_ to others' bids from the mempool) before calling `claim`. The winner (the person who called bid with the highest `value`), upon calling `claim` gets the entire balance of the contract.
+
+## setup
 
 ```sh
 yarn install
