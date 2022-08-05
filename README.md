@@ -16,7 +16,7 @@ Daemons
 
 * **dumb-searcher:** blindly sends bid (constant `value`) & claim txs on every block
   * mostly fails and wastes money on bids (for others to take)
-  * may send to mempool [or FB relay (TODO)]
+  * sends to FB builder, may also send to mempool (pending how/what we want to test)
 * **smart-searcher:** finds winning bid amount and uses a smart contract that atomically executes bid+claim to win the pool
   * if only one instance is run, it's practically guaranteed to win every round
   * if more than one instance is run, they will generate "conflicting" bundles
