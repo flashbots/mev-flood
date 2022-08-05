@@ -48,7 +48,7 @@ PROVIDER.on('block', async blockNum => {
         // send
         try {
             const sentBundles = await Promise.all(bundles.map(async bundle => {
-                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2)
+                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 1)
             }))
             console.log("sent bundles", sentBundles.map(res => res.data))
         } catch (e) {
