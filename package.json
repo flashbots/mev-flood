@@ -9,14 +9,17 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
+    "axios": "^0.27.2",
     "dotenv": "^16.0.1",
     "ethers": "^5.6.9",
     "readline-sync": "^1.4.10"
   },
   "scripts": {
     "build": "npx tsc",
-    "start": "node build/index.js",
-    "dev": "npx ts-node src/index.ts",
+    "dumb-search": "node build/dumb-search.js",
+    "dumb-dev": "npx ts-node src/dumb-search.ts",
+    "smart-search": "node build/smart-search.js",
+    "smart-dev": "npx ts-node src/smart-search.ts",
     "script.createWallets": "npx ts-node src/scripts/createWallets.ts",
     "script.fundWallets": "npx ts-node src/scripts/fundWallets.ts",
     "script.createTestBundle": "npx ts-node src/scripts/createTestBundle.ts"

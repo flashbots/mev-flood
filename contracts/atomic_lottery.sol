@@ -8,9 +8,12 @@ interface LotteryMEV {
 }
 
 contract AtomicLottery {
-    constructor(address lotteryAddress) payable {
-        LotteryMEV lottery = LotteryMEV(lotteryAddress);
-        lottery.bid{value: msg.value}();
+    constructor(address lottery_address) payable {
+        LotteryMEV lottery = LotteryMEV(lottery_address);
+        uint256 highest_bid = lottery.bid{value: msg.value}();
+        if (msg.value < highest_bid) {
+            revert("bid_not_enough");
+        }
         lottery.claim();
         selfdestruct(payable(msg.sender));
     }

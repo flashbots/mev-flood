@@ -1,8 +1,8 @@
 import { Wallet, utils } from "ethers"
 import rl from "readline-sync"
 
-import env from '../env'
-import { GWEI, PROVIDER } from './helpers'
+import env from '../lib/env'
+import { GWEI, PROVIDER } from '../lib/helpers'
 import minionWallets from "../output/wallets.json"
 
 const FUND_AMOUNT = utils.parseEther("0.1")

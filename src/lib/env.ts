@@ -7,6 +7,7 @@ const env = {
     CHAIN_ID: parseInt(process.env.CHAIN_ID || ""),
     CHAIN_NAME: process.env.CHAIN_NAME || "",
     RPC_URL: process.env.RPC_URL || "",
+    MEV_GETH_HTTP_URL: process.env.MEV_GETH_HTTP_URL || "",
 }
 
 let fail = false

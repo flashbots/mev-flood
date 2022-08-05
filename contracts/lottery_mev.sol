@@ -22,10 +22,11 @@ contract LotteryMEV {
     }
 
     function claim() public returns (uint256) {
+        uint256 start_balance = address(this).balance;
         if (msg.sender == winners[last_bid_block]) {
             highest_bid = 1e9;
             msg.sender.call{value: address(this).balance}("");
         }
-        return address(this).balance;
+        return start_balance;
     }
 }
