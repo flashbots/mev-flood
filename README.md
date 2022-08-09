@@ -59,6 +59,8 @@ _Fund test accounts (careful, it sends 0.1 ETH to 100 accounts):_
 yarn script.fundWallets
 ```
 
+## run
+
 _Run dumb-search simulator with 5 accounts (careful, it currently sends to mempool without checking for profit):_
 
 ```sh
@@ -102,4 +104,26 @@ yarn dumb-dev 49 98
 
 # terminal 3 (2 test wallets)
 yarn smart-dev 98 100
+```
+
+### other features
+
+_Get bundle stats:_
+
+```sh
+yarn script.getBundleStats 0x40d83aebb63f61730eb6309e1a806624cf6d52ff666d1b13d5ced535397f9a46 0x7088e9
+# alternatively you can use int block number
+yarn script.getBundleStats 0x40d83aebb63f61730eb6309e1a806624cf6d52ff666d1b13d5ced535397f9a46 7375081
+```
+
+_Send private tx:_ (sends some ETH from adminWallet to itself)
+
+```sh
+yarn script.sendPrivateTx
+```
+
+_Cancel private tx:_
+
+```sh
+yarn script.cancelPrivateTx 0xca79f3114de50a77e42dd595c0ba4e786d3ddf782c62075ec067fe32329e3ea2
 ```
