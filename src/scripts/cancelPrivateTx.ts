@@ -1,7 +1,6 @@
-import { FlashbotsBundleProvider, FlashbotsPrivateTransactionResponse, RelayResponseError } from '@flashbots/ethers-provider-bundle';
-import { BigNumber } from 'ethers';
+import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle';
 import env from '../lib/env';
-import { GWEI, PROVIDER } from '../lib/helpers';
+import { PROVIDER } from '../lib/helpers';
 import { getAdminWallet } from '../lib/wallets';
 
 async function main() {
