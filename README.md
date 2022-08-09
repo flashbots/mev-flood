@@ -129,3 +129,9 @@ _Cancel private tx:_
 ```sh
 yarn script.cancelPrivateTx 0xca79f3114de50a77e42dd595c0ba4e786d3ddf782c62075ec067fe32329e3ea2
 ```
+
+_Print a test bundle:_
+
+```sh
+yarn script.createTestBundle
+```
