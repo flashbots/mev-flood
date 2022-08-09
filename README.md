@@ -51,6 +51,7 @@ export NODE_ENV=sepolia
 _Generate test accounts:_
 
 ```sh
+mkdir src/output
 yarn script.createWallets
 ```
 
