@@ -81,6 +81,14 @@ yarn dumb-search $i $j
 yarn smart-search
 ```
 
+### mempool testing
+
+You might need to use the mempool to test your transactions' validity before trying to use the bundle API.
+
+```sh
+yarn dumb-dev 13 14 mempool
+```
+
 ### stress-test example
 
 _Run 49 dumb searchers and 2 smart searchers (a relatively realistic case):_

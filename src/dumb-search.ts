@@ -28,7 +28,7 @@ PROVIDER.on('block', async blockNum => {
             console.log(bundleResults)
         } catch (e) {
             const err: any = e
-            console.error("backend error", err.code)
+            console.error("[mempool] backend error", err)
         }
     } else {
         console.warn("SENDING TXS TO FLASHBOTS")
@@ -42,7 +42,7 @@ PROVIDER.on('block', async blockNum => {
             // throws 500
         } catch (e) {
             const err: any = e
-            console.error("backend error", err.code)
+            console.error("[simulateBundle] backend error", err.code)
         }
 
         // send
@@ -53,7 +53,7 @@ PROVIDER.on('block', async blockNum => {
             console.log("sent bundles", sentBundles.map(res => res.data))
         } catch (e) {
             const err: any = e
-            console.error("backend error", err.code)
+            console.error("[sendBundle] backend error", err.code)
         }
     }
 
