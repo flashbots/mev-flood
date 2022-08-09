@@ -38,7 +38,8 @@ yarn install
 cp .env.example .env.goerli
 cp .env.example .env.sepolia
 
-vim .env
+vim .env.goerli
+vim .env.sepolia
 ```
 
 _Set preferred environment:_
