@@ -22,7 +22,7 @@ async function main() {
 
     const res: FlashbotsPrivateTransactionResponse | RelayResponseError = await flashbotsProvider.sendPrivateTransaction(privateTx)
     if ('wait' in res) {
-        console.log("private tx res", await res.wait())
+        console.log("private tx res", res)
     } else {
         console.error("[privateTx] error", res)
     }
