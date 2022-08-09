@@ -10,6 +10,9 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
     const bidTx = await lotteryContract.populateTransaction.bid()
     const claimTx = await lotteryContract.populateTransaction.claim()
     const nonces = await Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
+    const feeData = await PROVIDER.getFeeData()
+    const baseFee = feeData.gasPrice?.div(GWEI).sub(1)
+    console.log("baseFee", baseFee?.toString())
     
     // sign a lottery bid with every wallet in the set
     const signedTxPromises = walletSet.map(async (wallet, idx) => {
@@ -18,7 +21,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             from: wallet.address,
             value: GWEI.mul(500).add(GWEI.mul(idx)),
             gasLimit: 100000,
-            gasPrice: GWEI.mul(20),
+            gasPrice: GWEI,
             chainId: env.CHAIN_ID,
             nonce: nonces[idx],
         }
@@ -26,7 +29,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
-            gasPrice: GWEI.mul(1),
+            gasPrice: baseFee || 7, // bare minimum
             chainId: env.CHAIN_ID,
             nonce: nonces[idx] + 1,
         }
@@ -52,7 +55,7 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
             ...atomicLotteryDeployTx,
             chainId: env.CHAIN_ID,
             gasLimit: 300000,
-            gasPrice: GWEI.mul(50),
+            gasPrice: GWEI.mul(10),
             nonce: nonces[idx],
         })
     }))

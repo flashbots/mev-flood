@@ -36,18 +36,18 @@ PROVIDER.on('block', async blockNum => {
             // throws 500
         } catch (e) {
             const err: any = e
-            console.error("backend error", err.code)
+            console.error("[simulateBundle] backend error", err.code)
         }
 
         //send
         try {
             const sentBundles = await Promise.all(signedTxs.map(async tx => {
-                return await sendBundle([tx], blockNum + 1)
+                return await sendBundle([tx], blockNum + 2)
             }))
             console.log("sent bundles", sentBundles.map(res => res.data))
         } catch (e) {
             const err: any = e
-            console.error("backend error", err.code)
+            console.error("[sendBundle] backend error", err)
         }
     }
 

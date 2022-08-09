@@ -33,7 +33,7 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
 export const simulateBundle = async (signedTransactions: string[], simulationBlock: number) => {
     const authSigner = getAdminWallet()
     const block = await PROVIDER.getBlock(simulationBlock)
-    console.log("block", block)
+    // console.log("block", block)
     
     signedTransactions.forEach((rawTx) => {
         const tx = parseTransaction(rawTx)
@@ -52,7 +52,7 @@ export const simulateBundle = async (signedTransactions: string[], simulationBlo
         difficulty: block.difficulty
         }
     ]
-    console.log('params', params)
+    // console.log('params', params)
 
     let totalGasUsed = 0
     const body = {
