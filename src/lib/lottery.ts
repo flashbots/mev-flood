@@ -19,7 +19,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
         const bidReq = {
             ...bidTx,
             from: wallet.address,
-            value: GWEI.mul(500).add(GWEI.mul(idx)),
+            value: GWEI.mul(5000).add(GWEI.mul(idx)),
             gasLimit: 100000,
             gasPrice: GWEI.mul(10),
             chainId: env.CHAIN_ID,
@@ -29,7 +29,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
-            gasPrice: GWEI.mul(10) || 7, // bare minimum
+            gasPrice: GWEI.mul(10),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx] + 1,
         }

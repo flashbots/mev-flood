@@ -5,8 +5,9 @@ import env from './env'
 import { PROVIDER } from './helpers'
 import { getAdminWallet } from './wallets'
 
+const authSigner = getAdminWallet()
+
 export const sendBundle = async (signedTransactions: string[], targetBlock: number) => {
-    const authSigner = getAdminWallet()
     const params = [
         {
         txs: signedTransactions,
@@ -31,7 +32,6 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
 }
 
 export const simulateBundle = async (signedTransactions: string[], simulationBlock: number) => {
-    const authSigner = getAdminWallet()
     const block = await PROVIDER.getBlock(simulationBlock)
     // console.log("block", block)
     
@@ -70,7 +70,7 @@ export const simulateBundle = async (signedTransactions: string[], simulationBlo
     
     if (res.error || res.data.error) {
         let e = res.error ? res.error : res.data.error
-        console.log('error', e)
+        console.log('[flashbots.simulateBundle] error', e)
     }
     
     const simResult = res.data.result
@@ -87,4 +87,52 @@ export const simulateBundle = async (signedTransactions: string[], simulationBlo
         `block_number=${simulationBlock},coinbase_diff=${coinbaseDiff},eth_sent_to_coinbase=${formatEther(simResult.ethSentToCoinbase)},totalGasUsed=${totalGasUsed},gasPrice=${simResult.coinbaseDiff / totalGasUsed / 1e9}`
     )
     return simResult
+}
+
+export interface GetBundleStatsResponseSuccess {
+    isSimulated: boolean
+    isSentToMiners: boolean
+    isHighPriority: boolean
+    simulatedAt: string
+    submittedAt: string
+    sentToMinersAt: string
+}
+
+export interface RelayResponseError {
+    error: {
+      message: string
+      code: number
+    }
+}
+
+export type GetBundleStatsResponse = GetBundleStatsResponseSuccess | RelayResponseError
+
+export const getBundleStats = async (bundleHash: string, blockNumber: string) => {
+    const evmBlockNumber = blockNumber.startsWith("0x") ? blockNumber : `0x${parseInt(blockNumber).toString(16)}`
+
+    const params = [{ bundleHash, blockNumber: evmBlockNumber }]
+
+    const body = {
+        method: "flashbots_getBundleStats",
+        params,
+        id: "1337",
+        jsonrpc: '2.0'
+    }
+    const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {
+        headers: {
+        'Content-Type': 'application/json',
+        'X-Flashbots-Signature': (await authSigner.getAddress()) + ':' + (await authSigner.signMessage(ethersId(JSON.stringify(body))))
+        }
+    })
+
+    if (res.error !== undefined && res.error !== null) {
+      return {
+        error: {
+          message: res.error.message,
+          code: res.error.code
+        }
+      }
+    }
+
+    return res.data
 }

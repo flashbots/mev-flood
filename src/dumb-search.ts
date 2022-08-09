@@ -25,7 +25,7 @@ PROVIDER.on('block', async blockNum => {
             const bundleResults = await Promise.all(bundleResultPromises.map(async bundleResult => {
                 return await Promise.all([bundleResult.bidRes, bundleResult.claimRes])
             }))
-            console.log(bundleResults)
+            console.log("[mempool] bundle results", bundleResults)
         } catch (e) {
             const err: any = e
             console.error("[mempool] backend error", err)
@@ -48,7 +48,7 @@ PROVIDER.on('block', async blockNum => {
         // send
         try {
             const sentBundles = await Promise.all(bundles.map(async bundle => {
-                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 1)
+                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2)
             }))
             console.log("sent bundles", sentBundles.map(res => res.data))
         } catch (e) {
