@@ -1,5 +1,6 @@
 import dotenv from "dotenv"
-dotenv.config()
+dotenv.config({ path: `.env.${process.env.NODE_ENV}` })
+console.log(`ENV: ${process.env.NODE_ENV}`)
 
 const env = {
     ADMIN_PRIVATE_KEY: process.env.ADMIN_PRIVATE_KEY || "",

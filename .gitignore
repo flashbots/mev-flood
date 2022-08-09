@@ -1,4 +1,6 @@
 .env
+.env.sepolia
+.env.goerli
 
 # node
 node_modules

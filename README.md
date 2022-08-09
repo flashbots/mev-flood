@@ -33,8 +33,18 @@ Scripts
 
 ```sh
 yarn install
-cp .env.example .env
+
+# pick your poison:
+cp .env.example .env.goerli
+cp .env.example .env.sepolia
+
 vim .env
+```
+
+_Set preferred environment:_
+
+```sh
+export NODE_ENV=sepolia
 ```
 
 _Generate test accounts:_
