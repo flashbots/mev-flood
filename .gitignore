@@ -1,6 +1,5 @@
 .env
-.env.sepolia
-.env.goerli
+.env.*
 
 # node
 node_modules

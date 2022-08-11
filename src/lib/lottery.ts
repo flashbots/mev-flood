@@ -1,8 +1,10 @@
 import { ContractFactory, Wallet } from "ethers"
 
 import env from './env'
-import { GWEI, PROVIDER } from './helpers'
+import { GWEI, ETH, PROVIDER } from './helpers'
 import contracts, { getContract } from './contracts'
+
+const LARGE_BID_VALUE = ETH.div(100)
 
 /** return a bunch of bundles that compete for the same opportunity */
 export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
@@ -19,9 +21,9 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
         const bidReq = {
             ...bidTx,
             from: wallet.address,
-            value: GWEI.mul(5000).add(GWEI.mul(idx)),
+            value: LARGE_BID_VALUE.add(GWEI.mul(idx)),
             gasLimit: 100000,
-            gasPrice: GWEI.mul(10),
+            gasPrice: GWEI.mul(13),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx],
         }
@@ -29,7 +31,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
-            gasPrice: GWEI.mul(10),
+            gasPrice: GWEI.mul(13),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx] + 1,
         }
@@ -42,14 +44,12 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
 }
 
 export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
-    const bid = GWEI.mul(3000)
-    // const bid = GWEI.div(10)
     const nonces = await Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
     return await Promise.all(walletSet.map(async (wallet, idx) => {
         const atomicLotteryDeployTx = new ContractFactory(
             contracts.AtomicLottery.abi, contracts.AtomicLottery.bytecode
         ).getDeployTransaction(
-            contracts.LotteryMEV.address, {value: bid.add(GWEI.mul(idx))}
+            contracts.LotteryMEV.address, {value: LARGE_BID_VALUE.add(GWEI.mul(idx))}
         )
         return await wallet.signTransaction({
             ...atomicLotteryDeployTx,
