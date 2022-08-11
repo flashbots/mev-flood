@@ -4,7 +4,8 @@ import env from './env'
 import { GWEI, ETH, PROVIDER } from './helpers'
 import contracts, { getContract } from './contracts'
 
-const LARGE_BID_VALUE = ETH.div(100)
+const MEDIUM_BID_VALUE = ETH.div(100)
+const LARGE_BID_VALUE = ETH.div(10)
 
 /** return a bunch of bundles that compete for the same opportunity */
 export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
@@ -21,7 +22,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
         const bidReq = {
             ...bidTx,
             from: wallet.address,
-            value: LARGE_BID_VALUE.add(GWEI.mul(idx)),
+            value: MEDIUM_BID_VALUE.add(GWEI.mul(idx)),
             gasLimit: 100000,
             gasPrice: GWEI.mul(13),
             chainId: env.CHAIN_ID,
@@ -31,7 +32,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
-            gasPrice: GWEI.mul(13),
+            gasPrice: GWEI.mul(1),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx] + 1,
         }
@@ -45,6 +46,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
 
 export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
     const nonces = await Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
+    console.log(`lottery: ${contracts.LotteryMEV.address}`)
     return await Promise.all(walletSet.map(async (wallet, idx) => {
         const atomicLotteryDeployTx = new ContractFactory(
             contracts.AtomicLottery.abi, contracts.AtomicLottery.bytecode
