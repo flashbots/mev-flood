@@ -1547,7 +1547,7 @@ export default {
         },
     },
     LotteryMEV: {
-        address: env.CHAIN_ID === 11155111 ? "0x1BA1CcB7920557bDa64A24DC552346a244AAbD93" : env.CHAIN_ID === 5 ? "0xd9931F59908ec495b769956ca10bC2edd8528D8c" : "",
+        address: env.CHAIN_ID === 11155111 ? "0xf3d95cDF5a6A39497694e3e26fCB44b04530c2C9" : env.CHAIN_ID === 5 ? "0xA2dEE5fB80d81D64Fc3ed0b030c40b2DaDfFF5f0" : "",
         abi: [
             {
                 "inputs": [],
