@@ -1,15 +1,18 @@
-import { ContractFactory, Wallet } from "ethers"
+import { BigNumber, ContractFactory, Wallet } from "ethers"
 
 import env from './env'
 import { GWEI, ETH, PROVIDER } from './helpers'
 import contracts, { getContract } from './contracts'
+import { simulateBundle } from './flashbots'
+import { getAdminWallet } from './wallets'
 
 const MEDIUM_BID_VALUE = ETH.div(100)
 const LARGE_BID_VALUE = ETH.div(10)
+const lotteryContract = getContract(contracts.LotteryMEV)
+const adminWallet = getAdminWallet().connect(PROVIDER)
 
 /** return a bunch of bundles that compete for the same opportunity */
 export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
-    const lotteryContract = getContract(contracts.LotteryMEV)
     const bidTx = await lotteryContract.populateTransaction.bid()
     const claimTx = await lotteryContract.populateTransaction.claim()
     const nonces = await Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
@@ -45,20 +48,29 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
 }
 
 export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
-    const nonces = await Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
+    const nonces = Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
     console.log(`lottery: ${contracts.LotteryMEV.address}`)
+
+    const pot = await PROVIDER.getBalance(lotteryContract.address)
+    console.log("pot", pot)
+    const gasLimit = 200000
+    const gasPrice = GWEI.mul(10)
+    if (pot.lte(gasPrice.mul(gasLimit))) {
+        return []
+    }
+
     return await Promise.all(walletSet.map(async (wallet, idx) => {
         const atomicLotteryDeployTx = new ContractFactory(
             contracts.AtomicLottery.abi, contracts.AtomicLottery.bytecode
         ).getDeployTransaction(
-            contracts.LotteryMEV.address, {value: LARGE_BID_VALUE.add(GWEI.mul(idx))}
+            contracts.LotteryMEV.address, {value: pot.add(13)}
         )
         return await wallet.signTransaction({
             ...atomicLotteryDeployTx,
             chainId: env.CHAIN_ID,
-            gasLimit: 300000,
-            gasPrice: GWEI.mul(10),
-            nonce: nonces[idx],
+            gasLimit,
+            gasPrice: gasPrice.add(GWEI.mul(idx)),
+            nonce: (await nonces)[idx],
         })
     }))
 }

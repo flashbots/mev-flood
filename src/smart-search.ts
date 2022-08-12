@@ -11,7 +11,10 @@ const walletSet = getWalletSet("smart-search")
 PROVIDER.on('block', async blockNum => {
     console.log(`[BLOCK ${blockNum}]`)
     const signedTxs = await createSmartLotteryTxs(walletSet)
-    console.log(signedTxs)
+    if (signedTxs.length === 0) {
+        console.log("no profit to be had")
+        return
+    }
 
     if (useMempool) {
         console.warn("SENDING TXS TO MEMPOOL")
