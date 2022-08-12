@@ -1547,72 +1547,79 @@ export default {
         },
     },
     LotteryMEV: {
-        address: env.CHAIN_ID === 11155111 ? "0xf3d95cDF5a6A39497694e3e26fCB44b04530c2C9" : env.CHAIN_ID === 5 ? "0xA2dEE5fB80d81D64Fc3ed0b030c40b2DaDfFF5f0" : "",
+        address: env.CHAIN_ID === 11155111 ? "0xf3d95cDF5a6A39497694e3e26fCB44b04530c2C9" : env.CHAIN_ID === 5 ? "0x1B8810316B4bcb959369C9031778d41757CC1210" : "",
         abi: [
             {
-                "inputs": [],
-                "stateMutability": "nonpayable",
-                "type": "constructor"
+              "inputs": [],
+              "stateMutability": "nonpayable",
+              "type": "constructor"
             },
             {
-                "inputs": [],
-                "name": "bid",
-                "outputs": [
+              "inputs": [],
+              "name": "bid",
+              "outputs": [
                 {
-                    "internalType": "uint256",
-                    "name": "",
-                    "type": "uint256"
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
                 }
-                ],
-                "stateMutability": "payable",
-                "type": "function"
+              ],
+              "stateMutability": "payable",
+              "type": "function"
             },
             {
-                "inputs": [],
-                "name": "claim",
-                "outputs": [
+              "inputs": [],
+              "name": "claim",
+              "outputs": [
                 {
-                    "internalType": "uint256",
-                    "name": "",
-                    "type": "uint256"
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
                 }
-                ],
-                "stateMutability": "nonpayable",
-                "type": "function"
+              ],
+              "stateMutability": "nonpayable",
+              "type": "function"
             },
             {
-                "inputs": [],
-                "name": "last_bid_block",
-                "outputs": [
+              "inputs": [],
+              "name": "last_bid_block",
+              "outputs": [
                 {
-                    "internalType": "uint256",
-                    "name": "",
-                    "type": "uint256"
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
                 }
-                ],
-                "stateMutability": "view",
-                "type": "function"
+              ],
+              "stateMutability": "view",
+              "type": "function"
             },
             {
-                "inputs": [
-                {
-                    "internalType": "uint256",
-                    "name": "",
-                    "type": "uint256"
-                }
-                ],
-                "name": "winners",
-                "outputs": [
-                {
-                    "internalType": "address",
-                    "name": "",
-                    "type": "address"
-                }
-                ],
-                "stateMutability": "view",
-                "type": "function"
+              "inputs": [],
+              "name": "terminate",
+              "outputs": [],
+              "stateMutability": "nonpayable",
+              "type": "function"
             },
-        ],
+            {
+              "inputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "name": "winners",
+              "outputs": [
+                {
+                  "internalType": "address",
+                  "name": "",
+                  "type": "address"
+                }
+              ],
+              "stateMutability": "view",
+              "type": "function"
+            }
+          ],
     },
     WETH: {
         address: env.CHAIN_ID === 11155111 ? "0xe2258541f30e991b96ef73068af258d29f8cae55" : "",

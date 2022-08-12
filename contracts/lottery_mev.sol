@@ -4,7 +4,7 @@ pragma solidity ^0.8.15;
 contract LotteryMEV {
     // blocknum => winner_address
     mapping(uint256 => address) public winners;
-    uint256 public highest_bid;
+    uint256 private highest_bid;
     uint256 public last_bid_block;
     address private creator;
 
