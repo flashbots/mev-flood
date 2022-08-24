@@ -50,7 +50,7 @@ PROVIDER.on('block', async blockNum => {
             const sentBundles = await Promise.all(bundles.map(async bundle => {
                 return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2)
             }))
-            console.log("sent bundles", sentBundles.map(res => res.data))
+            console.log("sent bundles", sentBundles)
         } catch (e) {
             const err: any = e
             console.error("[sendBundle] backend error", err.code)
