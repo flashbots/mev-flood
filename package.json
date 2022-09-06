@@ -22,6 +22,7 @@
     "dumb-dev": "npx ts-node src/dumb-search.ts",
     "smart-search": "node build/smart-search.js",
     "smart-dev": "npx ts-node src/smart-search.ts",
+    "fake-dev": "npx ts-node src/fake-search.ts",
     "script.createWallets": "npx ts-node src/scripts/createWallets.ts",
     "script.fundWallets": "npx ts-node src/scripts/fundWallets.ts",
     "script.createTestBundle": "npx ts-node src/scripts/createTestBundle.ts",
