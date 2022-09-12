@@ -179,3 +179,20 @@ _Print a test bundle (sends ETH from test wallet to itself):_
 ```sh
 yarn script.createTestBundle
 ```
+
+_Send tx to Protect:_
+
+```sh
+yarn script.sendProtectTx
+
+# send uniswapV2 router tx to Protect (works on any chain)
+yarn script.sendProtectTx dummy
+
+# send lottery contract tx to Protect with fast mode
+yarn script.sendProtectTx fast
+
+# send uniswapV2 router tx to Protect w/ fast mode
+yarn script.sendProtectTx fast dummy
+# or
+yarn script.sendProtectTx dummy fast
+```
