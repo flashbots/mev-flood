@@ -9,6 +9,9 @@ async function main() {
     const adminWallet = getAdminWallet().connect(PROVIDER)
     const flashbotsProvider = await FlashbotsBundleProvider.create(PROVIDER, adminWallet, env.MEV_GETH_HTTP_URL, env.CHAIN_NAME)
     const contract = getContract(contracts.LotteryMEV)
+    if (!contract) {
+        return
+    }
     const tx = {
         ...contract.populateTransaction.bid(),
         from: adminWallet.address,

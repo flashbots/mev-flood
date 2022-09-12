@@ -17,7 +17,7 @@ const adminWallet = getAdminWallet().connect(PROVIDER)
 export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
     if (!lotteryContract) {
         console.warn("lottery contract is undefined")
-        return undefined
+        return []
     }
     const bidTx = await lotteryContract.populateTransaction.bid()
     const claimTx = await lotteryContract.populateTransaction.claim()
@@ -56,7 +56,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
 export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
     if (!lotteryContract) {
         console.warn("lottery contract is undefined")
-        return undefined
+        return []
     }
     const nonces = Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
     console.log(`lottery: ${contracts.LotteryMEV.address}`)
@@ -86,7 +86,7 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
 }
 
 /** create a transaction that always reverts */
-export const createNonLandingTx = async () => {
+export const createNonLandingTx = async (deadline?: number) => {
     // make a swap on uniswap v2 where we don't have the tokens
     const uniContract = getContract(contracts.UniV2Router)
     if (!uniContract) {
@@ -98,7 +98,7 @@ export const createNonLandingTx = async () => {
         BigNumber.from(420).mul(1e9).mul(1e9),
         [contracts.DAI.address, contracts.WETH.address],
         adminWallet.address,
-        now() + 30
+        deadline || now() + 30
     )
     const gasLimit = 100000
     const gasPrice = GWEI.mul(100)
