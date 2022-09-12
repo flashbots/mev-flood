@@ -89,30 +89,45 @@ Example:
  * Get CLI args for sendProtectTx script.
  */
  export const getSendProtectTxArgs = () => {
+    let dummy = false
+    let fast = false
     const helpMessage = `send a sample Protect tx.
 
 Usage:
-    yarn script.sendProtectTx [dummy]
+    yarn script.sendProtectTx [dummy] [fast]
 
 Example:
-    # send Protect tx to lottery contract (lottery_mev.sol must be deployed on target chain)
+    # send lottery contract tx to Protect (lottery_mev.sol must be deployed on target chain)
     yarn script.sendProtectTx
 
-    # send Protect tx to uniswapV2 router (works on any chain)
+    # send uniswapV2 router tx to Protect (works on any chain)
     yarn script.sendProtectTx dummy
+
+    # send lottery contract tx to Protect with fast mode
+    yarn script.sendProtectTx fast
+
+    # send uniswapV2 router tx to Protect w/ fast mode
+    yarn script.sendProtectTx fast dummy
+    # or
+    yarn script.sendProtectTx dummy fast
 `
 
     if (process.argv.length > 2) {
         if (process.argv[2].includes("help")) {
             console.log(helpMessage)
-        } else if (process.argv[2].includes("dummy")) {
-            return {
-                dummy: true
-            }
+            return undefined
+        } 
+        const args = `${process.argv[2]}&${process.argv[3]}`
+        if (args.includes("dummy")) {
+            dummy = true
+        }
+        if (args.includes("fast")) {
+            fast = true
         }
     }
     return {
-        dummy: false
+        dummy,
+        fast,
     }
 }
 
