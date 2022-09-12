@@ -2,10 +2,10 @@ import { Wallet } from "ethers"
 import env from './env'
 
 import minionWallets from "../output/wallets.json"
-import { getArgs } from './cliArgs'
+import { getSearchArgs } from './cliArgs'
 
 export const getWalletSet = (programName: string) => {
-    const {startIdx, endIdx} = getArgs(programName)
+    const {startIdx, endIdx} = getSearchArgs(programName)
     const wallets = minionWallets
         .slice(parseInt(startIdx), parseInt(endIdx))
         .map(wallet => new Wallet(wallet.privateKey))

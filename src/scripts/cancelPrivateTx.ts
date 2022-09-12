@@ -1,13 +1,19 @@
-import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle';
-import env from '../lib/env';
-import { PROVIDER } from '../lib/helpers';
-import { getAdminWallet } from '../lib/wallets';
+import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
+import { getCancelPrivateTxArgs } from '../lib/cliArgs'
+import env from '../lib/env'
+import { PROVIDER } from '../lib/helpers'
+import { getAdminWallet } from '../lib/wallets'
 
 async function main() {
     const adminWallet = getAdminWallet()
-    const flashbotsProvider = await FlashbotsBundleProvider.create(PROVIDER, adminWallet, env.MEV_GETH_HTTP_URL, env.CHAIN_NAME)
-    
-    const txHash = process.argv[2]
+    // create custom flashbots provider w/ RPC_URL instead of MEV_GETH_URL (pre-merge infra is not fully integrated w/ one URL)
+    const flashbotsProvider = await FlashbotsBundleProvider.create(PROVIDER, adminWallet, env.RPC_URL, env.CHAIN_NAME)
+
+    const txHash = getCancelPrivateTxArgs()
+    if (!txHash) {
+        console.warn("tx hash must be provided. Run `yarn script.cancelPrivateTx help` for usage.")
+        return
+    }
     const res = await flashbotsProvider.cancelPrivateTransaction(txHash)
     !!res ? console.log(`tx ${txHash} cancelled`) : console.log("cancellation failed")
 }

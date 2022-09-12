@@ -1,4 +1,4 @@
-import { BigNumber, Contract, ContractFactory, Wallet } from "ethers"
+import { BigNumber, ContractFactory, Wallet } from "ethers"
 
 import env from './env'
 import { GWEI, ETH, PROVIDER, now } from './helpers'
@@ -86,7 +86,7 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
 }
 
 /** create a transaction that always reverts */
-export const createNonLandingTx = async (deadline?: number) => {
+export const createRevertingUniTx = async (deadline?: number) => {
     // make a swap on uniswap v2 where we don't have the tokens
     const uniContract = getContract(contracts.UniV2Router)
     if (!uniContract) {
@@ -100,20 +100,13 @@ export const createNonLandingTx = async (deadline?: number) => {
         adminWallet.address,
         deadline || now() + 30
     )
-    const gasLimit = 100000
+    const gasLimit = 200000
     const gasPrice = GWEI.mul(100)
-    return await adminWallet.signTransaction({
+    return {
         ...revertingTx,
         chainId: env.CHAIN_ID,
         gasPrice,
         gasLimit,
         nonce: (await adminWallet.getTransactionCount()),
-    })
-    // return ""
-}
-
-export const createNonConflictingBundles = (blockNum: number) => {
-    console.log("return a bunch of bundles that do not interfere with each other")
-    // return a bunch of bundles that do not interfere with each other
-    const weth = getContract(contracts.WETH)
+    }
 }

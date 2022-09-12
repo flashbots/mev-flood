@@ -1,37 +1,34 @@
 import { FlashbotsBundleProvider, FlashbotsPrivateTransactionResponse, RelayResponseError } from '@flashbots/ethers-provider-bundle';
-import { BigNumber } from 'ethers';
-import contracts, { getContract } from '../lib/contracts';
+import { getSendPrivateTxArgs } from '../lib/cliArgs';
 import env from '../lib/env';
-import { GWEI, PROVIDER } from '../lib/helpers';
+import { getSampleLotteryTx, PROVIDER } from '../lib/helpers';
+import { createRevertingUniTx } from '../lib/lottery';
 import { getAdminWallet } from '../lib/wallets';
 
 async function main() {
+    const args = getSendPrivateTxArgs()
     const adminWallet = getAdminWallet().connect(PROVIDER)
-    const flashbotsProvider = await FlashbotsBundleProvider.create(PROVIDER, adminWallet, env.MEV_GETH_HTTP_URL, env.CHAIN_NAME)
-    const contract = getContract(contracts.LotteryMEV)
-    if (!contract) {
+    // create custom flashbots provider w/ RPC_URL instead of MEV_GETH_URL (pre-merge infra is not fully integrated w/ one URL)
+    const flashbotsProvider = await FlashbotsBundleProvider.create(PROVIDER, adminWallet, env.RPC_URL, env.CHAIN_NAME)
+
+    const tx = args.dummy ? await createRevertingUniTx() : await getSampleLotteryTx(adminWallet)
+    if (!tx) {
+        console.warn("private tx is undefined")
         return
     }
-    const tx = {
-        ...contract.populateTransaction.bid(),
-        from: adminWallet.address,
-        to: adminWallet.address,
-        value: GWEI.mul(1000),
-        gasPrice: GWEI.mul(50),
-        gasLimit: BigNumber.from(90000),
-        chainId: env.CHAIN_ID,
-        nonce: await adminWallet.getTransactionCount()
-    }
+
     const privateTx = {
         transaction: tx,
         signer: adminWallet,
     }
+    console.log("privateTx", privateTx)
 
     const res: FlashbotsPrivateTransactionResponse | RelayResponseError = await flashbotsProvider.sendPrivateTransaction(privateTx)
     if ('wait' in res) {
         console.log("private tx res", res)
-        const simRes = await res.simulate()
-        console.log("sim result", simRes)
+        // disabled sim for now (eth_callBundle not implemented)
+        // const simRes = await res.simulate()
+        // console.log("sim result", simRes)
     } else {
         console.error("[privateTx] error", res)
     }
