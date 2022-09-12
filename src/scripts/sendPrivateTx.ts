@@ -7,6 +7,9 @@ import { getAdminWallet } from '../lib/wallets';
 
 async function main() {
     const args = getSendPrivateTxArgs()
+    if (!args) {
+        return
+    }
     const adminWallet = getAdminWallet().connect(PROVIDER)
     // create custom flashbots provider w/ RPC_URL instead of MEV_GETH_URL (pre-merge infra is not fully integrated w/ one URL)
     const flashbotsProvider = await FlashbotsBundleProvider.create(PROVIDER, adminWallet, env.RPC_URL, env.CHAIN_NAME)

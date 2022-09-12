@@ -1,10 +1,10 @@
 /**
  * Get CLI args for "search" scripts (dumb-search, smart-search, fake-search)
  * @param programName name of script for console readability
- * @returns start and end indices for wallets to use from `output/wallets.json`
+ * @returns start and end indices for wallets to use from `src/output/wallets.json`
  */
 export const getSearchArgs = (programName: string) => {
-    const helpMessage = (program: string) => `search on multiple wallets (defined in \`output/wallets.json\`)
+    const helpMessage = (program: string) => `search on multiple wallets (defined in \`src/output/wallets.json\`)
 
 Usage:
     yarn ${program} <first_wallet_index> <last_wallet_index> [mempool]
@@ -51,6 +51,7 @@ Example:
     if (process.argv.length > 2) {
         if (process.argv[2].includes("help")) {
             console.log(helpMessage)
+            return undefined
         } else if (process.argv[2].includes("dummy")) {
             return {
                 dummy: true

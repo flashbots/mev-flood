@@ -20,11 +20,6 @@ async function main() {
     })
     const signedTxs = await Promise.all(signedTxPromises)
     console.log(signedTxs)
-    // for (const tx of signedTxs) {
-    //     console.log("SENDING", tx)
-    //     const res = await PROVIDER.sendTransaction(tx)
-    //     console.log(res)
-    // }
 }
 
 main().then(() => {

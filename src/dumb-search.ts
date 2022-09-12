@@ -7,7 +7,6 @@ import { useMempool } from './lib/cliArgs'
 // load wallets from disk
 const walletSet = getWalletSet("dumb-search")
 
-
 // run a block monitor to send bundles on every block
 PROVIDER.on('block', async (blockNum: number) => {
     console.log(`[BLOCK ${blockNum}]`)
@@ -56,7 +55,4 @@ PROVIDER.on('block', async (blockNum: number) => {
             console.error("[sendBundle] backend error", err.code)
         }
     }
-
-    // console.warn("aborting for debug")
-    // process.exit(0)
 })

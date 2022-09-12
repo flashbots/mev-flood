@@ -7,11 +7,14 @@ import { getAdminWallet } from '../lib/wallets'
 
 async function main() {
     const args = getSendProtectTxArgs()
-    args?.fast && console.log("Using 'fast mode'")
+    if (!args) {
+        return
+    }
+    args.fast && console.log("Using 'fast mode'")
     const provider = args?.fast ? new providers.JsonRpcProvider(`${env.RPC_URL}/fast`) : PROVIDER
     const adminWallet = getAdminWallet().connect(provider)
 
-    const tx = args?.dummy ? await createRevertingUniTx() : await getSampleLotteryTx(adminWallet)
+    const tx = args.dummy ? await createRevertingUniTx() : await getSampleLotteryTx(adminWallet)
     if (!tx) {
         console.warn("protect tx is undefined")
         return
