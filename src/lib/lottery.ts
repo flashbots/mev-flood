@@ -1,18 +1,24 @@
 import { BigNumber, ContractFactory, Wallet } from "ethers"
 
 import env from './env'
-import { GWEI, ETH, PROVIDER } from './helpers'
+import { GWEI, ETH, PROVIDER, now } from './helpers'
 import contracts, { getContract } from './contracts'
 import { simulateBundle } from './flashbots'
 import { getAdminWallet } from './wallets'
 
+
 const MEDIUM_BID_VALUE = ETH.div(100)
 const LARGE_BID_VALUE = ETH.div(10)
+// TODO: clean up; don't instantiate contract here; getContract should never return undefined
 const lotteryContract = getContract(contracts.LotteryMEV)
 const adminWallet = getAdminWallet().connect(PROVIDER)
 
 /** return a bunch of bundles that compete for the same opportunity */
 export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
+    if (!lotteryContract) {
+        console.warn("lottery contract is undefined")
+        return []
+    }
     const bidTx = await lotteryContract.populateTransaction.bid()
     const claimTx = await lotteryContract.populateTransaction.claim()
     const nonces = await Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
@@ -48,6 +54,10 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
 }
 
 export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
+    if (!lotteryContract) {
+        console.warn("lottery contract is undefined")
+        return []
+    }
     const nonces = Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
     console.log(`lottery: ${contracts.LotteryMEV.address}`)
 
@@ -75,8 +85,28 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
     }))
 }
 
-export const createNonConflictingBundles = (blockNum: number) => {
-    console.log("return a bunch of bundles that do not interfere with each other")
-    // return a bunch of bundles that do not interfere with each other
-    const weth = getContract(contracts.WETH)
+/** create a transaction that always reverts */
+export const createRevertingUniTx = async (deadline?: number) => {
+    // make a swap on uniswap v2 where we don't have the tokens
+    const uniContract = getContract(contracts.UniV2Router)
+    if (!uniContract) {
+        console.warn("uniContract is undefined")
+        return undefined
+    }
+    const revertingTx = await uniContract.populateTransaction.swapExactTokensForTokens(
+        BigNumber.from(420).mul(1e9).mul(1e9),
+        BigNumber.from(420).mul(1e9).mul(1e9),
+        [contracts.DAI.address, contracts.WETH.address],
+        adminWallet.address,
+        deadline || now() + 30
+    )
+    const gasLimit = 200000
+    const gasPrice = GWEI.mul(100)
+    return {
+        ...revertingTx,
+        chainId: env.CHAIN_ID,
+        gasPrice,
+        gasLimit,
+        nonce: (await adminWallet.getTransactionCount()),
+    }
 }

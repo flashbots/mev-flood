@@ -2,7 +2,7 @@ import axios from "axios"
 import { formatEther, id as ethersId, parseTransaction } from "ethers/lib/utils"
 
 import env from './env'
-import { FB_PROVIDER, PROVIDER } from './helpers'
+import { getFlashbotsProvider, PROVIDER } from './helpers'
 import { getAdminWallet } from './wallets'
 
 const authSigner = getAdminWallet()
@@ -31,7 +31,7 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
     //       'X-Flashbots-Signature': signature
     //     }
     //   })).map(res => res.data)
-    const flashbots = await FB_PROVIDER
+    const flashbots = await getFlashbotsProvider()
     return await flashbots.sendRawBundle(signedTransactions, targetBlock)
 }
 

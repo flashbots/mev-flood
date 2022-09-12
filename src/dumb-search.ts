@@ -9,7 +9,7 @@ const walletSet = getWalletSet("dumb-search")
 
 
 // run a block monitor to send bundles on every block
-PROVIDER.on('block', async blockNum => {
+PROVIDER.on('block', async (blockNum: number) => {
     console.log(`[BLOCK ${blockNum}]`)
     const bundles = await createDumbLotteryBundles(walletSet)
     console.log("bundles", bundles)

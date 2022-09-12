@@ -1,9 +1,15 @@
 import { Wallet } from "ethers"
 import fs from "fs/promises"
 
-const WALLETS_PATH = "src/output/wallets.json"
+const WALLETS_DIR = "src/output/"
+const WALLETS_PATH = WALLETS_DIR + "wallets.json"
 
 async function main() {
+    try {
+        await fs.opendir(WALLETS_DIR)
+    } catch(e) {
+        await fs.mkdir(WALLETS_DIR)
+    }
     try {
         await fs.stat(WALLETS_PATH)
         console.error(`${WALLETS_PATH} already exists`)
