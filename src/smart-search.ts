@@ -33,7 +33,7 @@ PROVIDER.on('block', async blockNum => {
         try {
             for (const tx of signedTxs) {
                 // each tx should be in its own bundle
-                const simResult = await simulateBundle([tx], blockNum)
+                const simResult = await simulateBundle([tx], blockNum - 1)
                 console.log("sim result", simResult)
             }
             // throws 500

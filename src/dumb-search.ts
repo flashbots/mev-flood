@@ -35,7 +35,7 @@ PROVIDER.on('block', async (blockNum: number) => {
         try {
             for (const bundle of bundles) {
                 // each tx should be in its own bundle
-                const simResult = await simulateBundle([bundle.bidTx, bundle.claimTx], blockNum)
+                const simResult = await simulateBundle([bundle.bidTx, bundle.claimTx], blockNum - 1)
                 console.log("sim result", simResult)
             }
             // throws 500

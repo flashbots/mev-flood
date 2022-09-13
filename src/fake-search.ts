@@ -5,7 +5,6 @@ import { getAdminWallet } from './lib/wallets'
 
 const sendRevertingBundle = async (blockNum: number) => {
     console.log(`[BLOCK ${blockNum}]`)
-    const simBlock = blockNum - 1
     const targetBlock = blockNum + 2
     const adminWallet = getAdminWallet()
     const tx = await createRevertingUniTx(2000000000)
@@ -18,10 +17,10 @@ const sendRevertingBundle = async (blockNum: number) => {
     const bundleHash = calculateBundleHash(bundle)
     console.log("bundleHash (pre-calculated)", bundleHash)
     
-    // simulate disabled for now...
-    // console.log('simulating bundle...')
-    // const simResult = simulateBundle(bundle, simBlock)
-    // console.log("simResult", await simResult)
+    // simulate
+    console.log('simulating bundle...')
+    const simResult = simulateBundle(bundle, blockNum - 1)
+    console.log("simResult", await simResult)
     
     // send
     console.log(`sending bundle, targeting block ${targetBlock}...`)

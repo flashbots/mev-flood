@@ -29,9 +29,8 @@ async function main() {
     const res: FlashbotsPrivateTransactionResponse | RelayResponseError = await flashbotsProvider.sendPrivateTransaction(privateTx)
     if ('wait' in res) {
         console.log("private tx res", res)
-        // disabled sim for now (eth_callBundle not implemented)
-        // const simRes = await res.simulate()
-        // console.log("sim result", simRes)
+        const simRes = await res.simulate()
+        console.log("sim result", simRes)
     } else {
         console.error("[privateTx] error", res)
     }
