@@ -86,7 +86,7 @@ yarn script.fundWallets
 
 ## run
 
-_Run dumb-search simulator with 5 accounts (careful, it currently sends to mempool without checking for profit):_
+_Run dumb-search simulator with 5 accounts (careful, it currently sends without checking for profit):_
 
 ```sh
 yarn dumb-dev 0 5
