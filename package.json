@@ -29,6 +29,7 @@
     "script.createWallets": "npx ts-node src/scripts/createWallets.ts",
     "script.fundWallets": "npx ts-node src/scripts/fundWallets.ts",
     "script.getBundleStats": "npx ts-node src/scripts/getBundleStats.ts",
+    "script.getConflictingBundle": "npx ts-node src/scripts/getConflictingBundle.ts",
     "script.getUserStats": "npx ts-node src/scripts/getUserStats.ts",
     "script.sendPrivateTx": "npx ts-node src/scripts/sendPrivateTx.ts",
     "script.sendProtectTx": "npx ts-node src/scripts/sendProtectTx.ts"
