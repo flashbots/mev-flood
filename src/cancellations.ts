@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { randomInt } from 'crypto';
 
 // load wallets from disk
-const walletSet = getWalletSet("cancelBundles")
+const walletSet = getWalletSet("cancel")
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
