@@ -3,6 +3,7 @@ import { getWalletSet } from './lib/wallets'
 import { calculateBundleHash, PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
+import { v4 as uuidv4 } from "uuid"
 
 // load wallets from disk
 const walletSet = getWalletSet("smart-search")
@@ -12,6 +13,7 @@ PROVIDER.on('block', async blockNum => {
     console.log(`[BLOCK ${blockNum}]`)
     const signedTxs = await createSmartLotteryTxs(walletSet)
     if (signedTxs.length === 0) {
+        console.warn("no txs created")
         return
     }
 
@@ -46,7 +48,7 @@ PROVIDER.on('block', async blockNum => {
         //send
         try {
             const sentBundles = await Promise.all(signedTxs.map(async tx => {
-                return await sendBundle([tx], blockNum + 2)
+                return await sendBundle([tx], blockNum + 2, uuidv4())
             }))
             console.log("sent bundles", sentBundles)
         } catch (e) {

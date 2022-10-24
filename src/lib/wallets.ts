@@ -4,6 +4,11 @@ import env from './env'
 import minionWallets from "../output/wallets.json"
 import { getSearchArgs } from './cliArgs'
 
+/**
+ * Gets array of wallet(s) for given program according to CLI input.
+ * @param programName Name of program/script being run (see `package.json` scripts).
+ * @returns array of wallets from `src/output/wallets.json`
+ */
 export const getWalletSet = (programName: string) => {
     const {startIdx, endIdx} = getSearchArgs(programName)
     const wallets = minionWallets

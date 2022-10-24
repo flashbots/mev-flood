@@ -5,7 +5,7 @@ import { GWEI, ETH, PROVIDER, now } from './helpers'
 import contracts, { getContract } from './contracts'
 import { simulateBundle } from './flashbots'
 import { getAdminWallet } from './wallets'
-import { formatEther } from 'ethers/lib/utils'
+import { formatEther, formatUnits } from 'ethers/lib/utils'
 
 
 const MEDIUM_BID_VALUE = ETH.div(100)
@@ -15,7 +15,7 @@ const lotteryContract = getContract(contracts.LotteryMEV)
 const adminWallet = getAdminWallet().connect(PROVIDER)
 
 /** return a bunch of bundles that compete for the same opportunity */
-export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
+export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice: BigNumber) => {
     if (!lotteryContract) {
         console.warn("lottery contract is undefined")
         return []
@@ -26,6 +26,11 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
     const feeData = await PROVIDER.getFeeData()
     const baseFee = feeData.gasPrice?.div(GWEI)
     console.log("baseFee", baseFee?.toString())
+    const minBidGasPrice = GWEI.mul(Math.max(11, walletSet.length))
+    if (bidGasPrice.lt(minBidGasPrice)) {
+        console.warn(`bidGasPrice must be at least ${formatUnits(minBidGasPrice, "gwei")} gwei; overriding`)
+        bidGasPrice = minBidGasPrice
+    }
     
     // sign a lottery bid with every wallet in the set
     const signedTxPromises = walletSet.map(async (wallet, idx) => {
@@ -34,7 +39,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             from: wallet.address,
             value: MEDIUM_BID_VALUE.add(GWEI.mul(idx)),
             gasLimit: 100000,
-            gasPrice: GWEI.mul(13),
+            gasPrice: bidGasPrice.sub(GWEI.mul(idx)),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx],
         }
@@ -42,7 +47,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[]) => {
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
-            gasPrice: GWEI.mul(1),
+            gasPrice: bidGasPrice.sub(GWEI.mul(10)),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx] + 1,
         }
@@ -98,6 +103,12 @@ export const createRevertingUniTx = async (deadline?: number) => {
     if (!uniContract) {
         console.warn("uniContract is undefined")
         return undefined
+    }
+    if (!contracts.DAI.address) {
+        console.warn(`DAI address is undefined for ${process.env.NODE_ENV}`)
+    }
+    if (!contracts.WETH.address) {
+        console.warn(`WETH address is undefined for ${process.env.NODE_ENV}`)
     }
     const revertingTx = await uniContract.populateTransaction.swapExactTokensForTokens(
         BigNumber.from(420).mul(1e9).mul(1e9),

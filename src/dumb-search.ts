@@ -1,8 +1,9 @@
 import { createDumbLotteryBundles } from './lib/lottery'
 import { getWalletSet } from './lib/wallets'
-import { PROVIDER } from './lib/helpers'
+import { GWEI, PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
+import { v4 as uuidv4 } from 'uuid';
 
 // load wallets from disk
 const walletSet = getWalletSet("dumb-search")
@@ -10,7 +11,7 @@ const walletSet = getWalletSet("dumb-search")
 // run a block monitor to send bundles on every block
 PROVIDER.on('block', async (blockNum: number) => {
     console.log(`[BLOCK ${blockNum}]`)
-    const bundles = await createDumbLotteryBundles(walletSet)
+    const bundles = await createDumbLotteryBundles(walletSet, GWEI.mul(69))
     console.log("bundles", bundles)
 
     if (useMempool) {
@@ -47,7 +48,7 @@ PROVIDER.on('block', async (blockNum: number) => {
         // send
         try {
             const sentBundles = await Promise.all(bundles.map(async bundle => {
-                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2)
+                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2, uuidv4())
             }))
             console.log("sent bundles", sentBundles)
         } catch (e) {
