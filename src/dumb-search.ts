@@ -3,6 +3,7 @@ import { getWalletSet } from './lib/wallets'
 import { PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
+import { v4 as uuidv4 } from 'uuid';
 
 // load wallets from disk
 const walletSet = getWalletSet("dumb-search")
@@ -48,7 +49,7 @@ PROVIDER.on('block', async blockNum => {
         // send
         try {
             const sentBundles = await Promise.all(bundles.map(async bundle => {
-                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2)
+                return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2, uuidv4())
             }))
             console.log("sent bundles", sentBundles.map(res => res.data))
         } catch (e) {

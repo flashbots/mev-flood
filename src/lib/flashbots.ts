@@ -7,11 +7,35 @@ import { getAdminWallet } from './wallets'
 
 const authSigner = getAdminWallet()
 
-export const sendBundle = async (signedTransactions: string[], targetBlock: number) => {
+export const cancelBundle = async (uuid: string) => {
+    const params = [
+        {
+	userUuid: uuid,
+        }
+    ]
+    console.log('params', params)
+
+    const body = {
+        params,
+        method: 'eth_cancelBundle',
+        id: '1337',
+        jsonrpc: "2.0"
+    }
+
+    return await axios.post(env.MEV_GETH_HTTP_URL, body, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Flashbots-Signature': (await authSigner.getAddress()) + ':' + (await authSigner.signMessage(ethersId(JSON.stringify(body))))
+        }
+      })
+}
+
+export const sendBundle = async (signedTransactions: string[], targetBlock: number, uuid: string) => {
     const params = [
         {
         txs: signedTransactions,
         blockNumber: `0x${targetBlock.toString(16)}`,
+	userUuid: uuid,
         }
     ]
     console.log('params', params)
