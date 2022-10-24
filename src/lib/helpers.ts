@@ -8,8 +8,19 @@ import contracts, { getContract } from './contracts'
 export const GWEI = BigNumber.from(1e9)
 export const ETH = GWEI.mul(GWEI)
 export const PROVIDER = new providers.JsonRpcProvider(env.RPC_URL, {chainId: env.CHAIN_ID, name: env.CHAIN_NAME})
+
 export const getFlashbotsProvider = async (wallet?: Wallet) => FlashbotsBundleProvider.create(PROVIDER, wallet || getAdminWallet(), env.MEV_GETH_HTTP_URL)
+
+/**
+ * Now in seconds (UTC).
+ */
 export const now = () => Math.round(Date.now() / 1000)
+
+/**
+ * Pre-calculate a bundle hash.
+ * @param signedTxs signed bundle txs
+ * @returns bundleHash
+ */
 export const calculateBundleHash = (signedTxs: string[]) => {
     return utils.keccak256(signedTxs
         .map(tx => utils.keccak256(tx))

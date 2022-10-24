@@ -5,6 +5,7 @@ import { GWEI, ETH, PROVIDER, now } from './helpers'
 import contracts, { getContract } from './contracts'
 import { simulateBundle } from './flashbots'
 import { getAdminWallet } from './wallets'
+import { formatEther } from 'ethers/lib/utils'
 
 
 const MEDIUM_BID_VALUE = ETH.div(100)
@@ -65,8 +66,13 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
     console.log("pot", pot)
     const gasLimit = 200000
     const gasPrice = GWEI.mul(10)
-    if (pot.lte(gasPrice.mul(gasLimit))) {
+    const gasCost = gasPrice.mul(gasLimit)
+    const profit = pot.sub(gasCost)
+    if (pot.lte(gasCost)) {
+        console.log("no profit to be had")
         return []
+    } else {
+        console.log(`✅ Found profit. ${pot.toString()} - ${gasCost.toString()} = ${profit.toString()}\n✅ (${formatEther(profit)} ETH)`)
     }
 
     return await Promise.all(walletSet.map(async (wallet, idx) => {
