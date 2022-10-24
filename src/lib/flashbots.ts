@@ -2,7 +2,7 @@ import axios from "axios"
 import { formatEther, id as ethersId, parseTransaction } from "ethers/lib/utils"
 
 import env from './env'
-import { PROVIDER } from './helpers'
+import { getFlashbotsProvider, PROVIDER } from './helpers'
 import { getAdminWallet } from './wallets'
 
 const authSigner = getAdminWallet()
@@ -40,19 +40,23 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
     ]
     console.log('params', params)
 
-    const body = {
-        params,
-        method: 'eth_sendBundle',
-        id: '1337',
-        jsonrpc: "2.0"
-    }
+    // const body = {
+    //     params,
+    //     method: 'eth_sendBundle',
+    //     id: '1337',
+    //     jsonrpc: "2.0"
+    // }
 
-    return await axios.post(env.MEV_GETH_HTTP_URL, body, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Flashbots-Signature': (await authSigner.getAddress()) + ':' + (await authSigner.signMessage(ethersId(JSON.stringify(body))))
-        }
-      })
+    // const signature = `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`
+    // console.log("*** SIGNATURE", signature)
+    // return (await axios.post(env.MEV_GETH_HTTP_URL, body, {
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //       'X-Flashbots-Signature': signature
+    //     }
+    //   })).map(res => res.data)
+    const flashbots = await getFlashbotsProvider()
+    return await flashbots.sendRawBundle(signedTransactions, targetBlock)
 }
 
 export const simulateBundle = async (signedTransactions: string[], simulationBlock: number) => {
@@ -87,8 +91,8 @@ export const simulateBundle = async (signedTransactions: string[], simulationBlo
     }
     const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {
         headers: {
-        'Content-Type': 'application/json',
-        'X-Flashbots-Signature': (await authSigner.getAddress()) + ':' + (await authSigner.signMessage(ethersId(JSON.stringify(body))))
+        // 'Content-Type': 'application/json',
+        'X-Flashbots-Signature': `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`
         }
     })
     

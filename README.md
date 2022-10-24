@@ -12,22 +12,43 @@ mev-flood is a multi-daemon project, and is designed to be run in parallel with 
 
 ### features
 
-Daemons
+* 100 test accounts to send from (excluding accounts set in .env)
+* `claim` does not revert when called by a non-winner (on purpose, to add technical complexity to the game)
 
-* **dumb-searcher:** blindly sends bid (constant `value`) & claim txs on every block
+#### Daemons
+
+* **dumb-search:** blindly sends bid (constant `value`) & claim txs on every block
+  * helpful for stress-testing on testnet (don't run on mainnet!)
   * mostly fails and wastes money on bids (for others to take)
   * sends to FB builder, may also send to mempool (pending how/what we want to test)
-* **smart-searcher:** finds winning bid amount and uses a smart contract that atomically executes bid+claim to win the pool
+* **smart-search:** finds winning bid amount and uses a smart contract that atomically executes bid+claim to win the pool
+  * helpful for stress-testing on testnet (don't run on mainnet!)
   * if only one instance is run, it's practically guaranteed to win every round
   * if more than one instance is run, they will generate "conflicting" bundles
     * technically all the bundles will land but their profits will be affected by who gets included first
-* 100 test accounts to send from (+1 admin account)
-* `claim` does not revert when called by a non-winner (on purpose, to add technical complexity to the game)
+* **fake-search** sends a uniswap v2 swap that will always revert
+  * helpful for early testing (not stress-testing)
+  * mainnet-friendly (use an empty account for `ADMIN_PRIVATE_KEY`)
+  * this sends a single-transaction bundle to Flashbots from the admin wallet (env: `ADMIN_PRIVATE_KEY`)
 
-Scripts
+#### Scripts
 
 * **createWallets**: creates new `wallets.json` file populated w/ 100 wallets
-* **fundWallets**: send 0.1 ETH to each wallet in `wallets.json` from admin wallet (defined by env `ADMIN_PRIVATE_KEY`)
+* **fundWallets**: send 0.1 ETH to each wallet in `wallets.json` from admin wallet (`ADMIN_PRIVATE_KEY`)
+* **sendPrivateTx**: send a private transaction to the bundle API
+* **cancelPrivateTx**: cancel a private transaction sent to the bundle API given `txHash`
+* **getBundleStats**: get bundle stats for a given `bundleHash`
+* **getUserStats**: get user stats for admin wallet (`ADMIN_PRIVATE_KEY`)
+* **sendProtectTx**: send a tx to Protect RPC
+* **createTestBundle**: prints a test bundle without sending or signing it (txs are signed)
+
+Scripts with optional params are explained with the `help` flag:
+
+```sh
+yarn script.sendProtectTx --help
+yarn script.sendPrivateTx --help
+yarn script.cancelPrivateTx --help
+```
 
 ## setup
 
@@ -37,9 +58,11 @@ yarn install
 # pick your poison:
 cp .env.example .env.goerli
 cp .env.example .env.sepolia
+cp .env.example .env.mainnet
 
 vim .env.goerli
 vim .env.sepolia
+vim .env.mainnet
 ```
 
 _Set preferred environment:_
@@ -63,7 +86,7 @@ yarn script.fundWallets
 
 ## run
 
-_Run dumb-search simulator with 5 accounts (careful, it currently sends to mempool without checking for profit):_
+_Run dumb-search simulator with 5 accounts (careful, it currently sends without checking for profit):_
 
 ```sh
 yarn dumb-dev 0 5
@@ -77,12 +100,28 @@ _Run smart-search simulator._
 yarn smart-dev
 ```
 
-### production
+_Run fake-search simulator._
+
+```sh
+yarn fake-dev
+```
+
+### help
+
+Daemons that have params/options include the `help` flag:
+
+```sh
+yarn dumb-dev --help
+yarn smart-dev --help
+```
+
+### production builds
 
 ```sh
 yarn build
 yarn dumb-search $i $j
-yarn smart-search
+yarn smart-search $i $j
+yarn fake-search
 ```
 
 ### mempool testing
@@ -91,6 +130,7 @@ You might need to use the mempool to test your transactions' validity before try
 
 ```sh
 yarn dumb-dev 13 14 mempool
+yarn smart-dev 13 14 mempool
 ```
 
 ### stress-test example
@@ -118,10 +158,14 @@ yarn script.getBundleStats 0x40d83aebb63f61730eb6309e1a806624cf6d52ff666d1b13d5c
 yarn script.getBundleStats 0x40d83aebb63f61730eb6309e1a806624cf6d52ff666d1b13d5ced535397f9a46 7375081
 ```
 
-_Send private tx:_ (sends some ETH from adminWallet to itself)
+_Send private tx:_
 
 ```sh
+# send a lottery tx
 yarn script.sendPrivateTx
+
+# send a reverting univ2 swap
+yarn script.sendPrivateTx dummy
 ```
 
 _Cancel private tx:_
@@ -130,8 +174,25 @@ _Cancel private tx:_
 yarn script.cancelPrivateTx 0xca79f3114de50a77e42dd595c0ba4e786d3ddf782c62075ec067fe32329e3ea2
 ```
 
-_Print a test bundle:_
+_Print a test bundle (sends ETH from test wallet to itself):_
 
 ```sh
 yarn script.createTestBundle
+```
+
+_Send tx to Protect:_
+
+```sh
+yarn script.sendProtectTx
+
+# send uniswapV2 router tx to Protect (works on any chain)
+yarn script.sendProtectTx dummy
+
+# send lottery contract tx to Protect with fast mode
+yarn script.sendProtectTx fast
+
+# send uniswapV2 router tx to Protect w/ fast mode
+yarn script.sendProtectTx fast dummy
+# or
+yarn script.sendProtectTx dummy fast
 ```

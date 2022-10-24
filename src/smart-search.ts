@@ -1,6 +1,6 @@
 import { createSmartLotteryTxs } from './lib/lottery'
 import { getWalletSet } from './lib/wallets'
-import { PROVIDER } from './lib/helpers'
+import { calculateBundleHash, PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
 
@@ -12,7 +12,6 @@ PROVIDER.on('block', async blockNum => {
     console.log(`[BLOCK ${blockNum}]`)
     const signedTxs = await createSmartLotteryTxs(walletSet)
     if (signedTxs.length === 0) {
-        console.log("no profit to be had")
         return
     }
 
@@ -33,7 +32,9 @@ PROVIDER.on('block', async blockNum => {
         try {
             for (const tx of signedTxs) {
                 // each tx should be in its own bundle
-                const simResult = await simulateBundle([tx], blockNum)
+                const bundleHash = calculateBundleHash([tx])
+                console.log(`pre-calculated bundleHash: ${bundleHash}`)
+                const simResult = await simulateBundle([tx], blockNum - 1)
                 console.log("sim result", simResult)
             }
             // throws 500
@@ -47,7 +48,7 @@ PROVIDER.on('block', async blockNum => {
             const sentBundles = await Promise.all(signedTxs.map(async tx => {
                 return await sendBundle([tx], blockNum + 2)
             }))
-            console.log("sent bundles", sentBundles.map(res => res.data))
+            console.log("sent bundles", sentBundles)
         } catch (e) {
             const err: any = e
             console.error("[sendBundle] backend error", err)

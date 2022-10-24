@@ -8,9 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 // load wallets from disk
 const walletSet = getWalletSet("dumb-search")
 
-
 // run a block monitor to send bundles on every block
-PROVIDER.on('block', async blockNum => {
+PROVIDER.on('block', async (blockNum: number) => {
     console.log(`[BLOCK ${blockNum}]`)
     const bundles = await createDumbLotteryBundles(walletSet)
     console.log("bundles", bundles)
@@ -37,7 +36,7 @@ PROVIDER.on('block', async blockNum => {
         try {
             for (const bundle of bundles) {
                 // each tx should be in its own bundle
-                const simResult = await simulateBundle([bundle.bidTx, bundle.claimTx], blockNum)
+                const simResult = await simulateBundle([bundle.bidTx, bundle.claimTx], blockNum - 1)
                 console.log("sim result", simResult)
             }
             // throws 500
@@ -51,13 +50,10 @@ PROVIDER.on('block', async blockNum => {
             const sentBundles = await Promise.all(bundles.map(async bundle => {
                 return await sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 2, uuidv4())
             }))
-            console.log("sent bundles", sentBundles.map(res => res.data))
+            console.log("sent bundles", sentBundles)
         } catch (e) {
             const err: any = e
             console.error("[sendBundle] backend error", err.code)
         }
     }
-
-    // console.warn("aborting for debug")
-    // process.exit(0)
 })

@@ -20,16 +20,21 @@
   },
   "scripts": {
     "build": "npx tsc",
-    "dumb-search": "node build/dumb-search.js",
     "dumb-dev": "npx ts-node src/dumb-search.ts",
     "cancellations-dev": "npx ts-node src/cancellations.ts",
-    "smart-search": "node build/smart-search.js",
+    "dumb-search": "node build/dumb-search.js",
     "smart-dev": "npx ts-node src/smart-search.ts",
+    "smart-search": "node build/smart-search.js",
+    "fake-dev": "npx ts-node src/fake-search.ts",
+    "fake-search": "node build/fake-search.js",
+    "script.cancelPrivateTx": "npx ts-node src/scripts/cancelPrivateTx.ts",
+    "script.createTestBundle": "npx ts-node src/scripts/createTestBundle.ts",
     "script.createWallets": "npx ts-node src/scripts/createWallets.ts",
     "script.fundWallets": "npx ts-node src/scripts/fundWallets.ts",
-    "script.createTestBundle": "npx ts-node src/scripts/createTestBundle.ts",
     "script.getBundleStats": "npx ts-node src/scripts/getBundleStats.ts",
+    "script.getConflictingBundle": "npx ts-node src/scripts/getConflictingBundle.ts",
+    "script.getUserStats": "npx ts-node src/scripts/getUserStats.ts",
     "script.sendPrivateTx": "npx ts-node src/scripts/sendPrivateTx.ts",
-    "script.cancelPrivateTx": "npx ts-node src/scripts/cancelPrivateTx.ts"
+    "script.sendProtectTx": "npx ts-node src/scripts/sendProtectTx.ts"
   }
 }
