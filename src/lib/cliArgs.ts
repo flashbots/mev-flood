@@ -10,10 +10,13 @@ Usage:
     yarn ${program} <first_wallet_index> <last_wallet_index> [mempool]
 
 Example:
-    # search with 25 wallets on flashbots
+    # run with a single wallet
+    yarn ${program} 13
+
+    # run with 25 wallets on flashbots
     yarn ${program} 0 25
 
-    # search with 4 wallets on mempool
+    # run with 4 wallets on mempool
     yarn ${program} 0 25 mempool
 `
     if (process.argv.length > 2) {
@@ -22,12 +25,15 @@ Example:
             process.exit(0)
         }
     } else {
-        console.error("both wallet indices are required")
+        console.error("one or two wallet indices are required")
         console.log(helpMessage(programName))
         process.exit(1)
     }
     
-    const [startIdx, endIdx] = process.argv.slice(2)
+    let [startIdx, endIdx] = process.argv.slice(2)
+    if (!endIdx) {
+        endIdx = `${parseInt(startIdx) + 1}`
+    }
     return {startIdx, endIdx}
 }
 

@@ -20,7 +20,8 @@
   },
   "scripts": {
     "build": "npx tsc",
-    "cancellations-dev": "npx ts-node src/cancellations.ts",
+    "cancel-dev": "npx ts-node src/cancellations.ts",
+    "cancel": "node build/cancellations.js",
     "dumb-dev": "npx ts-node src/dumb-search.ts",
     "dumb-search": "node build/dumb-search.js",
     "smart-dev": "npx ts-node src/smart-search.ts",

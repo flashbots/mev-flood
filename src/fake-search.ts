@@ -2,6 +2,7 @@ import { createRevertingUniTx } from './lib/lottery'
 import { calculateBundleHash, PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { getAdminWallet } from './lib/wallets'
+import { v4 as uuidv4 } from 'uuid'
 
 const sendRevertingBundle = async (blockNum: number) => {
     console.log(`[BLOCK ${blockNum}]`)
@@ -24,7 +25,7 @@ const sendRevertingBundle = async (blockNum: number) => {
     
     // send
     console.log(`sending bundle, targeting block ${targetBlock}...`)
-    const sendResult = sendBundle(bundle, targetBlock)
+    const sendResult = sendBundle(bundle, targetBlock, uuidv4())
     console.log(await sendResult)
 }
 

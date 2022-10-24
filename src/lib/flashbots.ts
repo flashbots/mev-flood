@@ -32,7 +32,7 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
     ]
     console.log('params', params)
 
-    const { headers, body } = await getRpcRequest(params, "eth_cancelBundle", authSigner)
+    const { headers, body } = await getRpcRequest(params, "eth_sendBundle", authSigner)
     return (await axios.post(env.MEV_GETH_HTTP_URL, body, {
         headers,
       })).data
