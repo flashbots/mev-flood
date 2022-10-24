@@ -1,5 +1,7 @@
 import { BigNumber, Wallet, providers, utils } from "ethers"
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
+import { id as ethersId } from "ethers/lib/utils"
+
 
 import env from "./env"
 import { getAdminWallet } from './wallets'
@@ -26,6 +28,32 @@ export const calculateBundleHash = (signedTxs: string[]) => {
         .map(tx => utils.keccak256(tx))
         .reduce((prv, cur) => BigNumber.from(prv).add(cur), BigNumber.from(0)).toHexString()
     )
+}
+
+/**
+ * Standardized RPC request for talking to Bundle API (mev-geth) directly.
+ * @param params 
+ * @param method 
+ * @param authSigner 
+ * @returns 
+ */
+export const getRpcRequest = async (params: any, method: string, authSigner: Wallet) => {
+    const body = {
+        params,
+        method,
+        id: '1337',
+        jsonrpc: "2.0"
+    }
+    const signature = `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-Flashbots-Signature': signature,
+    }
+    return {
+        headers,
+        signature,
+        body,
+    }
 }
 
 /**

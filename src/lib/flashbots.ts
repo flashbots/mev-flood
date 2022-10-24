@@ -2,7 +2,7 @@ import axios from "axios"
 import { formatEther, id as ethersId, parseTransaction } from "ethers/lib/utils"
 
 import env from './env'
-import { getFlashbotsProvider, PROVIDER } from './helpers'
+import { getFlashbotsProvider, getRpcRequest, PROVIDER } from './helpers'
 import { getAdminWallet } from './wallets'
 
 const authSigner = getAdminWallet()
@@ -10,53 +10,32 @@ const authSigner = getAdminWallet()
 export const cancelBundle = async (uuid: string) => {
     const params = [
         {
-	userUuid: uuid,
+	        userUuid: uuid,
         }
     ]
     console.log('params', params)
 
-    const body = {
-        params,
-        method: 'eth_cancelBundle',
-        id: '1337',
-        jsonrpc: "2.0"
-    }
+    const { headers, body } = await getRpcRequest(params, "eth_cancelBundle", authSigner)
 
     return await axios.post(env.MEV_GETH_HTTP_URL, body, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Flashbots-Signature': (await authSigner.getAddress()) + ':' + (await authSigner.signMessage(ethersId(JSON.stringify(body))))
-        }
+        headers,
       })
 }
 
 export const sendBundle = async (signedTransactions: string[], targetBlock: number, uuid: string) => {
     const params = [
         {
-        txs: signedTransactions,
-        blockNumber: `0x${targetBlock.toString(16)}`,
-	userUuid: uuid,
+            txs: signedTransactions,
+            blockNumber: `0x${targetBlock.toString(16)}`,
+            userUuid: uuid,
         }
     ]
     console.log('params', params)
 
-    // const body = {
-    //     params,
-    //     method: 'eth_sendBundle',
-    //     id: '1337',
-    //     jsonrpc: "2.0"
-    // }
-
-    // const signature = `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`
-    // console.log("*** SIGNATURE", signature)
-    // return (await axios.post(env.MEV_GETH_HTTP_URL, body, {
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       'X-Flashbots-Signature': signature
-    //     }
-    //   })).map(res => res.data)
-    const flashbots = await getFlashbotsProvider()
-    return await flashbots.sendRawBundle(signedTransactions, targetBlock)
+    const { headers, body } = await getRpcRequest(params, "eth_cancelBundle", authSigner)
+    return (await axios.post(env.MEV_GETH_HTTP_URL, body, {
+        headers,
+      })).data
 }
 
 export const simulateBundle = async (signedTransactions: string[], simulationBlock: number) => {

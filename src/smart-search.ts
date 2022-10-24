@@ -3,6 +3,7 @@ import { getWalletSet } from './lib/wallets'
 import { calculateBundleHash, PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
+import { randomUUID } from 'crypto'
 
 // load wallets from disk
 const walletSet = getWalletSet("smart-search")
@@ -46,7 +47,7 @@ PROVIDER.on('block', async blockNum => {
         //send
         try {
             const sentBundles = await Promise.all(signedTxs.map(async tx => {
-                return await sendBundle([tx], blockNum + 2)
+                return await sendBundle([tx], blockNum + 2, randomUUID())
             }))
             console.log("sent bundles", sentBundles)
         } catch (e) {
