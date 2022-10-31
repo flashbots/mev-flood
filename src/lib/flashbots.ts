@@ -1,11 +1,38 @@
 import axios from "axios"
 import { formatEther, id as ethersId, parseTransaction } from "ethers/lib/utils"
+import { Wallet } from 'ethers'
 
 import env from './env'
-import { getFlashbotsProvider, getRpcRequest, PROVIDER } from './helpers'
+import { PROVIDER } from './helpers'
 import { getAdminWallet } from './wallets'
 
 const authSigner = getAdminWallet()
+
+/**
+ * Standardized RPC request for talking to Bundle API (mev-geth) directly.
+ * @param params 
+ * @param method 
+ * @param authSigner 
+ * @returns 
+ */
+ export const getRpcRequest = async (params: any, method: string, authSigner: Wallet) => {
+    const body = {
+        params,
+        method,
+        id: '1337',
+        jsonrpc: "2.0"
+    }
+    const signature = `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-Flashbots-Signature': signature,
+    }
+    return {
+        headers,
+        signature,
+        body,
+    }
+}
 
 export const cancelBundle = async (uuid: string) => {
     const params = [
@@ -19,7 +46,7 @@ export const cancelBundle = async (uuid: string) => {
 
     return await axios.post(env.MEV_GETH_HTTP_URL, body, {
         headers,
-      })
+    })
 }
 
 export const sendBundle = async (signedTransactions: string[], targetBlock: number, uuid: string) => {
@@ -59,21 +86,10 @@ export const simulateBundle = async (signedTransactions: string[], simulationBlo
         difficulty: block.difficulty
         }
     ]
-    // console.log('params', params)
 
     let totalGasUsed = 0
-    const body = {
-        params,
-        method: 'eth_callBundle',
-        id: '1337',
-        jsonrpc: "2.0"
-    }
-    const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {
-        headers: {
-        // 'Content-Type': 'application/json',
-        'X-Flashbots-Signature': `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`
-        }
-    })
+    const { body, headers } = await getRpcRequest(params, "eth_callBundle", authSigner)
+    const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {headers})
     
     if (res.error || res.data.error) {
         let e = res.error ? res.error : res.data.error
@@ -118,19 +134,8 @@ export const getBundleStats = async (bundleHash: string, blockNumber: string) =>
     const evmBlockNumber = blockNumber.startsWith("0x") ? blockNumber : `0x${parseInt(blockNumber).toString(16)}`
 
     const params = [{ bundleHash, blockNumber: evmBlockNumber }]
-
-    const body = {
-        method: "flashbots_getBundleStats",
-        params,
-        id: "1337",
-        jsonrpc: '2.0'
-    }
-    const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {
-        headers: {
-        'Content-Type': 'application/json',
-        'X-Flashbots-Signature': (await authSigner.getAddress()) + ':' + (await authSigner.signMessage(ethersId(JSON.stringify(body))))
-        }
-    })
+    const { body, headers } = await getRpcRequest(params, "flashbots_getBundleStats", authSigner)
+    const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {headers})
 
     if (res.error !== undefined && res.error !== null) {
       return {
@@ -148,16 +153,8 @@ export const getBundleStatsV2 = async (bundleHash: string, blockNumber: string) 
     const evmBlockNumber = blockNumber.startsWith("0x") ? blockNumber : `0x${parseInt(blockNumber).toString(16)}`
 
     const params = [{ bundleHash, blockNumber: evmBlockNumber }]
-
-    // const body = {
-    //     method: "flashbots_getBundleStats_v2",
-    //     params,
-    //     id: "1337",
-    //     jsonrpc: '2.0'
-    // }
     const { body, headers } = await getRpcRequest(params, "flashbots_getBundleStats_v2", authSigner)
     const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {headers})
-
 
     if (res.error !== undefined && res.error !== null) {
       return {

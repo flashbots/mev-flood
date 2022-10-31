@@ -31,32 +31,6 @@ export const calculateBundleHash = (signedTxs: string[]) => {
 }
 
 /**
- * Standardized RPC request for talking to Bundle API (mev-geth) directly.
- * @param params 
- * @param method 
- * @param authSigner 
- * @returns 
- */
-export const getRpcRequest = async (params: any, method: string, authSigner: Wallet) => {
-    const body = {
-        params,
-        method,
-        id: '1337',
-        jsonrpc: "2.0"
-    }
-    const signature = `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`
-    const headers = {
-        'Content-Type': 'application/json',
-        'X-Flashbots-Signature': signature,
-    }
-    return {
-        headers,
-        signature,
-        body,
-    }
-}
-
-/**
  * Get an unsigned sample lottery tx
  * @param sender Wallet connected to a provider.
  * @returns transaction that interacts with lottery contract
