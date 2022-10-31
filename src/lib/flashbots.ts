@@ -62,12 +62,11 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
     const { headers, body } = await getRpcRequest(params, "eth_sendBundle", authSigner)
     return (await axios.post(env.MEV_GETH_HTTP_URL, body, {
         headers,
-      })).data
+    })).data
 }
 
 export const simulateBundle = async (signedTransactions: string[], simulationBlock: number) => {
     const block = await PROVIDER.getBlock(simulationBlock)
-    // console.log("block", block)
     
     signedTransactions.forEach((rawTx) => {
         const tx = parseTransaction(rawTx)
