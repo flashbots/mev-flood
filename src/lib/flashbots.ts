@@ -143,3 +143,30 @@ export const getBundleStats = async (bundleHash: string, blockNumber: string) =>
 
     return res.data
 }
+
+export const getBundleStatsV2 = async (bundleHash: string, blockNumber: string) => {
+    const evmBlockNumber = blockNumber.startsWith("0x") ? blockNumber : `0x${parseInt(blockNumber).toString(16)}`
+
+    const params = [{ bundleHash, blockNumber: evmBlockNumber }]
+
+    // const body = {
+    //     method: "flashbots_getBundleStats_v2",
+    //     params,
+    //     id: "1337",
+    //     jsonrpc: '2.0'
+    // }
+    const { body, headers } = await getRpcRequest(params, "flashbots_getBundleStats_v2", authSigner)
+    const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {headers})
+
+
+    if (res.error !== undefined && res.error !== null) {
+      return {
+        error: {
+          message: res.error.message,
+          code: res.error.code
+        }
+      }
+    }
+
+    return res.data
+}
