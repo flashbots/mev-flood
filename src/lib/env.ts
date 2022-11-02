@@ -1,6 +1,8 @@
 import dotenv from "dotenv"
+import consolestamp from "console-stamp"
 dotenv.config({ path: `.env.${process.env.NODE_ENV}` })
 console.log(`ENV: ${process.env.NODE_ENV}`)
+consolestamp(console)
 
 const env = {
     ADMIN_PRIVATE_KEY: process.env.ADMIN_PRIVATE_KEY || "",

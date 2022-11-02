@@ -19,17 +19,22 @@ PROVIDER.on('block', async blockNum => {
         console.warn("SENDING TXS TO FLASHBOTS")
 
         // send
-		const uuid = uuidv4()
         try {
             const sendResults = []
 			for (const bundle of bundles) {
-				sendResults.push(sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 1, uuid))
+                const uuid = uuidv4()
+				sendResults.push({
+                    bundle: sendBundle([bundle.bidTx, bundle.claimTx], blockNum + 1, uuid),
+                    uuid,
+                })
 			}
-            const sentBundles = await Promise.all(sendResults)
+            const sentBundles = await Promise.all(sendResults.map(res => res.bundle))
             console.log("sent bundles", sentBundles)
             await sleep(1800)
-            const cancelRes = await cancelBundle(uuid)
-            console.log("canceled bundles", cancelRes.data)
+            for (const sentBundle of sentBundles) {
+                const cancelRes = await cancelBundle(sentBundle.uuid)
+                console.log("canceled bundles", cancelRes.data)
+            }
         } catch (e) {
             const err: any = e
             console.error("[sendBundle] backend error", err.code)

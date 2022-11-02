@@ -37,7 +37,7 @@ const authSigner = getAdminWallet()
 export const cancelBundle = async (uuid: string) => {
     const params = [
         {
-	        userUuid: uuid,
+	        replacementUuid: uuid,
         }
     ]
     console.log('params', params)
@@ -54,7 +54,7 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
         {
             txs: signedTransactions,
             blockNumber: `0x${targetBlock.toString(16)}`,
-            userUuid: uuid,
+            replacementUuid: uuid,
         }
     ]
     console.log('params', params)
