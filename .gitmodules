@@ -1,3 +1,6 @@
 [submodule "contracts/univ2-core"]
 	path = contracts/univ2-core
 	url = https://github.com/Uniswap/v2-core.git
+[submodule "contracts/univ2-periphery"]
+	path = contracts/univ2-periphery
+	url = https://github.com/Uniswap/v2-periphery.git

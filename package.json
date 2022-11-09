@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "^0.5.0",
+    "@uniswap/lib": "1.1.4",
     "axios": "^0.27.2",
     "dotenv": "^16.0.1",
     "ethers": "^5.0.0",
