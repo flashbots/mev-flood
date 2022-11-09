@@ -41,6 +41,7 @@ mev-flood is a multi-daemon project, and is designed to be run in parallel with 
 * **getUserStats**: get user stats for admin wallet (`ADMIN_PRIVATE_KEY`)
 * **sendProtectTx**: send a tx to Protect RPC
 * **createTestBundle**: prints a test bundle without sending or signing it (txs are signed)
+* **liquid**: bootstrap a complete uniswap v2 environment
 
 Scripts with optional params are explained with the `help` flag:
 
@@ -196,3 +197,11 @@ yarn script.sendProtectTx fast dummy
 # or
 yarn script.sendProtectTx dummy fast
 ```
+
+_Bootstrap a uniswap V2 environment:_
+
+```sh
+yarn script.liquid
+```
+
+In addition to deploying the contracts to the environment specified by NODE_ENV, this script will create a file at `src/output/uniBootstrap.json` containing all the details of the deployment, including pre-calculated contract addresses and a list of all signed transactions.

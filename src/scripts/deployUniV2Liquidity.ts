@@ -44,11 +44,11 @@ const getCloneDeployment = async (contract: ContractSpec, nonce: number, args?: 
     }
 }
 
-const getPairDeployment = async (factoryAddress: string, token1Address: string, token2Address: string, nonce: number, testProvider: providers.JsonRpcProvider): Promise<ContractDeployment> => {
+const getPairDeployment = async (factoryAddress: string, token1Address: string, token2Address: string, nonce: number,): Promise<ContractDeployment> => {
     const factoryContract = await new Contract(factoryAddress, contracts.UniV2Factory.abi)
     const txReq = populateTxFully(await factoryContract.populateTransaction.createPair(token1Address, token2Address), nonce)
     const signedTx = await adminWallet.signTransaction(txReq)
-    const contractAddress = await factoryContract.connect(testProvider).callStatic.createPair(token1Address, token2Address)
+    const contractAddress = await factoryContract.connect(PROVIDER).callStatic.createPair(token1Address, token2Address)
 
     return {
         contractAddress,
@@ -66,20 +66,17 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
  * all txs are signed with the account specified by ADMIN_PRIVATE_KEY in .env
 */
 const main = async () => {
-    console.log("NOTE: this script should be run against a FRESH HARDHAT NODE.")
-    const testProvider = new providers.JsonRpcProvider("http://localhost:1313", 31337)
     try {
-        await testProvider.getBlockNumber()
+        await PROVIDER.getBlockNumber()
     } catch (e) {
-        console.error("no devnet running on port 1313. Please run:")
-        console.error(`npx hardhat node --port 1313`)
+        console.error(`failed to connect to ${env.RPC_URL}.`)
         process.exit(1)
     }
     
-    const adminWallet = getAdminWallet().connect(testProvider)
+    const adminWallet = getAdminWallet().connect(PROVIDER)
     const nonce = await adminWallet.getTransactionCount()
     if (nonce != 0) {
-        console.warn(`Your nonce should be 0 but it's ${nonce}. You should run this script with a FRESH hardhat environment.`)
+        console.warn(`Your account nonce is currently ${nonce}.`)
         readline.question("press Enter to continue...")
     }
     console.log(`SIGNER ADDRESS: ${adminWallet.address} (nonce=${nonce})`)
@@ -99,16 +96,16 @@ const main = async () => {
     // deploy on local devnet
     console.log("deploying base contracts: 3 DAI tokens, 1 WETH, uniswapv2 factory...")
     for (const cd of indyDeployments) {
-        await (await testProvider.sendTransaction(cd.signedDeployTx)).wait(1)
+        await (await PROVIDER.sendTransaction(cd.signedDeployTx)).wait(1)
         console.log("OK.")
     }
 
     // ### deploy liq pairs
-    const dai1_weth = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, weth.contractAddress, nonce + 5, testProvider)
-    const dai2_weth = await getPairDeployment(uniV2Factory.contractAddress, dai2.contractAddress, weth.contractAddress, nonce + 6, testProvider)
-    const dai3_weth = await getPairDeployment(uniV2Factory.contractAddress, dai3.contractAddress, weth.contractAddress, nonce + 7, testProvider)
-    const dai1_dai2 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai2.contractAddress, nonce + 8, testProvider)
-    const dai1_dai3 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai3.contractAddress, nonce + 9, testProvider)
+    const dai1_weth = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, weth.contractAddress, nonce + 5)
+    const dai2_weth = await getPairDeployment(uniV2Factory.contractAddress, dai2.contractAddress, weth.contractAddress, nonce + 6)
+    const dai3_weth = await getPairDeployment(uniV2Factory.contractAddress, dai3.contractAddress, weth.contractAddress, nonce + 7)
+    const dai1_dai2 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai2.contractAddress, nonce + 8)
+    const dai1_dai3 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai3.contractAddress, nonce + 9)
 
     const pairDeployments = [
         dai1_weth,
@@ -119,7 +116,7 @@ const main = async () => {
     ]
     console.log("deploying 5 pairs...")
     for (const cd of pairDeployments) {
-        await (await testProvider.sendTransaction(cd.signedDeployTx)).wait(1)
+        await (await PROVIDER.sendTransaction(cd.signedDeployTx)).wait(1)
         console.log("OK.")
     }
 
@@ -152,7 +149,7 @@ const main = async () => {
         const signedTx = await adminWallet.signTransaction(txReq)
         daiMints.push(signedTx)
         console.log(`minting DAI${idx + 1}...`)
-        await (await testProvider.sendTransaction(signedTx)).wait(1)
+        await (await PROVIDER.sendTransaction(signedTx)).wait(1)
         idx += 1
         console.log(`DAI${idx} balance: ${await contract.balanceOf(adminWallet.address)}`)
     }
@@ -166,8 +163,8 @@ const main = async () => {
     }, nonce + 13)
     const signedMintWethTx = await adminWallet.signTransaction(mintWethTx)
     console.log("minting WETH...")
-    await (await testProvider.sendTransaction(signedMintWethTx)).wait(1)
-    console.log(`WETH balance: ${await wethContract.connect(testProvider).balanceOf(adminWallet.address)}`)
+    await (await PROVIDER.sendTransaction(signedMintWethTx)).wait(1)
+    console.log(`WETH balance: ${await wethContract.connect(PROVIDER).balanceOf(adminWallet.address)}`)
     // !! nonce=14
 
     // deposit (100 WETH / 150000 DAI) in each WETH/DAI pair
@@ -202,13 +199,13 @@ const main = async () => {
         daiWethDeposits.push(signedDepositDaiTx)
         daiWethDeposits.push(signedMintLpTokensTx)
         console.log(`depositing WETH into DAI${subIdx % 3 + 1}/WETH...`)
-        await (await testProvider.sendTransaction(signedDepositWethTx)).wait(1)
+        await (await PROVIDER.sendTransaction(signedDepositWethTx)).wait(1)
         console.log("OK.")
         console.log(`depositing DAI into DAI${subIdx % 3 + 1}/WETH...`)
-        await (await testProvider.sendTransaction(signedDepositDaiTx)).wait(1)
+        await (await PROVIDER.sendTransaction(signedDepositDaiTx)).wait(1)
         console.log("OK.")
         console.log("minting LP tokens...")
-        await (await testProvider.sendTransaction(signedMintLpTokensTx)).wait(1)
+        await (await PROVIDER.sendTransaction(signedMintLpTokensTx)).wait(1)
         console.log("OK.")
         idx += 3
         subIdx += 1
@@ -247,13 +244,13 @@ const main = async () => {
         daiDaiDeposits.push(signedDepositDaiNTx)
         daiDaiDeposits.push(signedMintLpTokensTx)
         console.log(`depositing DAI1 into DAI1/DAI${subIdx % 3 + 2}...`)
-        await (await testProvider.sendTransaction(signedDepositDai1Tx)).wait(1)
+        await (await PROVIDER.sendTransaction(signedDepositDai1Tx)).wait(1)
         console.log("OK.")
         console.log(`depositing DAI${subIdx % 3 + 2} into DAI1/DAI${subIdx % 3 + 2}...`)
-        await (await testProvider.sendTransaction(signedDepositDaiNTx)).wait(1)
+        await (await PROVIDER.sendTransaction(signedDepositDaiNTx)).wait(1)
         console.log("OK.")
         console.log("minting LP tokens...")
-        await (await testProvider.sendTransaction(signedMintLpTokensTx)).wait(1)
+        await (await PROVIDER.sendTransaction(signedMintLpTokensTx)).wait(1)
         console.log("OK.")
         idx += 3
         subIdx += 1
