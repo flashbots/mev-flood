@@ -1,0 +1,9 @@
+[submodule "contracts/v2-core"]
+	path = contracts/v2-core
+	url = https://github.com/Uniswap/v2-core.git
+[submodule "forge/lib/forge-std"]
+	path = forge/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "contracts/univ2-core"]
+	path = contracts/univ2-core
+	url = https://github.com/Uniswap/v2-core.git
