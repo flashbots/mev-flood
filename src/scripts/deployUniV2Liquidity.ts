@@ -9,7 +9,7 @@ import { getAdminWallet } from '../lib/wallets';
 const adminWallet = getAdminWallet()
 
 type ContractDeployment = {
-    deployAddress: string,
+    contractAddress: string,
     deployTx: TransactionRequest,
     signedDeployTx: string,
 }
@@ -18,7 +18,7 @@ const populateTxFully = (txRequest: TransactionRequest, nonce: number): Transact
     return {
         ...txRequest,
         gasPrice: GWEI.mul(420), // high gas bc idk what you're deploying on
-        gasLimit: 500000,
+        gasLimit: 3000000,
         from: adminWallet.address,
         nonce,
     }
@@ -35,18 +35,20 @@ const getCloneDeployment = async (contract: ContractSpec, nonce: number, args?: 
     const factory = new ContractFactory(contract.abi, contract.bytecode)
     const txReq = populateTxFully(args ? factory.getDeployTransaction(...args) : factory.getDeployTransaction(), nonce)
     return {
-        deployAddress: utils.getContractAddress({from: txReq.from || "", nonce}),
+        contractAddress: utils.getContractAddress({from: txReq.from || "", nonce}),
         deployTx: txReq,
         signedDeployTx: await adminWallet.signTransaction(txReq),
     }
 }
 
-const getPairDeployment = async (factoryAddress: string, token1Address: string, token2Address: string, nonce: number): Promise<ContractDeployment | undefined> => {
-    const factoryContract = new Contract(factoryAddress, contracts.UniV2Factory.abi)
+const getPairDeployment = async (factoryAddress: string, token1Address: string, token2Address: string, nonce: number, testProvider: providers.JsonRpcProvider): Promise<ContractDeployment> => {
+    const factoryContract = await new Contract(factoryAddress, contracts.UniV2Factory.abi)
     const txReq = populateTxFully(await factoryContract.populateTransaction.createPair(token1Address, token2Address), nonce)
     const signedTx = await adminWallet.signTransaction(txReq)
+    const contractAddress = await factoryContract.connect(testProvider).callStatic.createPair(token1Address, token2Address)
+
     return {
-        deployAddress: "// TODO: simulate this tx to get the pair address",
+        contractAddress,
         deployTx: txReq,
         signedDeployTx: signedTx,
     }
@@ -61,37 +63,60 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
  * all txs are signed with the account specified by ADMIN_PRIVATE_KEY in .env
 */
 const main = async () => {
-    // const provider = new providers.JsonRpcProvider("http://localhost:1313", env.CHAIN_ID)
-    // try {
-    //     await provider.getBlockNumber()
-    // } catch (e) {
-    //     console.error("no devnet running on port 1313. Please run:")
-    //     console.error(`anvil -p 1313 --chain-id ${env.CHAIN_ID}`)
-    //     process.exit(1)
-    // }
+    const testProvider = new providers.JsonRpcProvider("http://localhost:1313", 31337)
+    try {
+        await testProvider.getBlockNumber()
+    } catch (e) {
+        console.error("no devnet running on port 1313. Please run:")
+        console.error(`anvil -p 1313 --chain-id ${env.CHAIN_ID}`)
+        process.exit(1)
+    }
     
-    const adminWallet = getAdminWallet().connect(PROVIDER)
+    const adminWallet = getAdminWallet().connect(testProvider)
     let nonce = await adminWallet.getTransactionCount()
     console.log(`SIGNER ADDRESS: ${adminWallet.address} (nonce=${nonce})`)
-    // deploy tokens
+
+    // get token deployments
     const dai1 = await getCloneDeployment(contracts.DAI, nonce, [env.CHAIN_ID])
     const dai2 = await getCloneDeployment(contracts.DAI, nonce + 1, [env.CHAIN_ID])
     const dai3 = await getCloneDeployment(contracts.DAI, nonce + 2, [env.CHAIN_ID])
     const weth = await getCloneDeployment(contracts.WETH, nonce + 3) // weth has no constructor args
-    // deploy uniswapv2 factory
+    // get uniswapv2 factory deployment
     const uniV2Factory = await getCloneDeployment(contracts.UniV2Factory, nonce + 4, [adminWallet.address])
+
+    const indyDeployments = [
+        dai1, dai2, dai3, weth, uniV2Factory
+    ]
+
+    // deploy on local devnet
+    indyDeployments.forEach(async cd => {
+        (await testProvider.sendTransaction(cd.signedDeployTx)).wait(1)
+    })
+
     // deploy liq pairs
-    const dai1_weth = await getPairDeployment(uniV2Factory.deployAddress, dai1.deployAddress, weth.deployAddress, nonce + 5)
-    const dai2_weth = await getPairDeployment(uniV2Factory.deployAddress, dai2.deployAddress, weth.deployAddress, nonce + 6)
-    const dai3_weth = await getPairDeployment(uniV2Factory.deployAddress, dai3.deployAddress, weth.deployAddress, nonce + 7)
-    const dai1_dai2 = await getPairDeployment(uniV2Factory.deployAddress, dai1.deployAddress, dai2.deployAddress, nonce + 8)
-    const dai1_dai3 = await getPairDeployment(uniV2Factory.deployAddress, dai1.deployAddress, dai3.deployAddress, nonce + 9)
+    const dai1_weth = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, weth.contractAddress, nonce + 5, testProvider)
+    const dai2_weth = await getPairDeployment(uniV2Factory.contractAddress, dai2.contractAddress, weth.contractAddress, nonce + 6, testProvider)
+    const dai3_weth = await getPairDeployment(uniV2Factory.contractAddress, dai3.contractAddress, weth.contractAddress, nonce + 7, testProvider)
+    const dai1_dai2 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai2.contractAddress, nonce + 8, testProvider)
+    const dai1_dai3 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai3.contractAddress, nonce + 9, testProvider)
+
+    const pairDeployments = [
+        dai1_weth,
+        dai2_weth,
+        dai3_weth,
+        dai1_dai2,
+        dai1_dai3,
+    ]
+    pairDeployments.forEach(async cd => {
+        await (await testProvider.sendTransaction(cd.signedDeployTx)).wait(1)
+    })
+    
     
     // bootstrap liquidity
     // ... // TODO
 
-    console.log("contracts:")
-    console.log({
+    // console.log("contracts:")
+    const output = {
         dai1,
         dai2,
         dai3,
@@ -102,7 +127,8 @@ const main = async () => {
         dai3_weth,
         dai1_dai2,
         dai1_dai3,
-    })
+    }
+    console.log(output)
 }
 
 main()
