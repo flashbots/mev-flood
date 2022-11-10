@@ -257,20 +257,15 @@ const main = async () => {
     }
     
     if (shouldMintTokens) {
-        // ### bootstrap liquidity
-        /* Exchange rates: 1500 DAI/WETH; maybe add pairs to have 1 DAI1/DAI2|DAI3 */
-        // mint 25K DAI for each (15K per DAI/WETH pair, 5k per DAI/DAI pair)
-        const daiTokenAddrs = [
-            addr_dai1, addr_dai2, addr_dai3
-        ]
-        console.log("daiTokens", daiTokenAddrs)
         let idx = 0
-
-        for (const addr of daiTokenAddrs) {
+        // mint 25B DAI for 3 DAI clones
+        for (const addr of [
+            addr_dai1, addr_dai2, addr_dai3
+        ]) {
             const contract = new Contract(addr, contracts.DAI.abi, adminWallet)
             const txReq = populateTxFully(
                 await contract.populateTransaction.mint(
-                    adminWallet.address, ETH.mul(25).mul(1e9) // mint 25B DAI
+                    adminWallet.address, ETH.mul(25).mul(1e9)
                 ),
                 getNonce()
             )
@@ -278,8 +273,8 @@ const main = async () => {
             daiMints.push(signedTx)
             console.log(`minting DAI${idx + 1}...`)
             await (await PROVIDER.sendTransaction(signedTx)).wait(1)
+            console.log(`DAI${idx + 1} balance: ${await contract.balanceOf(adminWallet.address)}`)
             idx += 1
-            console.log(`DAI${idx} balance: ${await contract.balanceOf(adminWallet.address)}`)
         }
 
         // mint tons of weth
