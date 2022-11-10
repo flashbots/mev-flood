@@ -527,7 +527,7 @@ const main = async () => {
                 return amounts
             }
 
-            // swap 0.1 WETH for DAI1
+            // swap 0.01 WETH for DAI1
             const amountIn = ETH.div(100)
             const amountsOut = await getAmountsOut(amountIn, [addr_weth, addr_dai1])
 
