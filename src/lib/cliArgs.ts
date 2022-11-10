@@ -147,7 +147,7 @@ export const getDeployUniswapV2Args = () => {
     let shouldBootstrapLiquidity = true
     const helpMessage = `
     ${textColors.Bright}script.liquid${textColors.Reset}: deploy a uniswap v2 environment w/ bootstrapped liquidity.
-    Deployment details are written to \`src/output/uniBootstrap.json\`
+    Deployment details are written to \`src/output/uniBootstrap.json\`.
 
 Usage:
     yarn script.liquid [options]

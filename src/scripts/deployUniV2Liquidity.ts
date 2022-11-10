@@ -18,6 +18,25 @@ type ContractDeployment = {
     signedDeployTx: string,
 }
 
+type Deployments = {
+    dai1: ContractDeployment,           // erc20
+    dai2: ContractDeployment,           // erc20
+    dai3: ContractDeployment,           // erc20
+    weth: ContractDeployment,           // erc20
+    uniV2Factory: ContractDeployment,   // univ2 factory (creates univ2 pairs)
+    uniV2Router: ContractDeployment,    // univ2 router (handles trades; interacts w/ pairs & does safety checks)
+    // dai1_weth: ContractDeployment,      // univ2 pair
+    // dai2_weth: ContractDeployment,      // univ2 pair
+    // dai3_weth: ContractDeployment,      // univ2 pair
+    // dai1_dai2: ContractDeployment,      // univ2 pair
+    // dai1_dai3: ContractDeployment,      // univ2 pair
+}
+
+type DeploymentsFile = {
+    deployments: Deployments,
+    allSignedTxs: string[],
+}
+
 const populateTxFully = (txRequest: TransactionRequest, nonce: number): TransactionRequest => {
     return {
         ...txRequest,
@@ -61,6 +80,19 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
     }
 }
 
+const dir = "src/output"
+const getNewDeploymentFilename = async () => {
+    const fileNumber = (await fs.readdir(dir)).filter(e => e.includes("uniDeployment")).length
+    return `${dir}/uniDeployment${fileNumber}.json`
+}
+const getNewLiquidityFilename = async () => {
+    const fileNumber = (await fs.readdir(dir)).filter(e => e.includes("uniLiquidity")).length
+    return `${dir}/uniLiquidity${fileNumber}.json`
+}
+const getExistingDeploymentFilename = async () => {
+    const fileNumber = (await fs.readdir(dir)).filter(e => e.includes("uniDeployment")).length - 1
+    return `${dir}/uniDeployment${fileNumber}.json`
+}
 
 /** Prints txs:
  * build a set of contracts to deploy,
@@ -71,6 +103,7 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
 */
 const main = async () => {
     const {shouldDeploy, shouldBootstrapLiquidity} = getDeployUniswapV2Args()
+
     try {
         await PROVIDER.getBlockNumber()
     } catch (e) {
@@ -93,29 +126,70 @@ const main = async () => {
         readline.question("press Enter to continue...")
     }
 
-    // ### get contract deployments
-    const dai1 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
-    const dai2 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
-    const dai3 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
-    const weth = await getCloneDeployment(contracts.WETH, getNonce()) // weth has no constructor args
-    // get uniswapv2 factory deployment
-    const uniV2Factory = await getCloneDeployment(contracts.UniV2Factory, getNonce(), [adminWallet.address])
-    const uniV2Router = await getCloneDeployment(contracts.UniV2Router, getNonce(), [uniV2Factory.contractAddress, weth.contractAddress])
-    
-    const wethContract = new Contract(weth.contractAddress, contracts.WETH.abi)
-    const dai1Contract = new Contract(dai1.contractAddress, contracts.DAI.abi)
-    const dai2Contract = new Contract(dai2.contractAddress, contracts.DAI.abi)
-    const dai3Contract = new Contract(dai3.contractAddress, contracts.DAI.abi)
+    let addr_dai1: string
+    let addr_dai2: string
+    let addr_dai3: string
+    let addr_weth: string
+    let addr_uniV2Factory: string
+    let addr_uniV2Router: string
+    // arrays to be returned at end
+    let deployments: Deployments | undefined = undefined // the contracts we will interact with
+    let daiMints = []
+    let approvals = []
+    let wethDaiDeposits: any = []
+    let daiDaiDeposits: any = []
+    let signedMintWethTx: string | undefined = undefined
 
     // deploy on local devnet
-    console.log("deploying base contracts: 3 DAI tokens, WETH, uniswapV2factory, uniswapv2Router...")
-    for (const deployment of [
-        dai1, dai2, dai3, weth, uniV2Factory, uniV2Router
-    ]) {
-        await (await PROVIDER.sendTransaction(deployment.signedDeployTx)).wait(1)
-        console.log("OK.")
+    if (shouldDeploy) {
+        // ### get contract deployments
+        let dai1 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
+        let dai2 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
+        let dai3 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
+        let weth = await getCloneDeployment(contracts.WETH, getNonce()) // weth has no constructor args
+        // get uniswapv2 factory deployment
+        let uniV2Factory = await getCloneDeployment(contracts.UniV2Factory, getNonce(), [adminWallet.address])
+        let uniV2Router = await getCloneDeployment(contracts.UniV2Router, getNonce(), [uniV2Factory.contractAddress, weth.contractAddress])
+        console.log("deploying base contracts: 3 DAI tokens, WETH, uniswapV2factory, uniswapv2Router...")
+        deployments = {
+            dai1,           // erc20
+            dai2,           // erc20
+            dai3,           // erc20
+            weth,           // erc20
+            uniV2Factory,   // univ2 factory (creates univ2 pairs)
+            uniV2Router,    // univ2 router (handles trades; interacts w/ pairs & does safety checks)
+            // dai1_weth,      // univ2 pair
+            // dai2_weth,      // univ2 pair
+            // dai3_weth,      // univ2 pair
+            // dai1_dai2,      // univ2 pair
+            // dai1_dai3,      // univ2 pair
+        }
+        addr_dai1 = dai1.contractAddress
+        addr_dai2 = dai2.contractAddress
+        addr_dai3 = dai3.contractAddress
+        addr_weth = weth.contractAddress
+        addr_uniV2Factory = uniV2Factory.contractAddress
+        addr_uniV2Router = uniV2Router.contractAddress
+        for (const deployment of Object.values(deployments)) {
+            await (await PROVIDER.sendTransaction(deployment.signedDeployTx)).wait(1)
+            console.log("OK.")
+        }
+    } else {
+        // read contracts from output/
+        const uniDeployments: DeploymentsFile = JSON.parse(await fs.readFile(await getExistingDeploymentFilename(), {encoding: "utf-8"}))
+        addr_dai1 = uniDeployments.deployments.dai1.contractAddress
+        addr_dai2 = uniDeployments.deployments.dai2.contractAddress
+        addr_dai3 = uniDeployments.deployments.dai3.contractAddress
+        addr_weth = uniDeployments.deployments.weth.contractAddress
+        addr_uniV2Factory = uniDeployments.deployments.uniV2Factory.contractAddress
+        addr_uniV2Router = uniDeployments.deployments.uniV2Router.contractAddress
     }
-    const uniV2RouterContract = new Contract(uniV2Router.contractAddress, contracts.UniV2Router.abi)
+
+    const wethContract = new Contract(addr_weth, contracts.WETH.abi)
+    const dai1Contract = new Contract(addr_dai1, contracts.DAI.abi)
+    const dai2Contract = new Contract(addr_dai2, contracts.DAI.abi)
+    const dai3Contract = new Contract(addr_dai3, contracts.DAI.abi)
+    const uniV2RouterContract = new Contract(addr_uniV2Router, contracts.UniV2Router.abi)
     
     // // ### deploy liq pairs
     // const dai1_weth = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, weth.contractAddress, getNonce())
@@ -136,39 +210,24 @@ const main = async () => {
     //     await (await PROVIDER.sendTransaction(cd.signedDeployTx)).wait(1)
     //     console.log("OK.")
     // }
-
-    // the contracts we will interact with
-    const deployments = {
-        dai1,           // erc20
-        dai2,           // erc20
-        dai3,           // erc20
-        weth,           // erc20
-        uniV2Factory,   // univ2 factory (creates univ2 pairs)
-        uniV2Router,    // univ2 router (handles trades; interacts w/ pairs & does safety checks)
-        // dai1_weth,      // univ2 pair
-        // dai2_weth,      // univ2 pair
-        // dai3_weth,      // univ2 pair
-        // dai1_dai2,      // univ2 pair
-        // dai1_dai3,      // univ2 pair
-    }
     
-    // arrays to be returned at end
-    let daiMints = []
-    let approvals = []
-    let daiDaiDeposits: any = []
-    let signedMintWethTx: any
-    if (shouldDeploy) {
+    if (shouldBootstrapLiquidity) {
         // ### bootstrap liquidity
         /* Exchange rates: 1500 DAI/WETH; 1 DAI/DAI */
         // mint 25K DAI for each (15K per DAI/WETH pair, 5k per DAI/DAI pair)
-        const daiTokens = [
-            dai1, dai2, dai3
+        const daiTokenAddrs = [
+            addr_dai1, addr_dai2, addr_dai3
         ]
         let idx = 0
         
-        for (const cd of daiTokens) {
-            const contract = new Contract(cd.contractAddress, contracts.DAI.abi, adminWallet)
-            const txReq = populateTxFully(await contract.populateTransaction.mint(adminWallet.address, ETH.mul(25000)), getNonce())
+        for (const addr of daiTokenAddrs) {
+            const contract = new Contract(addr, contracts.DAI.abi, adminWallet)
+            const txReq = populateTxFully(
+                await contract.populateTransaction.mint(
+                    adminWallet.address, ETH.mul(25000)
+                ),
+                getNonce()
+            )
             const signedTx = await adminWallet.signTransaction(txReq)
             daiMints.push(signedTx)
             console.log(`minting DAI${idx + 1}...`)
@@ -179,10 +238,10 @@ const main = async () => {
         // !! nonce=9
     
         // mint 40 WETH (10 for each (of 3) DAI/WETH pair, 10 for funzies)
-        console.log("WETH", weth.contractAddress)
+        console.log("WETH", addr_weth)
         const mintWethTx = populateTxFully({
             value: ETH.mul(40),
-            to: weth.contractAddress,
+            to: addr_weth,
         }, getNonce())
         signedMintWethTx = await adminWallet.signTransaction(mintWethTx)
         console.log("minting WETH...")
@@ -193,25 +252,25 @@ const main = async () => {
         // approve univ2 router to spend my tokens
         const signedApproveWeth = await adminWallet.signTransaction(
             populateTxFully(
-                await wethContract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(1000000)), // allow pair to handle 1M of my eth
+                await wethContract.populateTransaction.approve(addr_uniV2Router, ETH.mul(1000000)), // allow pair to handle 1M of my eth
                 getNonce()
             )
         )
         const signedApproveDai1 = await adminWallet.signTransaction(
             populateTxFully(
-                await dai1Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
+                await dai1Contract.populateTransaction.approve(addr_uniV2Router, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
                 getNonce()
             )
         )
         const signedApproveDai2 = await adminWallet.signTransaction(
             populateTxFully(
-                await dai2Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
+                await dai2Contract.populateTransaction.approve(addr_uniV2Router, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
                 getNonce()
             )
         )
         const signedApproveDai3 = await adminWallet.signTransaction(
             populateTxFully(
-                await dai3Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
+                await dai3Contract.populateTransaction.approve(addr_uniV2Router, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
                 getNonce()
             )
         )
@@ -226,7 +285,7 @@ const main = async () => {
     }
 
     // deposit (100 WETH / 150000 DAI) in each WETH/DAI pair
-    let wethDaiDeposits: any = []
+
     // for (let i = 0; i < 3; i++) {
     //     const daiX = i === 0 ? dai1 : i === 1 ? dai2 : dai3;
     //     const signedTx = await adminWallet.signTransaction(
@@ -256,7 +315,7 @@ const main = async () => {
     // let daiWethDeposits = []
     // for (const cd of daiWethPairs) {
     //     const pairContract = new Contract(cd.contractAddress, contracts.UniV2Pair.abi)
-    //     const daiContract = new Contract(daiTokens[subIdx % 3].contractAddress, contracts.DAI.abi)
+    //     const daiContract = new Contract(daiTokenAddrs[subIdx % 3].contractAddress, contracts.DAI.abi)
         
     //     const signedDepositWethTx = await adminWallet.signTransaction(
     //         populateTxFully(
@@ -301,7 +360,7 @@ const main = async () => {
     // let subIdx = 0
     // for (const cd of daiDaiPairs) {
     //     const pairContract = new Contract(cd.contractAddress, contracts.UniV2Pair.abi)
-    //     const daiNContract = new Contract(daiTokens[1 + subIdx].contractAddress, contracts.DAI.abi)
+    //     const daiNContract = new Contract(daiTokenAddrs[1 + subIdx].contractAddress, contracts.DAI.abi)
         
     //     const signedDepositDai1Tx = await adminWallet.signTransaction(
     //         populateTxFully(
@@ -379,14 +438,15 @@ const main = async () => {
     const endBalance = await adminWallet.connect(PROVIDER).getBalance()
     console.log(`balance: ${utils.formatEther(endBalance)} ETH (spent ${utils.formatEther(startBalance.sub(endBalance))})`)
     
-    const signedTxs = Object.values(deployments)
-        .map(d => d.signedDeployTx)
+    const deploymentsSignedTxs = deployments ? Object.values(deployments)
+        .map(d => d.signedDeployTx) : []
+    const signedTxs = deploymentsSignedTxs
         .concat(daiMints)
-        .concat(signedMintWethTx)
+        .concat(signedMintWethTx || [])
         .concat()
         .concat(wethDaiDeposits)
         .concat(daiDaiDeposits)
-    const filename = "src/output/uniBootstrap.json"
+    const filename = !shouldDeploy ? await getNewLiquidityFilename() : await getNewDeploymentFilename()
     await fs.writeFile(filename, JSON.stringify({deployments, allSignedTxs: signedTxs}), {encoding: "utf8"})
     console.log(`Done. Check output at ${textColors.Bright}${filename}${textColors.Reset}`)
 }
