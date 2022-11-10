@@ -20,10 +20,13 @@ type ContractDeployment = {
 const populateTxFully = (txRequest: TransactionRequest, nonce: number): TransactionRequest => {
     return {
         ...txRequest,
-        gasPrice: GWEI.mul(420), // high gas bc idk what you're deploying on
+        maxFeePerGas: GWEI.mul(42),
+        maxPriorityFeePerGas: GWEI.mul(3),
         gasLimit: 7000000,
         from: adminWallet.address,
         nonce,
+        type: 2,
+        chainId: env.CHAIN_ID,
     }
 }
 
@@ -44,7 +47,7 @@ const getCloneDeployment = async (contract: ContractSpec, nonce: number, args?: 
     }
 }
 
-const getPairDeployment = async (factoryAddress: string, token1Address: string, token2Address: string, nonce: number,): Promise<ContractDeployment> => {
+const getPairDeployment = async (factoryAddress: string, token1Address: string, token2Address: string, nonce: number): Promise<ContractDeployment> => {
     const factoryContract = await new Contract(factoryAddress, contracts.UniV2Factory.abi)
     const txReq = populateTxFully(await factoryContract.populateTransaction.createPair(token1Address, token2Address), nonce)
     const signedTx = await adminWallet.signTransaction(txReq)
@@ -74,7 +77,15 @@ const main = async () => {
     }
     
     const adminWallet = getAdminWallet().connect(PROVIDER)
-    const nonce = await adminWallet.getTransactionCount()
+    console.log("adminWallet", adminWallet.address)
+    const startBalance = await adminWallet.connect(PROVIDER).getBalance()
+    console.log(`balance: ${utils.formatEther(startBalance)} ETH`)
+    let nonce = await adminWallet.getTransactionCount()
+    const getNonce = () => {
+        const tempNonce = nonce
+        nonce += 1
+        return tempNonce
+    }
     if (nonce != 0) {
         console.warn(`Your account nonce is currently ${nonce}.`)
         readline.question("press Enter to continue...")
@@ -82,13 +93,13 @@ const main = async () => {
     console.log(`SIGNER ADDRESS: ${adminWallet.address} (nonce=${nonce})`)
 
     // ### get contract deployments
-    const dai1 = await getCloneDeployment(contracts.DAI, nonce, [env.CHAIN_ID])
-    const dai2 = await getCloneDeployment(contracts.DAI, nonce + 1, [env.CHAIN_ID])
-    const dai3 = await getCloneDeployment(contracts.DAI, nonce + 2, [env.CHAIN_ID])
-    const weth = await getCloneDeployment(contracts.WETH, nonce + 3) // weth has no constructor args
+    const dai1 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
+    const dai2 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
+    const dai3 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
+    const weth = await getCloneDeployment(contracts.WETH, getNonce()) // weth has no constructor args
     // get uniswapv2 factory deployment
-    const uniV2Factory = await getCloneDeployment(contracts.UniV2Factory, nonce + 4, [adminWallet.address])
-    const uniV2Router = await getCloneDeployment(contracts.UniV2Router, nonce + 5, [uniV2Factory.contractAddress, weth.contractAddress])
+    const uniV2Factory = await getCloneDeployment(contracts.UniV2Factory, getNonce(), [adminWallet.address])
+    const uniV2Router = await getCloneDeployment(contracts.UniV2Router, getNonce(), [uniV2Factory.contractAddress, weth.contractAddress])
     
     const wethContract = new Contract(weth.contractAddress, JSON.stringify(contracts.WETH.abi))
     const dai1Contract = new Contract(dai1.contractAddress, contracts.DAI.abi)
@@ -108,11 +119,11 @@ const main = async () => {
     const uniV2RouterContract = new Contract(uniV2Router.contractAddress, contracts.UniV2Router.abi)
     
     // // ### deploy liq pairs
-    // const dai1_weth = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, weth.contractAddress, nonce + 6)
-    // const dai2_weth = await getPairDeployment(uniV2Factory.contractAddress, dai2.contractAddress, weth.contractAddress, nonce + 7)
-    // const dai3_weth = await getPairDeployment(uniV2Factory.contractAddress, dai3.contractAddress, weth.contractAddress, nonce + 8)
-    // const dai1_dai2 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai2.contractAddress, nonce + 9)
-    // const dai1_dai3 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai3.contractAddress, nonce + 10)
+    // const dai1_weth = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, weth.contractAddress, getNonce())
+    // const dai2_weth = await getPairDeployment(uniV2Factory.contractAddress, dai2.contractAddress, weth.contractAddress, getNonce())
+    // const dai3_weth = await getPairDeployment(uniV2Factory.contractAddress, dai3.contractAddress, weth.contractAddress, getNonce())
+    // const dai1_dai2 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai2.contractAddress, getNonce())
+    // const dai1_dai3 = await getPairDeployment(uniV2Factory.contractAddress, dai1.contractAddress, dai3.contractAddress, getNonce())
 
     // const pairDeployments = [
     //     dai1_weth,
@@ -152,7 +163,7 @@ const main = async () => {
     let daiMints = []
     for (const cd of daiTokens) {
         const contract = new Contract(cd.contractAddress, contracts.DAI.abi, adminWallet)
-        const txReq = populateTxFully(await contract.populateTransaction.mint(adminWallet.address, ETH.mul(250000)), nonce + 6 + idx)
+        const txReq = populateTxFully(await contract.populateTransaction.mint(adminWallet.address, ETH.mul(250000)), getNonce())
         const signedTx = await adminWallet.signTransaction(txReq)
         daiMints.push(signedTx)
         console.log(`minting DAI${idx + 1}...`)
@@ -167,7 +178,7 @@ const main = async () => {
     const mintWethTx = populateTxFully({
         value: ETH.mul(400),
         to: weth.contractAddress,
-    }, nonce + 9)
+    }, getNonce())
     const signedMintWethTx = await adminWallet.signTransaction(mintWethTx)
     console.log("minting WETH...")
     await (await PROVIDER.sendTransaction(signedMintWethTx)).wait(1)
@@ -178,25 +189,25 @@ const main = async () => {
     const signedApproveWeth = await adminWallet.signTransaction(
         populateTxFully(
             await wethContract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(1000000)), // allow pair to handle 1M of my eth
-            nonce + 10
+            getNonce()
         )
     )
     const signedApproveDai1 = await adminWallet.signTransaction(
         populateTxFully(
             await dai1Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
-            nonce + 11
+            getNonce()
         )
     )
     const signedApproveDai2 = await adminWallet.signTransaction(
         populateTxFully(
             await dai2Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
-            nonce + 12
+            getNonce()
         )
     )
     const signedApproveDai3 = await adminWallet.signTransaction(
         populateTxFully(
             await dai3Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
-            nonce + 13
+            getNonce()
         )
     )
     const approveResWeth = await (await PROVIDER.sendTransaction(signedApproveWeth)).wait(1)
@@ -209,28 +220,28 @@ const main = async () => {
     console.log("approve dai3", approveResDai3.transactionHash)
 
     // deposit (100 WETH / 150000 DAI) in each WETH/DAI pair
-    let wethDaiDeposits = []
-    for (let i = 0; i < 3; i++) {
-        const daiX = i === 0 ? dai1 : i === 1 ? dai2 : dai3;
-        const signedTx = await adminWallet.signTransaction(
-            populateTxFully(
-                await uniV2RouterContract.populateTransaction.addLiquidity(
-                    weth.contractAddress,
-                    daiX.contractAddress,
-                    ETH.mul(10),
-                    ETH.mul(50000),
-                    ETH.mul(9),
-                    ETH.mul(40000),
-                    adminWallet.address,
-                    now() + 1000), 
-                nonce + 14 + i
-            ))
-        console.log(`adding liquidity for WETH/DAI${i + 1}`)
-        wethDaiDeposits.push(signedTx)
+    let wethDaiDeposits: any = []
+    // for (let i = 0; i < 3; i++) {
+    //     const daiX = i === 0 ? dai1 : i === 1 ? dai2 : dai3;
+    //     const signedTx = await adminWallet.signTransaction(
+    //         populateTxFully(
+    //             await uniV2RouterContract.populateTransaction.addLiquidity(
+    //                 weth.contractAddress,
+    //                 daiX.contractAddress,
+    //                 ETH.mul(10),
+    //                 ETH.mul(50000),
+    //                 ETH.mul(9),
+    //                 ETH.mul(40000),
+    //                 adminWallet.address,
+    //                 now() + 1000), 
+    //             getNonce() + i
+    //         ))
+    //     console.log(`adding liquidity for WETH/DAI${i + 1}`)
+    //     wethDaiDeposits.push(signedTx)
         
-        await (await PROVIDER.sendTransaction(signedTx)).wait(1)
-        console.log("OK.")
-    }
+    //     await (await PROVIDER.sendTransaction(signedTx)).wait(1)
+    //     console.log("OK.")
+    // }
     // !! nonce=18
 
     // const daiWethPairs = [dai1_weth, dai2_weth, dai3_weth]
@@ -244,19 +255,19 @@ const main = async () => {
     //     const signedDepositWethTx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await wethContract.populateTransaction.transfer(cd.contractAddress, ETH.mul(100)),
-    //             nonce + 15 + idx
+    //             getNonce() + idx
     //         )
     //     )
     //     const signedDepositDaiTx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await daiContract.populateTransaction.transfer(cd.contractAddress, ETH.mul(150000)),
-    //             nonce + 16 + idx
+    //             getNonce() + idx
     //         )
     //     )
     //     const signedMintLpTokensTx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await pairContract.populateTransaction.mint(adminWallet.address),
-    //             nonce + 17 + idx
+    //             getNonce() + idx
     //         )
     //     )
 
@@ -290,19 +301,19 @@ const main = async () => {
     //     const signedDepositDai1Tx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await dai1Contract.populateTransaction.transfer(cd.contractAddress, ETH.mul(50000)),
-    //             nonce + 24 + idx
+    //             getNonce() + idx
     //         )
     //     )
     //     const signedDepositDaiNTx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await daiNContract.populateTransaction.transfer(cd.contractAddress, ETH.mul(50000)),
-    //             nonce + 25 + idx
+    //             getNonce() + idx
     //         )
     //     )
     //     const signedMintLpTokensTx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await pairContract.populateTransaction.mint(adminWallet.address),
-    //             nonce + 26 + idx
+    //             getNonce() + idx
     //         )
     //     )
     //     daiDaiDeposits.push(signedDepositDai1Tx)
@@ -338,7 +349,7 @@ const main = async () => {
     // const signedApprove1 = await adminWallet.signTransaction(
     //     populateTxFully(
     //         await wethContract.populateTransaction.approve(dai1_weth.contractAddress, ETH.mul(100000)), // allow pair to handle 1M of my eth
-    //         nonce + 30
+    //         getNonce()
     //     )
     // )
     // const approveRes1 = await (await PROVIDER.sendTransaction(signedApprove1)).wait(1)
@@ -347,7 +358,7 @@ const main = async () => {
     // const signedApprove2 = await adminWallet.signTransaction(
     //     populateTxFully(
     //         await dai1Contract.populateTransaction.approve(dai1_weth.contractAddress, ETH.mul(100000)), // allow pair to handle 1M of my eth
-    //         nonce + 31
+    //         getNonce()
     //     )
     // )
     // const approveRes2 = await (await PROVIDER.sendTransaction(signedApprove2)).wait(1)
@@ -356,11 +367,13 @@ const main = async () => {
     // const signedSwap = await adminWallet.signTransaction(
     //     populateTxFully(
     //         await uniV2RouterContract.populateTransaction.swapExactTokensForTokens(amountIn, amountOut, path, adminWallet.address, now() + 2000),
-    //         nonce + 32
+    //         getNonce()
     //     )
     // )
     // const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
     // console.log("swap result", swapRes.transactionHash)
+    const endBalance = await adminWallet.connect(PROVIDER).getBalance()
+    console.log(`balance: ${utils.formatEther(endBalance)} ETH (spent ${utils.formatEther(startBalance.sub(endBalance))})`)
     
     const signedTxs = Object.values(deployments)
         .map(d => d.signedDeployTx)
