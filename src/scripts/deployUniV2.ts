@@ -241,18 +241,39 @@ const main = async () => {
         console.log("weth addr", uniDeployments.deployments.weth.contractAddress)
     }
 
-    const wethContract = new Contract(addr_weth, contracts.WETH.abi)
-    const dai1Contract = new Contract(addr_dai1, contracts.DAI.abi)
-    const dai2Contract = new Contract(addr_dai2, contracts.DAI.abi)
-    const dai3Contract = new Contract(addr_dai3, contracts.DAI.abi)
-    const uniV2FactoryContract = new Contract(addr_uniV2Factory, contracts.UniV2Factory.abi)
+    const wethContract = new Contract(addr_weth, contracts.WETH.abi).connect(PROVIDER)
+    const dai1Contract = new Contract(addr_dai1, contracts.DAI.abi).connect(PROVIDER)
+    const dai2Contract = new Contract(addr_dai2, contracts.DAI.abi).connect(PROVIDER)
+    const dai3Contract = new Contract(addr_dai3, contracts.DAI.abi).connect(PROVIDER)
+    const uniV2FactoryContract = new Contract(addr_uniV2Factory, contracts.UniV2Factory.abi).connect(PROVIDER)
+    const dai1WethPair = new Contract(addr_dai1_weth, contracts.UniV2Pair.abi).connect(PROVIDER)
+    const dai2WethPair = new Contract(addr_dai2_weth, contracts.UniV2Pair.abi).connect(PROVIDER)
+    const dai3WethPair = new Contract(addr_dai3_weth, contracts.UniV2Pair.abi).connect(PROVIDER)
 
     getBalances = async () => {
+        const isWeth0 = async (pair: Contract) => {
+            const token0: string = await pair.token0()
+            return token0.toLowerCase() === addr_weth.toLowerCase()
+        }
+        const reservesDai1: BigNumber[] = (await dai1WethPair.getReserves()).slice(0, 2)
+        const reservesDai2 = await dai2WethPair.getReserves()
+        const reservesDai3 = await dai3WethPair.getReserves()
         return {
-            wethBalance: await wethContract.connect(PROVIDER).balanceOf(adminWallet.address),
-            dai1Balance: await dai1Contract.connect(PROVIDER).balanceOf(adminWallet.address),
-            dai2Balance: await dai2Contract.connect(PROVIDER).balanceOf(adminWallet.address),
-            dai3Balance: await dai3Contract.connect(PROVIDER).balanceOf(adminWallet.address),
+            weth: (await wethContract.balanceOf(adminWallet.address)).toString(),
+            dai1: (await dai1Contract.balanceOf(adminWallet.address)).toString(),
+            dai2: (await dai2Contract.balanceOf(adminWallet.address)).toString(),
+            dai3: (await dai3Contract.balanceOf(adminWallet.address)).toString(),
+            pricesPerWeth: {
+                dai1: (await isWeth0(dai1WethPair) ?
+                    reservesDai1[1].div(reservesDai1[0]) :
+                    reservesDai1[0].div(reservesDai1[1])).toString(),
+                dai2: (await isWeth0(dai2WethPair) ?
+                    reservesDai2[1].div(reservesDai2[0]) :
+                    reservesDai2[0].div(reservesDai2[1])).toString(),
+                dai3: (await isWeth0(dai3WethPair) ?
+                    reservesDai3[1].div(reservesDai3[0]) :
+                    reservesDai3[0].div(reservesDai3[1])).toString(),
+            }
         }
     }
     
@@ -287,7 +308,7 @@ const main = async () => {
         signedMintWethTx = await adminWallet.signTransaction(mintWethTx)
         console.log("minting WETH...")
         await (await PROVIDER.sendTransaction(signedMintWethTx)).wait(1)
-        console.log(`WETH balance: ${await wethContract.connect(PROVIDER).balanceOf(adminWallet.address)}`)
+        console.log(`WETH balance: ${await wethContract.balanceOf(adminWallet.address)}`)
 
         console.log("balances", await getBalances())
     }
@@ -352,15 +373,15 @@ const main = async () => {
     }
 
     if (shouldBootstrapLiquidity) {
-        const factoryPairsLength = await uniV2FactoryContract.connect(PROVIDER).allPairsLength()
+        const factoryPairsLength = await uniV2FactoryContract.allPairsLength()
         console.log("factory num pairs", factoryPairsLength)
-        const factoryFeeTo = await uniV2FactoryContract.connect(PROVIDER).feeTo()
+        const factoryFeeTo = await uniV2FactoryContract.feeTo()
 
-        const addr_dai1_weth: string = await uniV2FactoryContract.connect(PROVIDER).getPair(addr_weth, addr_dai1)
+        const addr_dai1_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai1)
         console.log("addr_dai1_weth", addr_dai1_weth)
-        const addr_dai2_weth: string = await uniV2FactoryContract.connect(PROVIDER).getPair(addr_weth, addr_dai2)
+        const addr_dai2_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai2)
         console.log("addr_dai2_weth", addr_dai2_weth)
-        const addr_dai3_weth: string = await uniV2FactoryContract.connect(PROVIDER).getPair(addr_weth, addr_dai3)
+        const addr_dai3_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai3)
         console.log("addr_dai3_weth", addr_dai3_weth)
 
         // set feeTo in univ2 factory
@@ -463,9 +484,9 @@ const main = async () => {
     
     if (shouldTestSwap) {
         try {
-            const addr_dai1_weth: string = await uniV2FactoryContract.connect(PROVIDER).getPair(addr_weth, addr_dai1)
-            // const addr_dai2_weth: string = await uniV2FactoryContract.connect(PROVIDER).getPair(addr_weth, addr_dai2)
-            // const addr_dai3_weth: string = await uniV2FactoryContract.connect(PROVIDER).getPair(addr_weth, addr_dai3)
+            const addr_dai1_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai1)
+            // const addr_dai2_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai2)
+            // const addr_dai3_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai3)
             const dai1WethPair = new Contract(addr_dai1_weth, contracts.UniV2Pair.abi)
             // const dai2WethPair = new Contract(addr_dai2_weth, contracts.UniV2Pair.abi)
             // const dai3WethPair = new Contract(addr_dai3_weth, contracts.UniV2Pair.abi)
@@ -497,10 +518,10 @@ const main = async () => {
                 let amounts = []
                 amounts[0] = amountIn;
                 for (let i = 0; i < path.length - 1; i++) {
-                    let pairAddress = await uniV2FactoryContract.connect(PROVIDER)
+                    let pairAddress = await uniV2FactoryContract
                         .getPair(path[i], path[i + 1])
-                    let pairContract = new Contract(pairAddress, contracts.UniV2Pair.abi)
-                    const reserves = await pairContract.connect(PROVIDER).getReserves()
+                    let pairContract = (new Contract(pairAddress, contracts.UniV2Pair.abi)).connect(PROVIDER)
+                    const reserves = await pairContract.getReserves()
                     amounts[i + 1] = getAmountOut(amounts[i], reserves[0], reserves[1]);
                 }
                 return amounts
