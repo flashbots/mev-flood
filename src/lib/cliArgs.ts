@@ -1,3 +1,5 @@
+import { textColors } from './helpers'
+
 /**
  * Get CLI args for "search" scripts (dumb-search, smart-search, fake-search)
  * @param programName name of script for console readability
@@ -141,42 +143,43 @@ Example:
 export const useMempool = process.argv.length > 4 && process.argv[4] == "mempool"
 
 export const getDeployUniswapV2Args = () => {
-    let deployOnly = false
-    const helpMessage = `deploy a uniswap v2 environment w/ bootstrapped liquidity.
-    Generates a JSON file with all details of deployments in \`src/output/uniBootstrap.json\`
+    let shouldDeploy = true
+    let shouldBootstrapLiquidity = true
+    const helpMessage = `
+    ${textColors.Bright}script.liquid${textColors.Reset}: deploy a uniswap v2 environment w/ bootstrapped liquidity.
+    Deployment details are written to \`src/output/uniBootstrap.json\`
 
 Usage:
     yarn script.liquid [options]
 
 Options:
-    --deploy-only       Only deploy contracts, don't bootstrap liquidity.
+    --deploy-only       Only deploy contracts, don't bootstrap liquidity. **
+    --bootstrap-only    Only bootstrap liquidity, don't deploy contracts. **
+
+    ** if both --deploy-only and --bootstrap-only are passed, neither will execute.
 
 Example:
     # default; deploy contracts and bootstrap liquidity
-    yarn script.sendProtectTx
+    yarn script.liquid
 
-    # send uniswapV2 router tx to Protect (works on any chain)
-    yarn script.sendProtectTx dummy
-
-    # send lottery contract tx to Protect with fast mode
-    yarn script.sendProtectTx fast
-
-    # send uniswapV2 router tx to Protect w/ fast mode
-    yarn script.sendProtectTx fast dummy
-    # or
-    yarn script.sendProtectTx dummy fast
+    # only deploy contracts
+    yarn script.liquid --deploy-only
 `
     if (process.argv.length > 2) {
-        if (process.argv[2].includes("help")) {
+        const args = process.argv.slice(2)
+        if (args.toString().includes("help")) {
             console.log(helpMessage)
-            return {deployOnly: false}
+            process.exit(0)
         } 
-        const args = `${process.argv[2]}&${process.argv[3]}`
         if (args.includes("--deploy-only")) {
-            deployOnly = true
+            shouldBootstrapLiquidity = false
+        }
+        if (args.includes("--bootstrap-only")) {
+            shouldDeploy = false
         }
     }
     return {
-        deployOnly
+        shouldDeploy,
+        shouldBootstrapLiquidity,
     }
 }

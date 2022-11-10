@@ -70,7 +70,7 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
  * all txs are signed with the account specified by ADMIN_PRIVATE_KEY in .env
 */
 const main = async () => {
-    const {deployOnly} = getDeployUniswapV2Args()
+    const {shouldDeploy, shouldBootstrapLiquidity} = getDeployUniswapV2Args()
     try {
         await PROVIDER.getBlockNumber()
     } catch (e) {
@@ -157,7 +157,7 @@ const main = async () => {
     let approvals = []
     let daiDaiDeposits: any = []
     let signedMintWethTx: any
-    if (!deployOnly) {
+    if (shouldDeploy) {
         // ### bootstrap liquidity
         /* Exchange rates: 1500 DAI/WETH; 1 DAI/DAI */
         // mint 25K DAI for each (15K per DAI/WETH pair, 5k per DAI/DAI pair)
