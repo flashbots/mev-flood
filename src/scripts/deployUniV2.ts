@@ -255,7 +255,7 @@ const main = async () => {
             const token0: string = await pair.token0()
             return token0.toLowerCase() === addr_weth.toLowerCase()
         }
-        const reservesDai1: BigNumber[] = (await dai1WethPair.getReserves()).slice(0, 2)
+        const reservesDai1 = await dai1WethPair.getReserves()
         const reservesDai2 = await dai2WethPair.getReserves()
         const reservesDai3 = await dai3WethPair.getReserves()
         return {
@@ -265,14 +265,14 @@ const main = async () => {
             dai3: (await dai3Contract.balanceOf(adminWallet.address)).toString(),
             pricesPerWeth: {
                 dai1: (await isWeth0(dai1WethPair) ?
-                    reservesDai1[1].div(reservesDai1[0]) :
-                    reservesDai1[0].div(reservesDai1[1])).toString(),
+                    reservesDai1[1].div(reservesDai1[0] > 0 ? reservesDai1[0] : 1) :
+                    reservesDai1[0].div(reservesDai1[1] > 0 ? reservesDai1[1] : 1)).toString(),
                 dai2: (await isWeth0(dai2WethPair) ?
-                    reservesDai2[1].div(reservesDai2[0]) :
-                    reservesDai2[0].div(reservesDai2[1])).toString(),
+                    reservesDai2[1].div(reservesDai2[0] > 0 ? reservesDai2[0] : 1) :
+                    reservesDai2[0].div(reservesDai2[1] > 0 ? reservesDai2[1] : 1)).toString(),
                 dai3: (await isWeth0(dai3WethPair) ?
-                    reservesDai3[1].div(reservesDai3[0]) :
-                    reservesDai3[0].div(reservesDai3[1])).toString(),
+                    reservesDai3[1].div(reservesDai3[0] > 0 ? reservesDai3[0] : 1) :
+                    reservesDai3[0].div(reservesDai3[1] > 0 ? reservesDai3[1] : 1)).toString(),
             }
         }
     }
@@ -353,17 +353,17 @@ const main = async () => {
         )
 
         const approveResDai1WethPool = await (await PROVIDER.sendTransaction(signedApproveDai1WethPool)).wait(1)
-        console.log("approved weth", approveResDai1WethPool.transactionHash)
+        console.log("approved DAI1 DAI1/WETH", approveResDai1WethPool.transactionHash)
         const approveResWethDai1Pool = await (await PROVIDER.sendTransaction(signedApproveWethDai1Pool)).wait(1)
-        console.log("approved weth dai1 pool", approveResWethDai1Pool.transactionHash)
+        console.log("approved WETH DAI1/WETH", approveResWethDai1Pool.transactionHash)
         const approveSignedApproveDAI2WethPool = await (await PROVIDER.sendTransaction(signedApproveDAI2WethPool)).wait(1)
-        console.log("approved XXX", approveSignedApproveDAI2WethPool.transactionHash)
+        console.log("approved DAI2 DAI2/WETH", approveSignedApproveDAI2WethPool.transactionHash)
         const approveSignedApproveWethDAI2Pool = await (await PROVIDER.sendTransaction(signedApproveWethDAI2Pool)).wait(1)
-        console.log("approved XXX", approveSignedApproveWethDAI2Pool.transactionHash)
+        console.log("approved WETH DAI2/WETH", approveSignedApproveWethDAI2Pool.transactionHash)
         const approveSignedApproveDAI3WethPool = await (await PROVIDER.sendTransaction(signedApproveDAI3WethPool)).wait(1)
-        console.log("approved XXX", approveSignedApproveDAI3WethPool.transactionHash)
+        console.log("approved DAI3 DAI3/WETH", approveSignedApproveDAI3WethPool.transactionHash)
         const approveSignedApproveWethDAI3Pool = await (await PROVIDER.sendTransaction(signedApproveWethDAI3Pool)).wait(1)
-        console.log("approved XXX", approveSignedApproveWethDAI3Pool.transactionHash)
+        console.log("approved WETH DAI3/WETH", approveSignedApproveWethDAI3Pool.transactionHash)
         approvals.push(signedApproveDai1WethPool)
         approvals.push(signedApproveWethDai1Pool)
         approvals.push(signedApproveDAI2WethPool)
