@@ -16,7 +16,7 @@ async function main() {
         console.log("bundleStats", res)
     } else {
         const res = await getBundleStats(process.argv[2], process.argv[3])
-        console.log("bundleStats", res)
+        console.log("bundleStats", JSON.stringify(res, null, 2))
     }
 }
 
