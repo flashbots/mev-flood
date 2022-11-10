@@ -2,10 +2,11 @@ import { TransactionRequest } from '@ethersproject/abstract-provider';
 import { ContractFactory, Contract, utils, providers } from "ethers"
 import fs from "fs/promises"
 import readline from "readline-sync"
+import { getDeployUniswapV2Args } from '../lib/cliArgs';
 
 import contracts, { ContractSpec } from "../lib/contracts"
 import env from '../lib/env';
-import { ETH, GWEI, now, PROVIDER } from '../lib/helpers';
+import { ETH, GWEI, now, PROVIDER, textColors } from '../lib/helpers';
 import { getAdminWallet } from '../lib/wallets';
 
 /** Used for signing only, NOT connected to a provider. */
@@ -69,6 +70,7 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
  * all txs are signed with the account specified by ADMIN_PRIVATE_KEY in .env
 */
 const main = async () => {
+    const {deployOnly} = getDeployUniswapV2Args()
     try {
         await PROVIDER.getBlockNumber()
     } catch (e) {
@@ -90,7 +92,6 @@ const main = async () => {
         console.warn(`Your account nonce is currently ${nonce}.`)
         readline.question("press Enter to continue...")
     }
-    console.log(`SIGNER ADDRESS: ${adminWallet.address} (nonce=${nonce})`)
 
     // ### get contract deployments
     const dai1 = await getCloneDeployment(contracts.DAI, getNonce(), [env.CHAIN_ID])
@@ -101,19 +102,17 @@ const main = async () => {
     const uniV2Factory = await getCloneDeployment(contracts.UniV2Factory, getNonce(), [adminWallet.address])
     const uniV2Router = await getCloneDeployment(contracts.UniV2Router, getNonce(), [uniV2Factory.contractAddress, weth.contractAddress])
     
-    const wethContract = new Contract(weth.contractAddress, JSON.stringify(contracts.WETH.abi))
+    const wethContract = new Contract(weth.contractAddress, contracts.WETH.abi)
     const dai1Contract = new Contract(dai1.contractAddress, contracts.DAI.abi)
     const dai2Contract = new Contract(dai2.contractAddress, contracts.DAI.abi)
     const dai3Contract = new Contract(dai3.contractAddress, contracts.DAI.abi)
-    
-    const indyDeployments = [
-        dai1, dai2, dai3, weth, uniV2Factory, uniV2Router
-    ]
 
     // deploy on local devnet
-    console.log("deploying base contracts: 3 DAI tokens, 1 WETH, uniswapv2 factory...")
-    for (const cd of indyDeployments) {
-        await (await PROVIDER.sendTransaction(cd.signedDeployTx)).wait(1)
+    console.log("deploying base contracts: 3 DAI tokens, WETH, uniswapV2factory, uniswapv2Router...")
+    for (const deployment of [
+        dai1, dai2, dai3, weth, uniV2Factory, uniV2Router
+    ]) {
+        await (await PROVIDER.sendTransaction(deployment.signedDeployTx)).wait(1)
         console.log("OK.")
     }
     const uniV2RouterContract = new Contract(uniV2Router.contractAddress, contracts.UniV2Router.abi)
@@ -145,6 +144,7 @@ const main = async () => {
         dai3,           // erc20
         weth,           // erc20
         uniV2Factory,   // univ2 factory (creates univ2 pairs)
+        uniV2Router,    // univ2 router (handles trades; interacts w/ pairs & does safety checks)
         // dai1_weth,      // univ2 pair
         // dai2_weth,      // univ2 pair
         // dai3_weth,      // univ2 pair
@@ -152,72 +152,78 @@ const main = async () => {
         // dai1_dai3,      // univ2 pair
     }
     
-    // ### bootstrap liquidity
-    /* Exchange rates: 1500 DAI/WETH; 1 DAI/DAI */
-    
-    // mint 250K DAI for each (150K per DAI/WETH pair, 50k per DAI/DAI pair)
-    const daiTokens = [
-        dai1, dai2, dai3
-    ]
-    let idx = 0
+    // arrays to be returned at end
     let daiMints = []
-    for (const cd of daiTokens) {
-        const contract = new Contract(cd.contractAddress, contracts.DAI.abi, adminWallet)
-        const txReq = populateTxFully(await contract.populateTransaction.mint(adminWallet.address, ETH.mul(250000)), getNonce())
-        const signedTx = await adminWallet.signTransaction(txReq)
-        daiMints.push(signedTx)
-        console.log(`minting DAI${idx + 1}...`)
-        await (await PROVIDER.sendTransaction(signedTx)).wait(1)
-        idx += 1
-        console.log(`DAI${idx} balance: ${await contract.balanceOf(adminWallet.address)}`)
+    let approvals = []
+    let daiDaiDeposits: any = []
+    let signedMintWethTx: any
+    if (!deployOnly) {
+        // ### bootstrap liquidity
+        /* Exchange rates: 1500 DAI/WETH; 1 DAI/DAI */
+        // mint 25K DAI for each (15K per DAI/WETH pair, 5k per DAI/DAI pair)
+        const daiTokens = [
+            dai1, dai2, dai3
+        ]
+        let idx = 0
+        
+        for (const cd of daiTokens) {
+            const contract = new Contract(cd.contractAddress, contracts.DAI.abi, adminWallet)
+            const txReq = populateTxFully(await contract.populateTransaction.mint(adminWallet.address, ETH.mul(25000)), getNonce())
+            const signedTx = await adminWallet.signTransaction(txReq)
+            daiMints.push(signedTx)
+            console.log(`minting DAI${idx + 1}...`)
+            await (await PROVIDER.sendTransaction(signedTx)).wait(1)
+            idx += 1
+            console.log(`DAI${idx} balance: ${await contract.balanceOf(adminWallet.address)}`)
+        }
+        // !! nonce=9
+    
+        // mint 40 WETH (10 for each (of 3) DAI/WETH pair, 10 for funzies)
+        console.log("WETH", weth.contractAddress)
+        const mintWethTx = populateTxFully({
+            value: ETH.mul(40),
+            to: weth.contractAddress,
+        }, getNonce())
+        signedMintWethTx = await adminWallet.signTransaction(mintWethTx)
+        console.log("minting WETH...")
+        await (await PROVIDER.sendTransaction(signedMintWethTx)).wait(1)
+        console.log(`WETH balance: ${await wethContract.connect(PROVIDER).balanceOf(adminWallet.address)}`)
+        // !! nonce=10
+    
+        // approve univ2 router to spend my tokens
+        const signedApproveWeth = await adminWallet.signTransaction(
+            populateTxFully(
+                await wethContract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(1000000)), // allow pair to handle 1M of my eth
+                getNonce()
+            )
+        )
+        const signedApproveDai1 = await adminWallet.signTransaction(
+            populateTxFully(
+                await dai1Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
+                getNonce()
+            )
+        )
+        const signedApproveDai2 = await adminWallet.signTransaction(
+            populateTxFully(
+                await dai2Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
+                getNonce()
+            )
+        )
+        const signedApproveDai3 = await adminWallet.signTransaction(
+            populateTxFully(
+                await dai3Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
+                getNonce()
+            )
+        )
+        const approveResWeth = await (await PROVIDER.sendTransaction(signedApproveWeth)).wait(1)
+        console.log("approve weth", approveResWeth.transactionHash)
+        const approveResDai1 = await (await PROVIDER.sendTransaction(signedApproveDai1)).wait(1)
+        console.log("approve dai1", approveResDai1.transactionHash)
+        const approveResDai2 = await (await PROVIDER.sendTransaction(signedApproveDai2)).wait(1)
+        console.log("approve dai2", approveResDai2.transactionHash)
+        const approveResDai3 = await (await PROVIDER.sendTransaction(signedApproveDai3)).wait(1)
+        console.log("approve dai3", approveResDai3.transactionHash)
     }
-    // !! nonce=9
-
-    // mint 400 WETH (100 for each (of 3) DAI/WETH pair, 100 for funzies)
-    console.log("WETH", weth.contractAddress)
-    const mintWethTx = populateTxFully({
-        value: ETH.mul(400),
-        to: weth.contractAddress,
-    }, getNonce())
-    const signedMintWethTx = await adminWallet.signTransaction(mintWethTx)
-    console.log("minting WETH...")
-    await (await PROVIDER.sendTransaction(signedMintWethTx)).wait(1)
-    console.log(`WETH balance: ${await wethContract.connect(PROVIDER).balanceOf(adminWallet.address)}`)
-    // !! nonce=10
-
-    // approve univ2 router to spend my tokens
-    const signedApproveWeth = await adminWallet.signTransaction(
-        populateTxFully(
-            await wethContract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(1000000)), // allow pair to handle 1M of my eth
-            getNonce()
-        )
-    )
-    const signedApproveDai1 = await adminWallet.signTransaction(
-        populateTxFully(
-            await dai1Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
-            getNonce()
-        )
-    )
-    const signedApproveDai2 = await adminWallet.signTransaction(
-        populateTxFully(
-            await dai2Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
-            getNonce()
-        )
-    )
-    const signedApproveDai3 = await adminWallet.signTransaction(
-        populateTxFully(
-            await dai3Contract.populateTransaction.approve(uniV2Router.contractAddress, ETH.mul(100000000)), // allow pair to handle 100M of my DAI1
-            getNonce()
-        )
-    )
-    const approveResWeth = await (await PROVIDER.sendTransaction(signedApproveWeth)).wait(1)
-    console.log("approve weth", approveResWeth.transactionHash)
-    const approveResDai1 = await (await PROVIDER.sendTransaction(signedApproveDai1)).wait(1)
-    console.log("approve dai1", approveResDai1.transactionHash)
-    const approveResDai2 = await (await PROVIDER.sendTransaction(signedApproveDai2)).wait(1)
-    console.log("approve dai2", approveResDai2.transactionHash)
-    const approveResDai3 = await (await PROVIDER.sendTransaction(signedApproveDai3)).wait(1)
-    console.log("approve dai3", approveResDai3.transactionHash)
 
     // deposit (100 WETH / 150000 DAI) in each WETH/DAI pair
     let wethDaiDeposits: any = []
@@ -293,7 +299,6 @@ const main = async () => {
     // const daiDaiPairs = [dai1_dai2, dai1_dai3]
     // idx = 0
     // let subIdx = 0
-    // let daiDaiDeposits = []
     // for (const cd of daiDaiPairs) {
     //     const pairContract = new Contract(cd.contractAddress, contracts.UniV2Pair.abi)
     //     const daiNContract = new Contract(daiTokens[1 + subIdx].contractAddress, contracts.DAI.abi)
@@ -301,19 +306,19 @@ const main = async () => {
     //     const signedDepositDai1Tx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await dai1Contract.populateTransaction.transfer(cd.contractAddress, ETH.mul(50000)),
-    //             getNonce() + idx
+    //             getNonce()
     //         )
     //     )
     //     const signedDepositDaiNTx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await daiNContract.populateTransaction.transfer(cd.contractAddress, ETH.mul(50000)),
-    //             getNonce() + idx
+    //             getNonce()
     //         )
     //     )
     //     const signedMintLpTokensTx = await adminWallet.signTransaction(
     //         populateTxFully(
     //             await pairContract.populateTransaction.mint(adminWallet.address),
-    //             getNonce() + idx
+    //             getNonce()
     //         )
     //     )
     //     daiDaiDeposits.push(signedDepositDai1Tx)
@@ -328,7 +333,6 @@ const main = async () => {
     //     console.log("minting LP tokens...")
     //     await (await PROVIDER.sendTransaction(signedMintLpTokensTx)).wait(1)
     //     console.log("OK.")
-    //     idx += 3
     //     subIdx += 1
     // }
     // !! nonce=30
@@ -381,10 +385,10 @@ const main = async () => {
         .concat(signedMintWethTx)
         .concat()
         .concat(wethDaiDeposits)
-        // .concat(daiDaiDeposits)
+        .concat(daiDaiDeposits)
     const filename = "src/output/uniBootstrap.json"
     await fs.writeFile(filename, JSON.stringify({deployments, allSignedTxs: signedTxs}), {encoding: "utf8"})
-    console.log(`Done. Check output at ${filename}`)
+    console.log(`Done. Check output at ${textColors.Bright}${filename}${textColors.Reset}`)
 }
 
 main()

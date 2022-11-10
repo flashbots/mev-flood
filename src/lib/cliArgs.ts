@@ -139,3 +139,44 @@ Example:
 }
 
 export const useMempool = process.argv.length > 4 && process.argv[4] == "mempool"
+
+export const getDeployUniswapV2Args = () => {
+    let deployOnly = false
+    const helpMessage = `deploy a uniswap v2 environment w/ bootstrapped liquidity.
+    Generates a JSON file with all details of deployments in \`src/output/uniBootstrap.json\`
+
+Usage:
+    yarn script.liquid [options]
+
+Options:
+    --deploy-only       Only deploy contracts, don't bootstrap liquidity.
+
+Example:
+    # default; deploy contracts and bootstrap liquidity
+    yarn script.sendProtectTx
+
+    # send uniswapV2 router tx to Protect (works on any chain)
+    yarn script.sendProtectTx dummy
+
+    # send lottery contract tx to Protect with fast mode
+    yarn script.sendProtectTx fast
+
+    # send uniswapV2 router tx to Protect w/ fast mode
+    yarn script.sendProtectTx fast dummy
+    # or
+    yarn script.sendProtectTx dummy fast
+`
+    if (process.argv.length > 2) {
+        if (process.argv[2].includes("help")) {
+            console.log(helpMessage)
+            return {deployOnly: false}
+        } 
+        const args = `${process.argv[2]}&${process.argv[3]}`
+        if (args.includes("--deploy-only")) {
+            deployOnly = true
+        }
+    }
+    return {
+        deployOnly
+    }
+}
