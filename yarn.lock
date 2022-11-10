@@ -769,11 +769,6 @@
   resolved "https://registry.npmjs.org/@types/uuid/-/uuid-8.3.4.tgz"
   integrity sha512-c/I8ZRb51j+pYGAu5CrFMRxqZ2ke4y2grEBO5AUjgSkSk+qT2Ea+OdWElz/OiMf5MNpn2b17kuVBwZLQJXzihw==
 
-"@uniswap/lib@1.1.4":
-  version "1.1.4"
-  resolved "https://registry.yarnpkg.com/@uniswap/lib/-/lib-1.1.4.tgz#85100cddcdb61e0b7eae9b8e9e21525e147c47f3"
-  integrity sha512-5una/3a2dPzPN0moDBsa9LfTxCjZjEiLEkN75wjwplmDU4oFqneVAzVA3Heq+DadEk3k17cszAbSMcaIu7hLfg==
-
 abort-controller@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/abort-controller/-/abort-controller-3.0.0.tgz#eaf54d53b62bae4138e809ca225c8439a6efb392"
