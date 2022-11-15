@@ -259,34 +259,34 @@ const main = async () => {
         const reservesDai2 = await dai2WethPair.getReserves()
         const reservesDai3 = await dai3WethPair.getReserves()
         return {
-            weth: (await wethContract.balanceOf(adminWallet.address)).toString(),
-            dai1: (await dai1Contract.balanceOf(adminWallet.address)).toString(),
-            dai2: (await dai2Contract.balanceOf(adminWallet.address)).toString(),
-            dai3: (await dai3Contract.balanceOf(adminWallet.address)).toString(),
+            weth: utils.formatEther(await wethContract.balanceOf(adminWallet.address)),
+            dai1: utils.formatEther(await dai1Contract.balanceOf(adminWallet.address)),
+            dai2: utils.formatEther(await dai2Contract.balanceOf(adminWallet.address)),
+            dai3: utils.formatEther(await dai3Contract.balanceOf(adminWallet.address)),
             pricesPerWeth: {
-                dai1: (await isWeth0(dai1WethPair) ?
-                    reservesDai1[1].div(reservesDai1[0] > 0 ? reservesDai1[0] : 1) :
-                    reservesDai1[0].div(reservesDai1[1] > 0 ? reservesDai1[1] : 1)).toString(),
-                dai2: (await isWeth0(dai2WethPair) ?
-                    reservesDai2[1].div(reservesDai2[0] > 0 ? reservesDai2[0] : 1) :
-                    reservesDai2[0].div(reservesDai2[1] > 0 ? reservesDai2[1] : 1)).toString(),
-                dai3: (await isWeth0(dai3WethPair) ?
-                    reservesDai3[1].div(reservesDai3[0] > 0 ? reservesDai3[0] : 1) :
-                    reservesDai3[0].div(reservesDai3[1] > 0 ? reservesDai3[1] : 1)).toString(),
+                dai1: utils.formatEther(await isWeth0(dai1WethPair) ?
+                    (reservesDai1[1].mul(ETH)).div(reservesDai1[0] > 0 ? reservesDai1[0] : 1) :
+                    (reservesDai1[0].mul(ETH)).div(reservesDai1[1] > 0 ? reservesDai1[1] : 1)),
+                dai2: utils.formatEther(await isWeth0(dai2WethPair) ?
+                    (reservesDai2[1].mul(ETH)).div(reservesDai2[0] > 0 ? reservesDai2[0] : 1) :
+                    (reservesDai2[0].mul(ETH)).div(reservesDai2[1] > 0 ? reservesDai2[1] : 1)),
+                dai3: utils.formatEther(await isWeth0(dai3WethPair) ?
+                    (reservesDai3[1].mul(ETH)).div(reservesDai3[0] > 0 ? reservesDai3[0] : 1) :
+                    (reservesDai3[0].mul(ETH)).div(reservesDai3[1] > 0 ? reservesDai3[1] : 1)),
             }
         }
     }
     
     if (shouldMintTokens) {
         let idx = 0
-        // mint 25B DAI for 3 DAI clones
+        // mint 2600000 DAI for 3 DAI clones (+5000 for adminWallet)
         for (const addr of [
             addr_dai1, addr_dai2, addr_dai3
         ]) {
             const contract = new Contract(addr, contracts.DAI.abi, adminWallet)
             const txReq = populateTxFully(
                 await contract.populateTransaction.mint(
-                    adminWallet.address, ETH.mul(25).mul(1e9)
+                    adminWallet.address, ETH.mul(2605000)
                 ),
                 getNonce()
             )
@@ -411,7 +411,7 @@ const main = async () => {
             )
             const signedDepositDaiTx = await adminWallet.signTransaction(
                 populateTxFully(
-                    await daiContract.populateTransaction.transfer(pairAddr, ETH.mul(20).mul(1e9)),
+                    await daiContract.populateTransaction.transfer(pairAddr, ETH.mul(2600000)), // price 1300 DAI/WETH
                     getNonce()
                 )
             )
@@ -527,8 +527,8 @@ const main = async () => {
                 return amounts
             }
 
-            // swap 0.01 WETH for DAI1
-            const amountIn = ETH.div(100)
+            // swap 1 WETH for DAI1
+            const amountIn = ETH.mul(1)
             const amountsOut = await getAmountsOut(amountIn, [addr_weth, addr_dai1])
 
             // need to send `amountIn` to pair contract before calling `swap`
@@ -550,6 +550,7 @@ const main = async () => {
             )
             const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
             console.log("swap", swapRes.transactionHash)
+
         } catch (e) {
             console.error("failed to swap", e)
         }
