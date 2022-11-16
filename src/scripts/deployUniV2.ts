@@ -25,6 +25,7 @@ type Deployments = {
     dai3: ContractDeployment,           // erc20
     weth: ContractDeployment,           // erc20
     uniV2Factory: ContractDeployment,   // univ2 factory (creates univ2 pairs)
+    atomicSwap: ContractDeployment,
     dai1_weth?: ContractDeployment,      // univ2 pair
     dai2_weth?: ContractDeployment,      // univ2 pair
     dai3_weth?: ContractDeployment,      // univ2 pair
@@ -153,6 +154,7 @@ const main = async () => {
     let addr_dai1_weth: string
     let addr_dai2_weth: string
     let addr_dai3_weth: string
+    let addr_atomicSwap: string
     // arrays to be returned at end
     let deployments: Deployments | undefined = undefined // the contracts we will interact with
     let daiMints: string[] = []
@@ -173,6 +175,7 @@ const main = async () => {
         let weth = await getCloneDeployment(contracts.WETH, getNonce()) // weth has no constructor args
         // get uniswapv2 factory deployment
         let uniV2Factory = await getCloneDeployment(contracts.UniV2Factory, getNonce(), [adminWallet.address])
+        let atomicSwap = await getCloneDeployment(contracts.AtomicSwap, getNonce(), [weth.contractAddress])
         console.log("deploying base contracts: 3 DAI tokens, WETH, uniswapV2factory...")
         deployments = {
             dai1,           // erc20
@@ -180,6 +183,7 @@ const main = async () => {
             dai3,           // erc20
             weth,           // erc20
             uniV2Factory,   // univ2 factory (creates univ2 pairs)
+            atomicSwap,
             // dai1_weth,      // univ2 pair
             // dai2_weth,      // univ2 pair
             // dai3_weth,      // univ2 pair
@@ -191,6 +195,7 @@ const main = async () => {
         addr_dai3 = dai3.contractAddress
         addr_weth = weth.contractAddress
         addr_uniV2Factory = uniV2Factory.contractAddress
+        addr_atomicSwap = atomicSwap.contractAddress
 
         for (const deployment of Object.values(deployments)) {
             await (await PROVIDER.sendTransaction(deployment.signedDeployTx)).wait(1)
@@ -238,6 +243,7 @@ const main = async () => {
         addr_dai2_weth = uniDeployments.deployments.dai2_weth?.contractAddress || ''
         addr_dai3_weth = uniDeployments.deployments.dai3_weth?.contractAddress || ''
         addr_uniV2Factory = uniDeployments.deployments.uniV2Factory.contractAddress
+        addr_atomicSwap = uniDeployments.deployments.atomicSwap.contractAddress
         console.log("weth addr", uniDeployments.deployments.weth.contractAddress)
     }
 
@@ -246,6 +252,7 @@ const main = async () => {
     const dai2Contract = new Contract(addr_dai2, contracts.DAI.abi).connect(PROVIDER)
     const dai3Contract = new Contract(addr_dai3, contracts.DAI.abi).connect(PROVIDER)
     const uniV2FactoryContract = new Contract(addr_uniV2Factory, contracts.UniV2Factory.abi).connect(PROVIDER)
+    const atomicSwapContract = new Contract (addr_atomicSwap, contracts.AtomicSwap.abi).connect(PROVIDER)
     const dai1WethPair = new Contract(addr_dai1_weth, contracts.UniV2Pair.abi).connect(PROVIDER)
     const dai2WethPair = new Contract(addr_dai2_weth, contracts.UniV2Pair.abi).connect(PROVIDER)
     const dai3WethPair = new Contract(addr_dai3_weth, contracts.UniV2Pair.abi).connect(PROVIDER)
@@ -351,25 +358,55 @@ const main = async () => {
                 getNonce()
             )
         )
+        // approve atomicSwap to spend all my tokens
+        const signedApproveWethAtomicSwap = await adminWallet.signTransaction(
+            populateTxFully(
+                await wethContract.populateTransaction.approve(addr_atomicSwap, constants.MaxUint256),
+                getNonce(),
+            )
+        )
+        const signedApproveDai1AtomicSwap = await adminWallet.signTransaction(
+            populateTxFully(
+                await dai1Contract.populateTransaction.approve(addr_atomicSwap, constants.MaxUint256),
+                getNonce(),
+            )
+        )
+        const signedApproveDai2AtomicSwap = await adminWallet.signTransaction(
+            populateTxFully(
+                await dai2Contract.populateTransaction.approve(addr_atomicSwap, constants.MaxUint256),
+                getNonce(),
+            )
+        )
+        const signedApproveDai3AtomicSwap = await adminWallet.signTransaction(
+            populateTxFully(
+                await dai3Contract.populateTransaction.approve(addr_atomicSwap, constants.MaxUint256),
+                getNonce(),
+            )
+        )
 
-        const approveResDai1WethPool = await (await PROVIDER.sendTransaction(signedApproveDai1WethPool)).wait(1)
-        console.log("approved DAI1 DAI1/WETH", approveResDai1WethPool.transactionHash)
-        const approveResWethDai1Pool = await (await PROVIDER.sendTransaction(signedApproveWethDai1Pool)).wait(1)
-        console.log("approved WETH DAI1/WETH", approveResWethDai1Pool.transactionHash)
-        const approveSignedApproveDAI2WethPool = await (await PROVIDER.sendTransaction(signedApproveDAI2WethPool)).wait(1)
-        console.log("approved DAI2 DAI2/WETH", approveSignedApproveDAI2WethPool.transactionHash)
-        const approveSignedApproveWethDAI2Pool = await (await PROVIDER.sendTransaction(signedApproveWethDAI2Pool)).wait(1)
-        console.log("approved WETH DAI2/WETH", approveSignedApproveWethDAI2Pool.transactionHash)
-        const approveSignedApproveDAI3WethPool = await (await PROVIDER.sendTransaction(signedApproveDAI3WethPool)).wait(1)
-        console.log("approved DAI3 DAI3/WETH", approveSignedApproveDAI3WethPool.transactionHash)
-        const approveSignedApproveWethDAI3Pool = await (await PROVIDER.sendTransaction(signedApproveWethDAI3Pool)).wait(1)
-        console.log("approved WETH DAI3/WETH", approveSignedApproveWethDAI3Pool.transactionHash)
-        approvals.push(signedApproveDai1WethPool)
-        approvals.push(signedApproveWethDai1Pool)
-        approvals.push(signedApproveDAI2WethPool)
-        approvals.push(signedApproveWethDAI2Pool)
-        approvals.push(signedApproveDAI3WethPool)
-        approvals.push(signedApproveWethDAI3Pool)
+        console.log("approved DAI1 DAI1/WETH", (await (await PROVIDER.sendTransaction(signedApproveDai1WethPool)).wait(1)).transactionHash)
+        console.log("approved WETH DAI1/WETH", (await (await PROVIDER.sendTransaction(signedApproveWethDai1Pool)).wait(1)).transactionHash)
+        console.log("approved DAI2 DAI2/WETH", (await (await PROVIDER.sendTransaction(signedApproveDAI2WethPool)).wait(1)).transactionHash)
+        console.log("approved WETH DAI2/WETH", (await (await PROVIDER.sendTransaction(signedApproveWethDAI2Pool)).wait(1)).transactionHash)
+        console.log("approved DAI3 DAI3/WETH", (await (await PROVIDER.sendTransaction(signedApproveDAI3WethPool)).wait(1)).transactionHash)
+        console.log("approved WETH DAI3/WETH", (await (await PROVIDER.sendTransaction(signedApproveWethDAI3Pool)).wait(1)).transactionHash)
+        // atomicSwap approvals
+        console.log("approved WETH atomicSwap", (await (await PROVIDER.sendTransaction(signedApproveWethAtomicSwap)).wait(1)).transactionHash)
+        console.log("approved DAI1 atomicSwap", (await (await PROVIDER.sendTransaction(signedApproveDai1AtomicSwap)).wait(1)).transactionHash)
+        console.log("approved DAI2 atomicSwap", (await (await PROVIDER.sendTransaction(signedApproveDai2AtomicSwap)).wait(1)).transactionHash)
+        console.log("approved DAI3 atomicSwap", (await (await PROVIDER.sendTransaction(signedApproveDai3AtomicSwap)).wait(1)).transactionHash)
+        approvals.push(...[
+            signedApproveDai1WethPool,
+            signedApproveWethDai1Pool,
+            signedApproveDAI2WethPool,
+            signedApproveWethDAI2Pool,
+            signedApproveDAI3WethPool,
+            signedApproveWethDAI3Pool,
+            signedApproveWethAtomicSwap,
+            signedApproveDai1AtomicSwap,
+            signedApproveDai2AtomicSwap,
+            signedApproveDai3AtomicSwap,
+        ])
     }
 
     if (shouldBootstrapLiquidity) {
@@ -487,7 +524,7 @@ const main = async () => {
             const addr_dai1_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai1)
             // const addr_dai2_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai2)
             // const addr_dai3_weth: string = await uniV2FactoryContract.getPair(addr_weth, addr_dai3)
-            const dai1WethPair = new Contract(addr_dai1_weth, contracts.UniV2Pair.abi)
+            // const dai1WethPair = new Contract(addr_dai1_weth, contracts.UniV2Pair.abi)
             // const dai2WethPair = new Contract(addr_dai2_weth, contracts.UniV2Pair.abi)
             // const dai3WethPair = new Contract(addr_dai3_weth, contracts.UniV2Pair.abi)
 
@@ -532,6 +569,7 @@ const main = async () => {
             const amountsOut = await getAmountsOut(amountIn, [addr_weth, addr_dai1])
 
             // need to send `amountIn` to pair contract before calling `swap`
+            /* /// manual method requires two txs
             const signedPreSwapTransfer = await adminWallet.signTransaction(
                 populateTxFully(
                     await wethContract.populateTransaction
@@ -550,7 +588,22 @@ const main = async () => {
             )
             const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
             console.log("swap", swapRes.transactionHash)
-
+            */
+            // use custom router to swap
+            const signedSwap = await adminWallet.signTransaction(
+                populateTxFully(
+                    await atomicSwapContract.populateTransaction.swap(
+                        amountsOut[0], // param to pair.swap
+                        amountsOut[1], // param to pair.swap
+                        amountIn, // amount of tokens that searcher sends to swap
+                        addr_weth, // address of token that searcher sends to swap
+                        addr_dai1_weth, // univ2 pair address to execute swap
+                    ),
+                    getNonce(),
+                )
+            )
+            const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
+            console.log("swap", swapRes.transactionHash)
         } catch (e) {
             console.error("failed to swap", e)
         }
