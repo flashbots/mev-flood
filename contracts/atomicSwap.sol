@@ -10,9 +10,16 @@ interface IWeth {
 
 contract AtomicSwap {
     address public WETH;
+    address private owner;
 
     constructor(address weth) {
         WETH = weth;
+        owner = msg.sender;
+    }
+
+    function liquidate() public {
+        IERC20 weth = IERC20(WETH);
+        weth.transfer(owner, weth.balanceOf(address(this)));
     }
 
     // perform swap and keep resulting token balance in contract
@@ -21,7 +28,8 @@ contract AtomicSwap {
         uint256 amount1Out, // param to pair.swap
         uint256 amountIn, // amount of tokens that searcher sends to swap
         address tokenInAddress, // address of token that searcher sends to swap
-        address pairAddress // univ2 pair address to execute swap
+        address pairAddress, // univ2 pair address to execute swap
+        address recipient // address that receives the tokens
     ) public {
         IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
         IERC20 tokenIn = IERC20(tokenInAddress);
@@ -29,7 +37,7 @@ contract AtomicSwap {
             tokenIn.transferFrom(msg.sender, pairAddress, amountIn),
             "transfer failed"
         );
-        pair.swap(amount0Out, amount1Out, address(this), "");
+        pair.swap(amount0Out, amount1Out, recipient, "");
     }
 
     // assume we only settle in WETH
@@ -40,9 +48,17 @@ contract AtomicSwap {
         address tokenInAddress, // address of token that searcher sends to swap
         address pairAddress // univ2 pair address to execute swap
     ) public {
+        require(owner == msg.sender, "not allowed");
         IERC20 tokenOut = IERC20(WETH);
         uint256 startBalance = tokenOut.balanceOf(address(this));
-        swap(amount0Out, amount1Out, amountIn, tokenInAddress, pairAddress);
+        swap(
+            amount0Out,
+            amount1Out,
+            amountIn,
+            tokenInAddress,
+            pairAddress,
+            address(this)
+        );
         uint256 endBalance = tokenOut.balanceOf(address(this));
         require(endBalance > startBalance, "arb was not profitable");
         uint256 bribeAmount = ((endBalance - startBalance) * 90) / 100; // bribe 90%
