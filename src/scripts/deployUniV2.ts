@@ -1,5 +1,5 @@
 import { TransactionRequest } from '@ethersproject/abstract-provider';
-import { ContractFactory, Contract, utils, BigNumber, constants, Wallet } from "ethers"
+import { ContractFactory, Contract, utils, BigNumber, constants, Wallet, ethers } from "ethers"
 import { constants as fsConstants } from 'fs';
 import fs from "fs/promises"
 import readline from "readline-sync"
@@ -256,8 +256,8 @@ const main = async () => {
             const token0: string = await pair.token0()
             return token0.toLowerCase() === addr_weth.toLowerCase()
         }
-        const reservesDaiWeth_A = await daiWethPair_A.getReserves()
-        const reservesDaiWeth_B = await daiWethPair_B.getReserves()
+        const reservesDaiWeth_A: any[] = await daiWethPair_A.getReserves()
+        const reservesDaiWeth_B: any[] = await daiWethPair_B.getReserves()
         return {
             admin: {
                 weth: utils.formatEther(await wethContract.balanceOf(adminWallet.address)),
@@ -267,6 +267,10 @@ const main = async () => {
                 weth: utils.formatEther(await wethContract.balanceOf(userWallet.address)),
                 dai: utils.formatEther(await daiContract.balanceOf(userWallet.address)),
             },
+            swapContract: {
+                weth: utils.formatEther(await wethContract.balanceOf(addr_atomicSwap)),
+                dai: utils.formatEther(await daiContract.balanceOf(addr_atomicSwap)),
+            },
             pricesPerWeth: {
                 dai_Univ2_A: utils.formatEther(await isWeth0(daiWethPair_A) ?
                     (reservesDaiWeth_A[1].mul(ETH)).div(reservesDaiWeth_A[0] > 0 ? reservesDaiWeth_A[0] : 1) :
@@ -274,6 +278,10 @@ const main = async () => {
                 dai_Univ2_B: utils.formatEther(await isWeth0(daiWethPair_B) ?
                     (reservesDaiWeth_B[1].mul(ETH)).div(reservesDaiWeth_B[0] > 0 ? reservesDaiWeth_B[0] : 1) :
                     (reservesDaiWeth_B[0].mul(ETH)).div(reservesDaiWeth_B[1] > 0 ? reservesDaiWeth_B[1] : 1)),
+            },
+            reserves: {
+                uni_A: reservesDaiWeth_A.slice(0, 2).map(r => utils.formatEther(r)),
+                uni_B: reservesDaiWeth_B.slice(0, 2).map(r => utils.formatEther(r)),
             }
         }
     }
@@ -303,7 +311,7 @@ const main = async () => {
 
         // mint tons of weth for admin
         signedTx = await adminWallet.signTransaction(populateTxFully({
-            value: ETH.mul(9001),
+            value: ETH.mul(9000),
             to: addr_weth,
             data: "0xd0e30db0" // deposit
         }, getAdminNonce()))
@@ -313,7 +321,7 @@ const main = async () => {
 
         // mint an earnest amount of weth for user
         signedTx = await userWallet.signTransaction(populateTxFully({
-            value: ETH.mul(13),
+            value: ETH.mul(1000),
             to: addr_weth,
             data: "0xd0e30db0" // deposit
         }, getUserNonce(), userWallet.address))
@@ -365,17 +373,6 @@ const main = async () => {
         console.log("addr_dai_weth_A", addr_dai_weth_A)
         console.log("addr_dai_weth_B", addr_dai_weth_B)
 
-        // // set feeTo in univ2 factory (not necessary)
-        // if (factoryFeeTo === "0x0000000000000000000000000000000000000000") {
-        //     setFeeToTx = await adminWallet.signTransaction(populateTxFully(
-        //         await uniV2FactoryContract.populateTransaction.setFeeTo(adminWallet.address),
-        //         getNonce()
-        //     ))
-        //     console.log("setting feeTo in univ2 factory...")
-        //     await (await PROVIDER.sendTransaction(setFeeToTx)).wait(1)
-        //     console.log("OK.")
-        // }
-
         // deposit liquidity into WETH/DAI pairs
         const daiWethPairAddrs = [addr_dai_weth_A, addr_dai_weth_B]
         for (const pairAddr of daiWethPairAddrs) {
@@ -417,63 +414,140 @@ const main = async () => {
     
     if (shouldTestSwap) {
         try {
-            const addr_dai_weth_A: string = await uniV2FactoryContract_A.getPair(addr_weth, addr_dai)
+            // const sortTokens = (tokenA: string, tokenB: string) => {
+            //     return tokenA < tokenB ? [tokenA, tokenB] : [tokenB, tokenA]
+            // }
+            // const getReserves = async (path: string[], pairContract: Contract) => {
+            //     const token0 = sortTokens(path[0], path[1])[0]
+            //     const reserves: any[] = await pairContract.getReserves()
+            //     console.log("RESERVES", reserves)
+            //     console.log("token0", await pairContract.token0())
+            //     console.log("token1", await pairContract.token1())
+            //     return path[0].toLowerCase() === token0.toLowerCase() ? reserves.slice(0, 2) : reserves.slice(0, 2).reverse()
+            // }
+            // // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset (copied from Univ2 library)
+            // const getAmountOut = (
+            //     amountIn: BigNumber,
+            //     reserveIn: BigNumber,
+            //     reserveOut: BigNumber
+            // ) => {
+            //     if (amountIn.lte(0)) {
+            //         console.error('UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT')
+            //     }
+            //     if (reserveIn.lte(0) && reserveOut.lte(0)) {
+            //         console.error('UniswapV2Library: INSUFFICIENT_LIQUIDITY')
+            //     }
+            //     const amountInWithFee = amountIn.mul(997);
+            //     const numerator = amountInWithFee.mul(reserveOut);
+            //     const denominator = reserveIn.mul(1000).add(amountInWithFee);
+            //     return numerator.div(denominator);
+            // }
+            // /**
+            //  * performs chained getAmountOut calculations on any number of pairs (copied from Univ2 library)
+            //  * returns amounts in [amountIn, amountOut] format
+            //  * @param amountIn 
+            //  * @param path 
+            //  * @param pairAddress 
+            //  * @returns 
+            //  */
+            // const getAmountsOut = async (
+            //     amountIn: BigNumber,
+            //     path: string[],
+            //     pairAddress: string,
+            // ) => {
+            //     if (path.length < 2) console.error('UniswapV2Library: INVALID_PATH')
+            //     let amounts = []
+            //     amounts[0] = amountIn;
+            //     let pairContract = (new Contract(pairAddress, contracts.UniV2Pair.abi)).connect(PROVIDER)
+            //     for (let i = 0; i < path.length - 1; i++) {
+            //         const [reserveIn, reserveOut] = await getReserves(path, pairContract)
+            //         amounts[i + 1] = getAmountOut(amounts[i], reserveIn, reserveOut);
+            //     }
+            //     return amounts
+            // }
+            // function sqrt(value: BigNumber) {
+            //     const ONE = ethers.BigNumber.from(1);
+            //     const TWO = ethers.BigNumber.from(2);
+            //     let x = ethers.BigNumber.from(value);
+            //     let z = x.add(ONE).div(TWO);
+            //     let y = x;
+            //     while (z.sub(y).isNegative()) {
+            //         y = z;
+            //         z = x.div(z).add(z).div(TWO);
+            //     }
+            //     return y;
+            // }
+            // /**
+            //  * This function sells reserve ONE for reserve ZERO
+            //  * @param firstPairReserve0 
+            //  * @param firstPairReserve1 
+            //  * @param secondPairReserve0 
+            //  * @param secondPairReserve1 
+            //  */
+            // function getOptimalPositionSize(
+            //     firstPairReserve0: BigNumber,
+            //     firstPairReserve1: BigNumber,
+            //     secondPairReserve0: BigNumber,
+            //     secondPairReserve1: BigNumber,
+            // ) {
+            //     let firstPairPrice = firstPairReserve0.div(firstPairReserve1);
+            //     let secondPairPrice = secondPairReserve1.div(secondPairReserve0);
+            //     const UNISWAP_PLATFORM_FEE = BigNumber.from(0.997);
+            
+            //     const numerator = sqrt(
+            //         firstPairPrice.mul(secondPairPrice).mul(UNISWAP_PLATFORM_FEE).mul(UNISWAP_PLATFORM_FEE)
+            //     ).sub(1);
+            //     const denominatorPart1 = UNISWAP_PLATFORM_FEE.div(firstPairReserve1);
+            //     const denominatorPart2 =
+            //     (UNISWAP_PLATFORM_FEE.mul(UNISWAP_PLATFORM_FEE).mul(firstPairPrice)).div(secondPairReserve0);
+            //     const denominator = denominatorPart1.add(denominatorPart2);
+            //     const amountIn = numerator.div(denominator);
+            //     return amountIn;
+            // }
 
-            // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset (copied from Univ2 library)
-            const getAmountOut = (
-                amountIn: BigNumber,
-                reserveIn: BigNumber,
-                reserveOut: BigNumber
-            ) => {
-                if (amountIn.lte(0)) {
-                    console.error('UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT')
-                }
-                if (reserveIn.lte(0) && reserveOut.lte(0)) {
-                    console.error('UniswapV2Library: INSUFFICIENT_LIQUIDITY')
-                }
-                const amountInWithFee = amountIn.mul(997);
-                const numerator = amountInWithFee.mul(reserveOut);
-                const denominator = reserveIn.mul(1000).add(amountInWithFee);
-                return numerator.div(denominator);
-            }
-
-            // performs chained getAmountOut calculations on any number of pairs (copied from Univ2 library)
-            const getAmountsOut = async (
-                amountIn: BigNumber,
-                path: string[],
-                pairAddress: string,
-            ) => {
-                if (path.length < 2) console.error('UniswapV2Library: INVALID_PATH')
-                let amounts = []
-                amounts[0] = amountIn;
-                for (let i = 0; i < path.length - 1; i++) {
-                    let pairContract = (new Contract(pairAddress, contracts.UniV2Pair.abi)).connect(PROVIDER)
-                    const reserves = await pairContract.getReserves()
-                    amounts[i + 1] = getAmountOut(amounts[i], reserves[0], reserves[1]);
-                }
-                return amounts
-            }
-
-            // swap 1 WETH for DAI on Uni_A
-            const amountIn = ETH.mul(1)
-            const amountsOut = await getAmountsOut(amountIn, [addr_weth, addr_dai], addr_dai_weth_A)
+            // swap 50 WETH for DAI on Uni_A
+            const amountIn = ETH.mul(50)
+            const path = [addr_weth, addr_dai]
 
             // use custom router to swap
-            const signedSwap = await adminWallet.signTransaction(
+            const signedSwap = await userWallet.signTransaction(
                 populateTxFully(
                     await atomicSwapContract.populateTransaction.swap(
-                        amountsOut[0], // param to pair.swap
-                        amountsOut[1], // param to pair.swap
-                        amountIn, // amount of tokens that searcher sends to swap
-                        addr_weth, // address of token that searcher sends to swap
-                        addr_dai_weth_A, // univ2 pair address to execute swap
-                        adminWallet.address
+                        path,
+                        amountIn,
+                        uniV2FactoryContract_A.address,
+                        userWallet.address,
+                        false
+                    ),
+                    getUserNonce(),
+                    userWallet.address,
+                )
+            )
+            const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
+            console.log("user swapped", swapRes.transactionHash)
+            console.log("balances", await getBalances())
+
+            const reserves_A: BigNumber[] = (await daiWethPair_A.getReserves()).slice(0,2)
+            const reserves_B: BigNumber[] = (await daiWethPair_B.getReserves()).slice(0,2)
+
+            const priceHigherOnA = reserves_A[0].div(reserves_A[1]).gt(reserves_B[0].div(reserves_B[1]))
+            const start_factory = priceHigherOnA ? addr_uniV2Factory_A : addr_uniV2Factory_B
+            const end_factory = priceHigherOnA ? addr_uniV2Factory_B : addr_uniV2Factory_A
+
+            // backrun it
+            const signedBackrun = await adminWallet.signTransaction(
+                populateTxFully(
+                    await atomicSwapContract.populateTransaction.backrun(
+                        addr_dai, // token we're going to buy and sell
+                        start_factory, // factory of pair we'll buy token from
+                        end_factory, // factory of pair we'll sell token to
+                        amountIn.mul(50).div(100) // amount of WETH to spend on tokens // lazy approximation
                     ),
                     getAdminNonce(),
                 )
             )
-            const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
-            console.log("swap", swapRes.transactionHash)
+            const backrunRes = await (await PROVIDER.sendTransaction(signedBackrun)).wait(1)
+            console.log("admin back-ran", backrunRes.transactionHash)
         } catch (e) {
             console.error("failed to swap", e)
         }

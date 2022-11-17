@@ -3,68 +3,116 @@ pragma solidity ^0.8.15;
 
 import "./univ2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "./univ2-core/contracts/interfaces/IERC20.sol";
+import "./UniV2Library.sol";
 
-interface IWeth {
+interface IWeth is IERC20 {
     function withdraw(uint256 wad) external;
 }
 
 contract AtomicSwap {
     address public WETH;
     address private owner;
+    IWeth private weth;
 
-    constructor(address weth) {
-        WETH = weth;
+    constructor(address _weth) {
+        WETH = _weth;
+        weth = IWeth(_weth);
         owner = msg.sender;
     }
 
+    event Wtf(address msg_sender);
+
     function liquidate() public {
-        IERC20 weth = IERC20(WETH);
         weth.transfer(owner, weth.balanceOf(address(this)));
     }
 
-    // perform swap and keep resulting token balance in contract
-    function swap(
+    // perform swap from sender's account
+    function _swap(
         uint256 amount0Out, // param to pair.swap
         uint256 amount1Out, // param to pair.swap
-        uint256 amountIn, // amount of tokens that searcher sends to swap
         address tokenInAddress, // address of token that searcher sends to swap
         address pairAddress, // univ2 pair address to execute swap
-        address recipient // address that receives the tokens
-    ) public {
+        address recipient, // address that receives the tokens
+        bool fromThis // flag to swap from this contract
+    ) internal {
         IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
         IERC20 tokenIn = IERC20(tokenInAddress);
+
+        uint256 transferAmount = pair.token0() == tokenInAddress
+            ? amount0Out
+            : amount1Out;
+
         require(
-            tokenIn.transferFrom(msg.sender, pairAddress, amountIn),
+            fromThis
+                ? tokenIn.transfer(pairAddress, transferAmount)
+                : tokenIn.transferFrom(msg.sender, pairAddress, transferAmount),
             "transfer failed"
         );
-        pair.swap(amount0Out, amount1Out, recipient, "");
+        pair.swap(
+            amount0Out == transferAmount ? 0 : amount0Out,
+            amount1Out == transferAmount ? 0 : amount1Out,
+            recipient,
+            new bytes(0)
+        );
+    }
+
+    function swap(
+        address[] memory path,
+        uint256 amountIn,
+        address factory,
+        address recipient,
+        bool fromThis
+    ) public {
+        IUniswapV2Pair pair = IUniswapV2Pair(
+            IUniswapV2Factory(factory).getPair(path[0], path[1])
+        );
+        // path-wise amounts
+        uint256[] memory amounts = UniswapV2Library.getAmountsOut(
+            factory,
+            amountIn,
+            path
+        );
+        _swap( // send weth from contract
+            pair.token0() == path[0] ? amounts[0] : amounts[1],
+            pair.token0() == path[0] ? amounts[1] : amounts[0],
+            path[0],
+            address(pair),
+            recipient,
+            fromThis
+        );
     }
 
     // assume we only settle in WETH
-    function bribeSwap(
-        uint256 amount0Out, // param to pair.swap
-        uint256 amount1Out, // param to pair.swap
-        uint256 amountIn, // amount of tokens that searcher sends to swap
-        address tokenInAddress, // address of token that searcher sends to swap
-        address pairAddress // univ2 pair address to execute swap
+    // FYI this is _incredibly_ inefficient
+    function backrun(
+        address _token, // token we're going to buy and sell
+        address _startFactory, // factory of pair we'll buy token from
+        address _endFactory, // factory of pair we'll sell token to
+        uint256 _amountIn // amount of WETH to spend on tokens
     ) public {
-        require(owner == msg.sender, "not allowed");
-        IERC20 tokenOut = IERC20(WETH);
-        uint256 startBalance = tokenOut.balanceOf(address(this));
+        uint256 startBalance = weth.balanceOf(address(this));
+
+        address[] memory startPath = new address[](2);
+        address[] memory endPath = new address[](2);
+        startPath[0] = WETH;
+        startPath[1] = _token;
+        endPath[0] = _token;
+        endPath[1] = WETH;
+
+        // swap WETH -> TKN on startPair
+        swap(startPath, _amountIn, _startFactory, address(this), false);
+
+        // swap TKN -> WETH on endPair
         swap(
-            amount0Out,
-            amount1Out,
-            amountIn,
-            tokenInAddress,
-            pairAddress,
-            address(this)
+            endPath,
+            IERC20(_token).balanceOf(address(this)),
+            _endFactory,
+            address(this),
+            true
         );
-        uint256 endBalance = tokenOut.balanceOf(address(this));
-        require(endBalance > startBalance, "arb was not profitable");
-        uint256 bribeAmount = ((endBalance - startBalance) * 90) / 100; // bribe 90%
-        // tokenOut.transferFrom(address(this), block.coinbase, value); // don't transfer tokens to coinbase, transfer ETH
-        IWeth weth = IWeth(WETH);
-        weth.withdraw(bribeAmount);
-        block.coinbase.transfer(bribeAmount);
+        // require(
+        //     weth.balanceOf(address(this)) > startBalance,
+        //     "arb not profitable"
+        // );
     }
 }
