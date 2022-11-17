@@ -110,9 +110,9 @@ contract AtomicSwap {
             address(this),
             true
         );
-        // require(
-        //     weth.balanceOf(address(this)) > startBalance,
-        //     "arb not profitable"
-        // );
+        require(
+            weth.balanceOf(address(this)) > startBalance + _amountIn,
+            "arb not profitable"
+        );
     }
 }
