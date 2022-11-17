@@ -20,7 +20,7 @@ contract AtomicSwap {
         owner = msg.sender;
     }
 
-    event Wtf(address msg_sender);
+    fallback() external payable {}
 
     function liquidate() public {
         weth.transfer(owner, weth.balanceOf(address(this)));
@@ -111,8 +111,14 @@ contract AtomicSwap {
             true
         );
         require(
-            weth.balanceOf(address(this)) > startBalance + _amountIn,
+            weth.balanceOf(address(this)) > (startBalance + _amountIn),
             "arb not profitable"
         );
+        uint256 tipAmount = ((weth.balanceOf(address(this)) -
+            startBalance -
+            _amountIn) * 9000) / 10000;
+        weth.withdraw(tipAmount);
+        block.coinbase.transfer(tipAmount); // pay validator
+        weth.transfer(msg.sender, weth.balanceOf(address(this))); // send surplus to caller (inefficient!)
     }
 }
