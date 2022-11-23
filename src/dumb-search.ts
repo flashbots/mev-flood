@@ -43,6 +43,7 @@ PROVIDER.on('block', async (blockNum: number) => {
         } catch (e) {
             const err: any = e
             console.error("[simulateBundle] backend error", err.code)
+            console.error(err.response.status, err.response.statusText)
         }
 
         // send
@@ -54,6 +55,7 @@ PROVIDER.on('block', async (blockNum: number) => {
         } catch (e) {
             const err: any = e
             console.error("[sendBundle] backend error", err.code)
+            console.error(err.response.status, err.response.statusText)
         }
     }
 })
