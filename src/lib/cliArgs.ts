@@ -1,3 +1,5 @@
+import { textColors } from './helpers'
+
 /**
  * Get CLI args for "search" scripts (dumb-search, smart-search, fake-search)
  * @param programName name of script for console readability
@@ -139,3 +141,89 @@ Example:
 }
 
 export const useMempool = process.argv.length > 4 && process.argv[4] == "mempool"
+
+export const getDeployUniswapV2Args = () => {
+    let shouldDeploy = true
+    let shouldMintTokens = true
+    let shouldBootstrapLiquidity = true
+    let shouldApproveTokens = true
+    let shouldTestSwap = true
+    let autoAccept = false
+
+    const helpMessage = `
+    ${textColors.Bright}script.liquid${textColors.Reset}: deploy a uniswap v2 environment w/ bootstrapped liquidity.
+    Deployment details are written to \`src/output/${process.env.NODE_ENV}/uniBootstrap$N.json\`
+    where $N increments numerically.
+
+Usage:
+    yarn script.liquid [options]
+
+Options:
+    --deploy-only *     Only deploy contracts, don't bootstrap liquidity.
+    --mint-only *       Only mint tokens.
+    --bootstrap-only *  Only bootstrap liquidity, don't deploy contracts.
+    --approve-only *    Only approve uni router to spend your tokens.
+    --swap-only *       Only test swap.
+    -y                  Auto-accept prompts (non-interactive mode)
+
+    (*) passing multiple --X-only params will cause none of them to execute.
+
+Example:
+    # default; deploy contracts and bootstrap liquidity
+    yarn script.liquid
+
+    # only deploy contracts
+    yarn script.liquid --deploy-only
+
+    # enable degen mode
+    yarn script.liquid --swap-only -y
+`
+    if (process.argv.length > 2) {
+        const args = process.argv.slice(2)
+        if (args.toString().includes("help")) {
+            console.log(helpMessage)
+            process.exit(0)
+        } 
+        if (args.includes("--deploy-only")) {
+            shouldBootstrapLiquidity = false
+            shouldMintTokens = false
+            shouldApproveTokens = false
+            shouldTestSwap = false
+        }
+        if (args.includes("--bootstrap-only")) {
+            shouldDeploy = false
+            shouldMintTokens = false
+            shouldApproveTokens = false
+            shouldTestSwap = false
+        }
+        if (args.includes("--mint-only")) {
+            shouldDeploy = false
+            shouldBootstrapLiquidity = false
+            shouldApproveTokens = false
+            shouldTestSwap = false
+        }
+        if (args.includes("--approve-only")) {
+            shouldDeploy = false
+            shouldBootstrapLiquidity = false
+            shouldMintTokens = false
+            shouldTestSwap = false
+        }
+        if (args.includes("--swap-only")) {
+            shouldDeploy = false
+            shouldBootstrapLiquidity = false
+            shouldMintTokens = false
+            shouldApproveTokens = false
+        }
+        if (args.includes("-y")) {
+            autoAccept = true
+        }
+    }
+    return {
+        shouldApproveTokens,
+        shouldDeploy,
+        shouldBootstrapLiquidity,
+        shouldMintTokens,
+        shouldTestSwap,
+        autoAccept,
+    }
+}

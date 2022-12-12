@@ -1,0 +1,11 @@
+[profile.default]
+libs = ['univ2-core/contracts', 'univ2-periphery/contracts', '../node_modules/@uniswap/lib']
+out = 'out'
+remappings = [
+  '@uniswap/v2-core=contracts/univ2-core',
+]
+src = 'contracts'
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+ignored_error_codes = [2462, 9302, 1878]
+optimizer_runs = 20
+revert_strings = 'default'
