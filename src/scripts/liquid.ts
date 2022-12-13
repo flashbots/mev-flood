@@ -219,10 +219,10 @@ const main = async () => {
     }
     
     if (shouldMintTokens) {
-        const DAI_ADMIN_MINT_AMOUNT = ETH.mul(3000000) // mint 3M DAI for admin (to make LP deposits)
-        const DAI_USER_MINT_AMOUNT = ETH.mul(50000)
-        const WETH_ADMIN_MINT_AMOUNT = ETH.mul(9000)
+        const WETH_ADMIN_MINT_AMOUNT = ETH.mul(2500)
         const WETH_USER_MINT_AMOUNT = ETH.mul(500)
+        const DAI_ADMIN_MINT_AMOUNT = WETH_ADMIN_MINT_AMOUNT.sub(500).mul(1300) // 2000 ETH will be paired w/ DAI @ 1300 DAI/WETH
+        const DAI_USER_MINT_AMOUNT = ETH.mul(50000) // mint 50k DAI for user
 
         // mint DAI for admin
         let signedTx = await adminWallet.signTransaction(populateTxFully(
@@ -246,7 +246,7 @@ const main = async () => {
         console.log(`minting DAI for user ${userWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-        // mint 1000 weth for admin
+        // mint WETH for admin
         signedTx = await adminWallet.signTransaction(populateTxFully({
             value: WETH_ADMIN_MINT_AMOUNT,
             to: addr_weth,
@@ -256,7 +256,7 @@ const main = async () => {
         console.log(`minting WETH for admin ${adminWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-        // mint an earnest amount of weth for user
+        // mint WETH for user
         signedTx = await userWallet.signTransaction(populateTxFully({
             value: WETH_USER_MINT_AMOUNT,
             to: addr_weth,
