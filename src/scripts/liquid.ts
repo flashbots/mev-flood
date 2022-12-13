@@ -219,7 +219,8 @@ const main = async () => {
     }
     
     if (shouldMintTokens) {
-        const DAI_ADMIN_MINT_AMOUNT = ETH.mul(5000000) // mint 5M DAI for admin (to make LP deposits)
+        const DAI_ADMIN_MINT_AMOUNT = ETH.mul(3000000) // mint 3M DAI for admin (to make LP deposits)
+        const DAI_USER_MINT_AMOUNT = ETH.mul(50000)
         const WETH_ADMIN_MINT_AMOUNT = ETH.mul(9000)
         const WETH_USER_MINT_AMOUNT = ETH.mul(500)
 
@@ -237,7 +238,7 @@ const main = async () => {
         // mint DAI for user
         signedTx = await adminWallet.signTransaction(populateTxFully(
             await daiContract.populateTransaction.mint(
-                userWallet.address, ETH.mul(50000)
+                userWallet.address, DAI_USER_MINT_AMOUNT
             ),
             getAdminNonce()
         ))
@@ -354,7 +355,7 @@ const main = async () => {
     
     if (shouldTestSwap) {
         // swap 1 WETH for DAI on Uni_A
-        const amountIn = ETH.mul(5)
+        const amountIn = ETH.mul(50)
         const path = [addr_weth, addr_dai]
 
         try {
@@ -389,7 +390,7 @@ const main = async () => {
             const backrunRes = await (await PROVIDER.sendTransaction(signedBackrun)).wait(1)
             console.log("admin back-ran", backrunRes.transactionHash)
         } catch (e) {
-            console.error("failed to backrun", e)
+            console.error("failed to backrun", (e as Error).message)
         }
         console.log("balances", await getBalances())
     }

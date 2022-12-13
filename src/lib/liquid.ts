@@ -38,7 +38,7 @@ export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: 
                 false
             ),
             nonce || await PROVIDER.getTransactionCount(sender.address),
-            {from: sender.address, gasLimit: 69000},
+            {from: sender.address, gasLimit: 150000},
         )
     )
 }
