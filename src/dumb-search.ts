@@ -1,12 +1,12 @@
 import { createDumbLotteryBundles } from './lib/lottery'
-import { getWalletSet } from './lib/wallets'
+import { getSearchWalletSet } from './lib/wallets'
 import { GWEI, PROVIDER } from './lib/helpers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
 import { v4 as uuidv4 } from 'uuid';
 
 // load wallets from disk
-const walletSet = getWalletSet("dumb-search")
+const walletSet = getSearchWalletSet("dumb-search")
 
 // run a block monitor to send bundles on every block
 PROVIDER.on('block', async (blockNum: number) => {

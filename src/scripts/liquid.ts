@@ -1,58 +1,16 @@
-import { TransactionRequest } from '@ethersproject/abstract-provider';
-import { ContractFactory, Contract, utils, BigNumber, constants, Wallet, ethers } from "ethers"
-import { constants as fsConstants } from 'fs';
+import { ContractFactory, Contract, utils, BigNumber, constants, Wallet } from "ethers"
 import fs from "fs/promises"
 import readline from "readline-sync"
 import { getDeployUniswapV2Args } from '../lib/cliArgs';
 
 import contracts, { ContractSpec } from "../lib/contracts"
 import env from '../lib/env';
-import { ETH, GWEI, PROVIDER, textColors } from '../lib/helpers';
+import { ETH, PROVIDER, textColors, populateTxFully } from '../lib/helpers';
+import { signSwap, getNewDeploymentFilename, getNewLiquidityFilename, getExistingDeploymentFilename, ContractDeployment, DeploymentsFile, Deployments, getDeployment } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 
 /** Used for signing only, NOT connected to a provider. */
 const adminWallet = getAdminWallet()
-
-type ContractDeployment = {
-    contractAddress: string,
-    deployTx: TransactionRequest,
-    signedDeployTx: string,
-}
-
-type Deployments = {
-    dai: ContractDeployment,           // erc20
-    weth: ContractDeployment,           // erc20
-    uniV2Factory_A: ContractDeployment,   // univ2 factory (creates univ2 pairs)
-    uniV2Factory_B: ContractDeployment,   // univ2 factory (creates univ2 pairs)
-    atomicSwap: ContractDeployment,
-    dai_weth_A?: ContractDeployment,      // univ2 pair on Uni_A
-    dai_weth_B?: ContractDeployment,      // univ2 pair on Uni_B
-}
-
-type DeploymentsFile = {
-    deployments: Deployments,
-    allSignedTxs: string[],
-}
-
-/**
- * Fills in runtime data for a tx.
- * @param txRequest 
- * @param nonce 
- * @param fromOverride (default: `adminWallet.address`)
- */
-const populateTxFully = (txRequest: TransactionRequest, nonce: number, fromOverride?: string): TransactionRequest => {
-    const from = fromOverride ? fromOverride : adminWallet.address
-    return {
-        ...txRequest,
-        maxFeePerGas: GWEI.mul(42),
-        maxPriorityFeePerGas: GWEI.mul(3),
-        gasLimit: 9000000,
-        from,
-        nonce,
-        type: 2,
-        chainId: env.CHAIN_ID,
-    }
-}
 
 /**
  * Get signed tx to deploy a generic contract clone, as well as the address it will be deployed at.
@@ -82,32 +40,6 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
         deployTx: txReq,
         signedDeployTx: signedTx,
     }
-}
-
-const dir = async () => {
-    const dirname = `src/output/${env.CHAIN_NAME}`
-    try {
-        await fs.access(dirname, fsConstants.R_OK | fsConstants.W_OK)
-    } catch (e) {
-        await fs.mkdir(dirname)
-    }
-    return dirname
-}
-
-const getNewDeploymentFilename = async () => {
-    const dirname = await dir()
-    const fileNumber = (await fs.readdir(dirname)).filter(e => e.includes("uniDeployment")).length
-    return `${dirname}/uniDeployment${fileNumber}.json`
-}
-const getNewLiquidityFilename = async () => {
-    const dirname = await dir()
-    const fileNumber = (await fs.readdir(dirname)).filter(e => e.includes("uniLiquidity")).length
-    return `${dirname}/uniLiquidity${fileNumber}.json`
-}
-const getExistingDeploymentFilename = async () => {
-    const dirname = await dir()
-    const fileNumber = (await fs.readdir(dirname)).filter(e => e.includes("uniDeployment")).length - 1
-    return `${dirname}/uniDeployment${fileNumber}.json`
 }
 
 /** Prints txs:
@@ -224,7 +156,7 @@ const main = async () => {
     } else { // read contracts from `output/${NODE_ENV}/uniDeployment${X}.json`
         const filename = await getExistingDeploymentFilename()
         console.log(`reading config from ${filename}`)
-        const uniDeployments: DeploymentsFile = JSON.parse(await fs.readFile(filename, {encoding: "utf-8"}))
+        const uniDeployments = await getDeployment()
         addr_dai = uniDeployments.deployments.dai.contractAddress
         addr_weth = uniDeployments.deployments.weth.contractAddress
         addr_dai_weth_A = uniDeployments.deployments.dai_weth_A?.contractAddress || ''
@@ -419,19 +351,7 @@ const main = async () => {
             const path = [addr_weth, addr_dai]
 
             // use custom router to swap
-            const signedSwap = await userWallet.signTransaction(
-                populateTxFully(
-                    await atomicSwapContract.populateTransaction.swap(
-                        path,
-                        amountIn,
-                        uniV2FactoryContract_A.address,
-                        userWallet.address,
-                        false
-                    ),
-                    getUserNonce(),
-                    userWallet.address,
-                )
-            )
+            const signedSwap = await signSwap(atomicSwapContract, uniV2FactoryContract_A.address, userWallet, amountIn, path, getUserNonce())
             const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
             console.log("user swapped", swapRes.transactionHash)
             console.log("balances", await getBalances())

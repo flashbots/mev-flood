@@ -1,11 +1,9 @@
-import { BigNumber, ContractFactory, providers, Wallet } from "ethers"
+import { BigNumber, ContractFactory, Wallet } from "ethers"
 import env from './env'
-import { GWEI, ETH, PROVIDER, now } from './helpers'
+import { GWEI, ETH, PROVIDER, now, TransactionRequest } from './helpers'
 import contracts, { getContract } from './contracts'
-import { simulateBundle } from './flashbots'
 import { getAdminWallet } from './wallets'
 import { formatEther, formatUnits } from 'ethers/lib/utils'
-type TransactionRequest = providers.TransactionRequest
 
 const BID_VALUE = ETH.div(100)
 // TODO: clean up; don't instantiate contract here; getContract should never return undefined

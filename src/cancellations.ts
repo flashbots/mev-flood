@@ -1,12 +1,12 @@
 import { createDumbLotteryBundles } from './lib/lottery'
-import { getWalletSet } from './lib/wallets'
+import { getSearchWalletSet } from './lib/wallets'
 import { GWEI, PROVIDER } from './lib/helpers'
 import { sendBundle, cancelBundle } from './lib/flashbots'
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt } from 'crypto';
 
 // load wallets from disk
-const walletSet = getWalletSet("cancel")
+const walletSet = getSearchWalletSet("cancel")
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

@@ -2,16 +2,16 @@ import { BigNumber, Wallet, providers, utils } from "ethers"
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { id as ethersId } from "ethers/lib/utils"
 
-
 import env from "./env"
 import { getAdminWallet } from './wallets'
-import contracts, { getContract } from './contracts'
 
+export type TransactionRequest = providers.TransactionRequest
 export const GWEI = BigNumber.from(1e9)
 export const ETH = GWEI.mul(GWEI)
 export const PROVIDER = new providers.JsonRpcProvider(env.RPC_URL, {chainId: env.CHAIN_ID, name: env.CHAIN_NAME})
 
-export const getFlashbotsProvider = async (wallet?: Wallet) => FlashbotsBundleProvider.create(PROVIDER, wallet || getAdminWallet(), env.MEV_GETH_HTTP_URL)
+const adminWallet = getAdminWallet()
+export const getFlashbotsProvider = async (wallet?: Wallet) => FlashbotsBundleProvider.create(PROVIDER, wallet || adminWallet, env.MEV_GETH_HTTP_URL)
 
 /**
  * Now in seconds (UTC).
@@ -82,4 +82,24 @@ export const textColors = {
     BgMagenta: "\x1b[45m",
     BgCyan: "\x1b[46m",
     BgWhite: "\x1b[47m",
+}
+
+/**
+ * Fills in runtime data for a tx.
+ * @param txRequest 
+ * @param nonce 
+ * @param fromOverride (default: `adminWallet.address`)
+ */
+ export const populateTxFully = (txRequest: TransactionRequest, nonce: number, fromOverride?: string): TransactionRequest => {
+    const from = fromOverride ? fromOverride : adminWallet.address
+    return {
+        ...txRequest,
+        maxFeePerGas: GWEI.mul(42),
+        maxPriorityFeePerGas: GWEI.mul(3),
+        gasLimit: 9000000,
+        from,
+        nonce,
+        type: 2,
+        chainId: env.CHAIN_ID,
+    }
 }
