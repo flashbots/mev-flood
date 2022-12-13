@@ -29,7 +29,7 @@
     "smart-search": "node build/smart-search.js",
     "fake-dev": "npx ts-node src/fake-search.ts",
     "fake-search": "node build/fake-search.js",
-    "liquid": "node build/scripts/deployUniV2.js",
+    "liquid": "node build/scripts/liquid.js",
     "script.cancelPrivateTx": "npx ts-node src/scripts/cancelPrivateTx.ts",
     "script.createTestBundle": "npx ts-node src/scripts/createTestBundle.ts",
     "script.createWallets": "npx ts-node src/scripts/createWallets.ts",
@@ -39,6 +39,6 @@
     "script.getUserStats": "npx ts-node src/scripts/getUserStats.ts",
     "script.sendPrivateTx": "npx ts-node src/scripts/sendPrivateTx.ts",
     "script.sendProtectTx": "npx ts-node src/scripts/sendProtectTx.ts",
-    "script.liquid": "npx ts-node src/scripts/deployUniV2.ts"
+    "script.liquid": "npx ts-node src/scripts/liquid.ts"
   }
 }
