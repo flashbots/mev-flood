@@ -219,10 +219,14 @@ const main = async () => {
     }
     
     if (shouldMintTokens) {
-        // mint 2600000 DAI (+50k for adminWallet)
+        const DAI_ADMIN_MINT_AMOUNT = ETH.mul(5000000) // mint 5M DAI for admin (to make LP deposits)
+        const WETH_ADMIN_MINT_AMOUNT = ETH.mul(9000)
+        const WETH_USER_MINT_AMOUNT = ETH.mul(500)
+
+        // mint DAI for admin
         let signedTx = await adminWallet.signTransaction(populateTxFully(
             await daiContract.populateTransaction.mint(
-                adminWallet.address, ETH.mul(2650000)
+                adminWallet.address, DAI_ADMIN_MINT_AMOUNT
             ),
             getAdminNonce()
         ))
@@ -230,7 +234,7 @@ const main = async () => {
         console.log(`minting DAI for admin ${adminWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-        // mint 50k DAI for userWallet
+        // mint DAI for user
         signedTx = await adminWallet.signTransaction(populateTxFully(
             await daiContract.populateTransaction.mint(
                 userWallet.address, ETH.mul(50000)
@@ -241,9 +245,9 @@ const main = async () => {
         console.log(`minting DAI for user ${userWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-        // mint tons of weth for admin
+        // mint 1000 weth for admin
         signedTx = await adminWallet.signTransaction(populateTxFully({
-            value: ETH.mul(9000),
+            value: WETH_ADMIN_MINT_AMOUNT,
             to: addr_weth,
             data: "0xd0e30db0" // deposit
         }, getAdminNonce()))
@@ -253,10 +257,10 @@ const main = async () => {
 
         // mint an earnest amount of weth for user
         signedTx = await userWallet.signTransaction(populateTxFully({
-            value: ETH.mul(1000),
+            value: WETH_USER_MINT_AMOUNT,
             to: addr_weth,
             data: "0xd0e30db0" // deposit
-        }, getUserNonce(), userWallet.address))
+        }, getUserNonce(), {from: userWallet.address}))
         signedTxs.push(signedTx)
         console.log(`minting WETH for user ${userWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
@@ -270,7 +274,7 @@ const main = async () => {
                 populateTxFully(
                     await token.populateTransaction.approve(spender, constants.MaxUint256),
                     owner.address == adminWallet.address ? getAdminNonce() : getUserNonce(),
-                    owner.address
+                    {from: owner.address}
                 )
             )
             signedTxs.push(signedTx)
@@ -295,6 +299,9 @@ const main = async () => {
     }
 
     if (shouldBootstrapLiquidity) {
+        const WETH_DEPOSIT_AMOUNT = ETH.mul(1000)
+        const DAI_DEPOSIT_AMOUNT = WETH_DEPOSIT_AMOUNT.mul(1300) // price 1300 DAI/WETH
+
         const factoryPairsLength_A = await uniV2FactoryContract_A.allPairsLength()
         const factoryPairsLength_B = await uniV2FactoryContract_B.allPairsLength()
         console.log("factory_A num pairs", factoryPairsLength_A)
@@ -306,13 +313,14 @@ const main = async () => {
         console.log("addr_dai_weth_B", addr_dai_weth_B)
 
         // deposit liquidity into WETH/DAI pairs
+        // TODO: this should be a router function
         const daiWethPairAddrs = [addr_dai_weth_A, addr_dai_weth_B]
         for (const pairAddr of daiWethPairAddrs) {
             const pairContract = new Contract(pairAddr, contracts.UniV2Pair.abi)
             
             let signedTx = await adminWallet.signTransaction( // deposit WETH into pair
                 populateTxFully(
-                    await wethContract.populateTransaction.transfer(pairAddr, ETH.mul(1000)),
+                    await wethContract.populateTransaction.transfer(pairAddr, WETH_DEPOSIT_AMOUNT),
                     getAdminNonce()
                 )
             )
@@ -320,9 +328,9 @@ const main = async () => {
             console.log(`depositing WETH into pair...`)
             await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-            signedTx = await adminWallet.signTransaction(
+            signedTx = await adminWallet.signTransaction( // deposit DAI into pair
                 populateTxFully(
-                    await daiContract.populateTransaction.transfer(pairAddr, ETH.mul(1300000)), // price 1300 DAI/WETH
+                    await daiContract.populateTransaction.transfer(pairAddr, DAI_DEPOSIT_AMOUNT),
                     getAdminNonce()
                 )
             )
@@ -330,7 +338,7 @@ const main = async () => {
             console.log(`depositing DAI into pair...`)
             await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-            signedTx = await adminWallet.signTransaction(
+            signedTx = await adminWallet.signTransaction( // mint LP tokens
                 populateTxFully(
                     await pairContract.populateTransaction.mint(adminWallet.address),
                     getAdminNonce()
@@ -345,17 +353,20 @@ const main = async () => {
     }
     
     if (shouldTestSwap) {
-        try {
-            // swap 50 WETH for DAI on Uni_A
-            const amountIn = ETH.mul(50)
-            const path = [addr_weth, addr_dai]
+        // swap 1 WETH for DAI on Uni_A
+        const amountIn = ETH.mul(5)
+        const path = [addr_weth, addr_dai]
 
+        try {
             // use custom router to swap
             const signedSwap = await signSwap(atomicSwapContract, uniV2FactoryContract_A.address, userWallet, amountIn, path, getUserNonce())
             const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
             console.log("user swapped", swapRes.transactionHash)
             console.log("balances", await getBalances())
-
+        } catch (e) {
+            console.error("failed to swap", e)
+        }
+        try {
             const reserves_A: BigNumber[] = (await daiWethPair_A.getReserves()).slice(0,2)
             const reserves_B: BigNumber[] = (await daiWethPair_B.getReserves()).slice(0,2)
 
@@ -378,7 +389,7 @@ const main = async () => {
             const backrunRes = await (await PROVIDER.sendTransaction(signedBackrun)).wait(1)
             console.log("admin back-ran", backrunRes.transactionHash)
         } catch (e) {
-            console.error("failed to swap", e)
+            console.error("failed to backrun", e)
         }
         console.log("balances", await getBalances())
     }

@@ -8,6 +8,7 @@ import { getAdminWallet } from './wallets'
 export type TransactionRequest = providers.TransactionRequest
 export const GWEI = BigNumber.from(1e9)
 export const ETH = GWEI.mul(GWEI)
+export const MAX_U256 = BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 export const PROVIDER = new providers.JsonRpcProvider(env.RPC_URL, {chainId: env.CHAIN_ID, name: env.CHAIN_NAME})
 
 const adminWallet = getAdminWallet()
@@ -90,14 +91,13 @@ export const textColors = {
  * @param nonce 
  * @param fromOverride (default: `adminWallet.address`)
  */
- export const populateTxFully = (txRequest: TransactionRequest, nonce: number, fromOverride?: string): TransactionRequest => {
-    const from = fromOverride ? fromOverride : adminWallet.address
+ export const populateTxFully = (txRequest: TransactionRequest, nonce: number, overrides?: {from?: string, gasLimit?: number, baseFee?: BigNumber, priorityFee?: BigNumber}): TransactionRequest => {
     return {
         ...txRequest,
-        maxFeePerGas: GWEI.mul(42),
-        maxPriorityFeePerGas: GWEI.mul(3),
-        gasLimit: 9000000,
-        from,
+        maxFeePerGas: overrides?.baseFee || GWEI.mul(42),
+        maxPriorityFeePerGas: overrides?.priorityFee || GWEI.mul(3),
+        gasLimit: overrides?.gasLimit || 9000000,
+        from: overrides?.from || adminWallet.address,
         nonce,
         type: 2,
         chainId: env.CHAIN_ID,
