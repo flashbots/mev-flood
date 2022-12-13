@@ -1,21 +1,19 @@
-import { BigNumber, ContractFactory, Wallet } from "ethers"
-
+import { BigNumber, ContractFactory, providers, Wallet } from "ethers"
 import env from './env'
 import { GWEI, ETH, PROVIDER, now } from './helpers'
 import contracts, { getContract } from './contracts'
 import { simulateBundle } from './flashbots'
 import { getAdminWallet } from './wallets'
 import { formatEther, formatUnits } from 'ethers/lib/utils'
+type TransactionRequest = providers.TransactionRequest
 
-
-const MEDIUM_BID_VALUE = ETH.div(100)
-const LARGE_BID_VALUE = ETH.div(10)
+const BID_VALUE = ETH.div(100)
 // TODO: clean up; don't instantiate contract here; getContract should never return undefined
 const lotteryContract = getContract(contracts.LotteryMEV)
 const adminWallet = getAdminWallet().connect(PROVIDER)
 
 /** return a bunch of bundles that compete for the same opportunity */
-export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice: BigNumber) => {
+export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice: BigNumber): Promise<{bidTx: string, claimTx: string}[]> => {
     if (!lotteryContract) {
         console.warn("lottery contract is undefined")
         return []
@@ -37,13 +35,13 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice:
         const bidReq = {
             ...bidTx,
             from: wallet.address,
-            value: MEDIUM_BID_VALUE.add(GWEI.mul(idx)),
+            value: BID_VALUE.add(GWEI.mul(idx)),
             gasLimit: 100000,
             gasPrice: bidGasPrice.sub(GWEI.mul(idx)),
             chainId: env.CHAIN_ID,
             nonce: nonces[idx],
         }
-        const claimReq = {
+        const claimReq: TransactionRequest = {
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
@@ -59,7 +57,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice:
     return await Promise.all(signedTxPromises)
 }
 
-export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
+export const createSmartLotteryTxs = async (walletSet: Wallet[]): Promise<string[]> => {
     if (!lotteryContract) {
         console.warn("lottery contract is undefined")
         return []
@@ -97,7 +95,7 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]) => {
 }
 
 /** create a transaction that always reverts */
-export const createRevertingUniTx = async (deadline?: number) => {
+export const createRevertingUniTx = async (deadline?: number): Promise<TransactionRequest | undefined> => {
     // make a swap on uniswap v2 where we don't have the tokens
     const uniContract = getContract(contracts.UniV2Router)
     if (!uniContract) {
@@ -125,5 +123,28 @@ export const createRevertingUniTx = async (deadline?: number) => {
         gasPrice,
         gasLimit,
         nonce: (await adminWallet.getTransactionCount()),
+    }
+}
+
+/**
+ * Get an unsigned sample lottery tx
+ * @param sender Wallet connected to a provider.
+ * @returns transaction that interacts with lottery contract
+ */
+ export const getSampleLotteryTx = async (sender: Wallet): Promise<TransactionRequest | undefined> => {
+    const contract = getContract(contracts.LotteryMEV)
+    if (!contract) {
+        console.warn("lottery contract is undefined for this chain.")
+        return undefined
+    }
+    return {
+        ...contract.populateTransaction.bid(),
+        from: sender.address,
+        to: sender.address,
+        value: GWEI.mul(1000),
+        gasPrice: GWEI.mul(50),
+        gasLimit: BigNumber.from(90000),
+        chainId: env.CHAIN_ID,
+        nonce: await sender.getTransactionCount()
     }
 }

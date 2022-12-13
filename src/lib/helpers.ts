@@ -56,29 +56,6 @@ export const getRpcRequest = async (params: any, method: string, authSigner: Wal
     }
 }
 
-/**
- * Get an unsigned sample lottery tx
- * @param sender Wallet connected to a provider.
- * @returns transaction that interacts with lottery contract
- */
-export const getSampleLotteryTx = async (sender: Wallet) => {
-    const contract = getContract(contracts.LotteryMEV)
-    if (!contract) {
-        console.warn("lottery contract is undefined for this chain.")
-        return
-    }
-    return {
-        ...contract.populateTransaction.bid(),
-        from: sender.address,
-        to: sender.address,
-        value: GWEI.mul(1000),
-        gasPrice: GWEI.mul(50),
-        gasLimit: BigNumber.from(90000),
-        chainId: env.CHAIN_ID,
-        nonce: await sender.getTransactionCount()
-    }
-}
-
 export const textColors = {
     Reset: "\x1b[0m",
     Bright: "\x1b[1m",
