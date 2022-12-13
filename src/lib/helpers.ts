@@ -2,16 +2,17 @@ import { BigNumber, Wallet, providers, utils } from "ethers"
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { id as ethersId } from "ethers/lib/utils"
 
-
 import env from "./env"
 import { getAdminWallet } from './wallets'
-import contracts, { getContract } from './contracts'
 
+export type TransactionRequest = providers.TransactionRequest
 export const GWEI = BigNumber.from(1e9)
 export const ETH = GWEI.mul(GWEI)
+export const MAX_U256 = BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 export const PROVIDER = new providers.JsonRpcProvider(env.RPC_URL, {chainId: env.CHAIN_ID, name: env.CHAIN_NAME})
 
-export const getFlashbotsProvider = async (wallet?: Wallet) => FlashbotsBundleProvider.create(PROVIDER, wallet || getAdminWallet(), env.MEV_GETH_HTTP_URL)
+const adminWallet = getAdminWallet()
+export const getFlashbotsProvider = async (wallet?: Wallet) => FlashbotsBundleProvider.create(PROVIDER, wallet || adminWallet, env.MEV_GETH_HTTP_URL)
 
 /**
  * Now in seconds (UTC).
@@ -56,29 +57,6 @@ export const getRpcRequest = async (params: any, method: string, authSigner: Wal
     }
 }
 
-/**
- * Get an unsigned sample lottery tx
- * @param sender Wallet connected to a provider.
- * @returns transaction that interacts with lottery contract
- */
-export const getSampleLotteryTx = async (sender: Wallet) => {
-    const contract = getContract(contracts.LotteryMEV)
-    if (!contract) {
-        console.warn("lottery contract is undefined for this chain.")
-        return
-    }
-    return {
-        ...contract.populateTransaction.bid(),
-        from: sender.address,
-        to: sender.address,
-        value: GWEI.mul(1000),
-        gasPrice: GWEI.mul(50),
-        gasLimit: BigNumber.from(90000),
-        chainId: env.CHAIN_ID,
-        nonce: await sender.getTransactionCount()
-    }
-}
-
 export const textColors = {
     Reset: "\x1b[0m",
     Bright: "\x1b[1m",
@@ -105,4 +83,23 @@ export const textColors = {
     BgMagenta: "\x1b[45m",
     BgCyan: "\x1b[46m",
     BgWhite: "\x1b[47m",
+}
+
+/**
+ * Fills in runtime data for a tx.
+ * @param txRequest 
+ * @param nonce 
+ * @param fromOverride (default: `adminWallet.address`)
+ */
+ export const populateTxFully = (txRequest: TransactionRequest, nonce: number, overrides?: {from?: string, gasLimit?: number, baseFee?: BigNumber, priorityFee?: BigNumber}): TransactionRequest => {
+    return {
+        ...txRequest,
+        maxFeePerGas: overrides?.baseFee || GWEI.mul(42),
+        maxPriorityFeePerGas: overrides?.priorityFee || GWEI.mul(3),
+        gasLimit: overrides?.gasLimit || 9000000,
+        from: overrides?.from || adminWallet.address,
+        nonce,
+        type: 2,
+        chainId: env.CHAIN_ID,
+    }
 }

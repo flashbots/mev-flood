@@ -5,7 +5,7 @@ import env from '../lib/env'
 import { GWEI, PROVIDER } from '../lib/helpers'
 import minionWallets from "../output/wallets.json"
 
-const FUND_AMOUNT = utils.parseEther("0.1")
+const FUND_AMOUNT = utils.parseEther("50")
 
 async function main() {
     // read wallets from file, send them each some ether

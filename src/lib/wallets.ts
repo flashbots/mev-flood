@@ -9,8 +9,13 @@ import { getSearchArgs } from './cliArgs'
  * @param programName Name of program/script being run (see `package.json` scripts).
  * @returns array of wallets from `src/output/wallets.json`
  */
-export const getWalletSet = (programName: string) => {
+export const getSearchWalletSet = (programName: string) => {
     const {startIdx, endIdx} = getSearchArgs(programName)
+    const wallets = getWalletSet(startIdx, endIdx)
+    return wallets
+}
+
+export const getWalletSet = (startIdx: string, endIdx: string) => {
     const wallets = minionWallets
         .slice(parseInt(startIdx), parseInt(endIdx))
         .map(wallet => new Wallet(wallet.privateKey))

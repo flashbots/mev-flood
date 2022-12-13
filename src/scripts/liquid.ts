@@ -1,58 +1,16 @@
-import { TransactionRequest } from '@ethersproject/abstract-provider';
-import { ContractFactory, Contract, utils, BigNumber, constants, Wallet, ethers } from "ethers"
-import { constants as fsConstants } from 'fs';
+import { ContractFactory, Contract, utils, BigNumber, constants, Wallet } from "ethers"
 import fs from "fs/promises"
 import readline from "readline-sync"
 import { getDeployUniswapV2Args } from '../lib/cliArgs';
 
 import contracts, { ContractSpec } from "../lib/contracts"
 import env from '../lib/env';
-import { ETH, GWEI, PROVIDER, textColors } from '../lib/helpers';
+import { ETH, PROVIDER, textColors, populateTxFully } from '../lib/helpers';
+import { signSwap, getNewDeploymentFilename, getNewLiquidityFilename, getExistingDeploymentFilename, ContractDeployment, DeploymentsFile, Deployments, getDeployment } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 
 /** Used for signing only, NOT connected to a provider. */
 const adminWallet = getAdminWallet()
-
-type ContractDeployment = {
-    contractAddress: string,
-    deployTx: TransactionRequest,
-    signedDeployTx: string,
-}
-
-type Deployments = {
-    dai: ContractDeployment,           // erc20
-    weth: ContractDeployment,           // erc20
-    uniV2Factory_A: ContractDeployment,   // univ2 factory (creates univ2 pairs)
-    uniV2Factory_B: ContractDeployment,   // univ2 factory (creates univ2 pairs)
-    atomicSwap: ContractDeployment,
-    dai_weth_A?: ContractDeployment,      // univ2 pair on Uni_A
-    dai_weth_B?: ContractDeployment,      // univ2 pair on Uni_B
-}
-
-type DeploymentsFile = {
-    deployments: Deployments,
-    allSignedTxs: string[],
-}
-
-/**
- * Fills in runtime data for a tx.
- * @param txRequest 
- * @param nonce 
- * @param fromOverride (default: `adminWallet.address`)
- */
-const populateTxFully = (txRequest: TransactionRequest, nonce: number, fromOverride?: string): TransactionRequest => {
-    const from = fromOverride ? fromOverride : adminWallet.address
-    return {
-        ...txRequest,
-        maxFeePerGas: GWEI.mul(42),
-        maxPriorityFeePerGas: GWEI.mul(3),
-        gasLimit: 9000000,
-        from,
-        nonce,
-        type: 2,
-        chainId: env.CHAIN_ID,
-    }
-}
 
 /**
  * Get signed tx to deploy a generic contract clone, as well as the address it will be deployed at.
@@ -82,32 +40,6 @@ const getPairDeployment = async (factoryAddress: string, token1Address: string, 
         deployTx: txReq,
         signedDeployTx: signedTx,
     }
-}
-
-const dir = async () => {
-    const dirname = `src/output/${env.CHAIN_NAME}`
-    try {
-        await fs.access(dirname, fsConstants.R_OK | fsConstants.W_OK)
-    } catch (e) {
-        await fs.mkdir(dirname)
-    }
-    return dirname
-}
-
-const getNewDeploymentFilename = async () => {
-    const dirname = await dir()
-    const fileNumber = (await fs.readdir(dirname)).filter(e => e.includes("uniDeployment")).length
-    return `${dirname}/uniDeployment${fileNumber}.json`
-}
-const getNewLiquidityFilename = async () => {
-    const dirname = await dir()
-    const fileNumber = (await fs.readdir(dirname)).filter(e => e.includes("uniLiquidity")).length
-    return `${dirname}/uniLiquidity${fileNumber}.json`
-}
-const getExistingDeploymentFilename = async () => {
-    const dirname = await dir()
-    const fileNumber = (await fs.readdir(dirname)).filter(e => e.includes("uniDeployment")).length - 1
-    return `${dirname}/uniDeployment${fileNumber}.json`
 }
 
 /** Prints txs:
@@ -224,7 +156,7 @@ const main = async () => {
     } else { // read contracts from `output/${NODE_ENV}/uniDeployment${X}.json`
         const filename = await getExistingDeploymentFilename()
         console.log(`reading config from ${filename}`)
-        const uniDeployments: DeploymentsFile = JSON.parse(await fs.readFile(filename, {encoding: "utf-8"}))
+        const uniDeployments = await getDeployment()
         addr_dai = uniDeployments.deployments.dai.contractAddress
         addr_weth = uniDeployments.deployments.weth.contractAddress
         addr_dai_weth_A = uniDeployments.deployments.dai_weth_A?.contractAddress || ''
@@ -287,10 +219,15 @@ const main = async () => {
     }
     
     if (shouldMintTokens) {
-        // mint 2600000 DAI (+50k for adminWallet)
+        const WETH_ADMIN_MINT_AMOUNT = ETH.mul(2500)
+        const WETH_USER_MINT_AMOUNT = ETH.mul(500)
+        const DAI_ADMIN_MINT_AMOUNT = WETH_ADMIN_MINT_AMOUNT.sub(500).mul(1300) // 2000 ETH will be paired w/ DAI @ 1300 DAI/WETH
+        const DAI_USER_MINT_AMOUNT = ETH.mul(50000) // mint 50k DAI for user
+
+        // mint DAI for admin
         let signedTx = await adminWallet.signTransaction(populateTxFully(
             await daiContract.populateTransaction.mint(
-                adminWallet.address, ETH.mul(2650000)
+                adminWallet.address, DAI_ADMIN_MINT_AMOUNT
             ),
             getAdminNonce()
         ))
@@ -298,10 +235,10 @@ const main = async () => {
         console.log(`minting DAI for admin ${adminWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-        // mint 50k DAI for userWallet
+        // mint DAI for user
         signedTx = await adminWallet.signTransaction(populateTxFully(
             await daiContract.populateTransaction.mint(
-                userWallet.address, ETH.mul(50000)
+                userWallet.address, DAI_USER_MINT_AMOUNT
             ),
             getAdminNonce()
         ))
@@ -309,9 +246,9 @@ const main = async () => {
         console.log(`minting DAI for user ${userWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-        // mint tons of weth for admin
+        // mint WETH for admin
         signedTx = await adminWallet.signTransaction(populateTxFully({
-            value: ETH.mul(9000),
+            value: WETH_ADMIN_MINT_AMOUNT,
             to: addr_weth,
             data: "0xd0e30db0" // deposit
         }, getAdminNonce()))
@@ -319,12 +256,12 @@ const main = async () => {
         console.log(`minting WETH for admin ${adminWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-        // mint an earnest amount of weth for user
+        // mint WETH for user
         signedTx = await userWallet.signTransaction(populateTxFully({
-            value: ETH.mul(1000),
+            value: WETH_USER_MINT_AMOUNT,
             to: addr_weth,
             data: "0xd0e30db0" // deposit
-        }, getUserNonce(), userWallet.address))
+        }, getUserNonce(), {from: userWallet.address}))
         signedTxs.push(signedTx)
         console.log(`minting WETH for user ${userWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
@@ -338,7 +275,7 @@ const main = async () => {
                 populateTxFully(
                     await token.populateTransaction.approve(spender, constants.MaxUint256),
                     owner.address == adminWallet.address ? getAdminNonce() : getUserNonce(),
-                    owner.address
+                    {from: owner.address}
                 )
             )
             signedTxs.push(signedTx)
@@ -363,6 +300,9 @@ const main = async () => {
     }
 
     if (shouldBootstrapLiquidity) {
+        const WETH_DEPOSIT_AMOUNT = ETH.mul(1000)
+        const DAI_DEPOSIT_AMOUNT = WETH_DEPOSIT_AMOUNT.mul(1300) // price 1300 DAI/WETH
+
         const factoryPairsLength_A = await uniV2FactoryContract_A.allPairsLength()
         const factoryPairsLength_B = await uniV2FactoryContract_B.allPairsLength()
         console.log("factory_A num pairs", factoryPairsLength_A)
@@ -374,13 +314,14 @@ const main = async () => {
         console.log("addr_dai_weth_B", addr_dai_weth_B)
 
         // deposit liquidity into WETH/DAI pairs
+        // TODO: this should be a router function
         const daiWethPairAddrs = [addr_dai_weth_A, addr_dai_weth_B]
         for (const pairAddr of daiWethPairAddrs) {
             const pairContract = new Contract(pairAddr, contracts.UniV2Pair.abi)
             
             let signedTx = await adminWallet.signTransaction( // deposit WETH into pair
                 populateTxFully(
-                    await wethContract.populateTransaction.transfer(pairAddr, ETH.mul(1000)),
+                    await wethContract.populateTransaction.transfer(pairAddr, WETH_DEPOSIT_AMOUNT),
                     getAdminNonce()
                 )
             )
@@ -388,9 +329,9 @@ const main = async () => {
             console.log(`depositing WETH into pair...`)
             await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-            signedTx = await adminWallet.signTransaction(
+            signedTx = await adminWallet.signTransaction( // deposit DAI into pair
                 populateTxFully(
-                    await daiContract.populateTransaction.transfer(pairAddr, ETH.mul(1300000)), // price 1300 DAI/WETH
+                    await daiContract.populateTransaction.transfer(pairAddr, DAI_DEPOSIT_AMOUNT),
                     getAdminNonce()
                 )
             )
@@ -398,7 +339,7 @@ const main = async () => {
             console.log(`depositing DAI into pair...`)
             await (await PROVIDER.sendTransaction(signedTx)).wait(1)
 
-            signedTx = await adminWallet.signTransaction(
+            signedTx = await adminWallet.signTransaction( // mint LP tokens
                 populateTxFully(
                     await pairContract.populateTransaction.mint(adminWallet.address),
                     getAdminNonce()
@@ -413,29 +354,20 @@ const main = async () => {
     }
     
     if (shouldTestSwap) {
-        try {
-            // swap 50 WETH for DAI on Uni_A
-            const amountIn = ETH.mul(50)
-            const path = [addr_weth, addr_dai]
+        // swap 1 WETH for DAI on Uni_A
+        const amountIn = ETH.mul(50)
+        const path = [addr_weth, addr_dai]
 
+        try {
             // use custom router to swap
-            const signedSwap = await userWallet.signTransaction(
-                populateTxFully(
-                    await atomicSwapContract.populateTransaction.swap(
-                        path,
-                        amountIn,
-                        uniV2FactoryContract_A.address,
-                        userWallet.address,
-                        false
-                    ),
-                    getUserNonce(),
-                    userWallet.address,
-                )
-            )
+            const signedSwap = await signSwap(atomicSwapContract, uniV2FactoryContract_A.address, userWallet, amountIn, path, getUserNonce())
             const swapRes = await (await PROVIDER.sendTransaction(signedSwap)).wait(1)
             console.log("user swapped", swapRes.transactionHash)
             console.log("balances", await getBalances())
-
+        } catch (e) {
+            console.error("failed to swap", e)
+        }
+        try {
             const reserves_A: BigNumber[] = (await daiWethPair_A.getReserves()).slice(0,2)
             const reserves_B: BigNumber[] = (await daiWethPair_B.getReserves()).slice(0,2)
 
@@ -458,7 +390,7 @@ const main = async () => {
             const backrunRes = await (await PROVIDER.sendTransaction(signedBackrun)).wait(1)
             console.log("admin back-ran", backrunRes.transactionHash)
         } catch (e) {
-            console.error("failed to swap", e)
+            console.error("failed to backrun", (e as Error).message)
         }
         console.log("balances", await getBalances())
     }

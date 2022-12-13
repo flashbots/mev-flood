@@ -227,3 +227,35 @@ Example:
         autoAccept,
     }
 }
+
+export const getSwapdArgs = () => {
+    const helpMessage = (program: string) => `randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)
+
+Usage:
+    yarn ${program} <first_wallet_index> <last_wallet_index>
+
+Example:
+    # run with a single wallet
+    yarn ${program} 13
+
+    # run with 25 wallets
+    yarn ${program} 0 25
+`
+    // TODO: DRY this out
+    if (process.argv.length > 2) {
+        if (process.argv[2].includes("help")) {
+            console.log(helpMessage("swapd"))
+            process.exit(0)
+        }
+    } else {
+        console.error("one or two wallet indices are required")
+        console.log(helpMessage("swapd"))
+        process.exit(1)
+    }
+    
+    let [startIdx, endIdx] = process.argv.slice(2)
+    if (!endIdx) {
+        endIdx = `${parseInt(startIdx) + 1}`
+    }
+    return {startIdx, endIdx}
+}

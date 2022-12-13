@@ -1,8 +1,8 @@
 import { FlashbotsBundleProvider, FlashbotsPrivateTransactionResponse, RelayResponseError } from '@flashbots/ethers-provider-bundle';
 import { getSendPrivateTxArgs } from '../lib/cliArgs';
 import env from '../lib/env';
-import { getSampleLotteryTx, PROVIDER } from '../lib/helpers';
-import { createRevertingUniTx } from '../lib/lottery';
+import { PROVIDER } from '../lib/helpers';
+import { createRevertingUniTx, getSampleLotteryTx } from '../lib/lottery';
 import { getAdminWallet } from '../lib/wallets';
 
 async function main() {
