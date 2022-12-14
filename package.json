@@ -31,6 +31,7 @@
     "fake-search": "node build/fake-search.js",
     "liquid": "node build/scripts/liquid.js",
     "swapd-dev": "npx ts-node src/swapd.ts",
+    "swapd": "node build/swapd.js",
     "script.cancelPrivateTx": "npx ts-node src/scripts/cancelPrivateTx.ts",
     "script.createTestBundle": "npx ts-node src/scripts/createTestBundle.ts",
     "script.createWallets": "npx ts-node src/scripts/createWallets.ts",

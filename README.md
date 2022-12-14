@@ -149,6 +149,21 @@ yarn dumb-dev 49 98
 yarn smart-dev 98 100
 ```
 
+### Generate random orderflow on univ2 environment
+
+```sh
+# if you haven't already, deploy univ2 environment
+yarn script.liquid
+
+# if you haven't already, fund your wallets
+yarn script.fundWallets
+
+# generate orderflow w/ 10 wallets
+yarn swapd 10 20
+```
+
+_Note: if you didn't run `yarn build` you can run `yarn swapd-dev` instead of `yarn swapd`._
+
 ### other features
 
 _Get bundle stats:_
