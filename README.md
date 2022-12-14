@@ -30,6 +30,7 @@ mev-flood is a multi-daemon project, and is designed to be run in parallel with 
   * helpful for early testing (not stress-testing)
   * mainnet-friendly (use an empty account for `ADMIN_PRIVATE_KEY`)
   * this sends a single-transaction bundle to Flashbots from the admin wallet (env: `ADMIN_PRIVATE_KEY`)
+* **swapd** generates a random swap for each wallet in the specified array, for every new block
 
 #### Scripts
 
