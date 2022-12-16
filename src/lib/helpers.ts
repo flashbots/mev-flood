@@ -42,7 +42,7 @@ export const getRpcRequest = async (params: any, method: string, authSigner: Wal
     const body = {
         params,
         method,
-        id: '1337',
+        id: 1337,
         jsonrpc: "2.0"
     }
     const signature = `${await authSigner.getAddress()}:${await authSigner.signMessage(ethersId(JSON.stringify(body)))}`

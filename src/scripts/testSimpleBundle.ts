@@ -56,8 +56,8 @@ async function main() {
     ]
     console.log(bundle)
     const flashbots = await getFlashbotsProvider(getAdminWallet())
-    // const simResult = await simulateBundle(bundle, currentBlock + 1, simBlock)
-    const simResult = await flashbots.simulate(bundle, currentBlock + 1, simBlock)
+    const simResult = await simulateBundle(bundle, currentBlock + 1, simBlock)
+    // const simResult = await flashbots.simulate(bundle, currentBlock + 1, simBlock)
     console.log("sim result", simResult)
 }
 
