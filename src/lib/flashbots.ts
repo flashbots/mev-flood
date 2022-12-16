@@ -38,10 +38,7 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
       })).data
 }
 
-export const simulateBundle = async (signedTransactions: string[], simulationBlock: number) => {
-    const block = await PROVIDER.getBlock(simulationBlock)
-    // console.log("block", block)
-    
+export const simulateBundle = async (signedTransactions: string[], blockNumber: number, stateBlockNumber: number, timestamp?: number) => {    
     signedTransactions.forEach((rawTx) => {
         const tx = parseTransaction(rawTx)
         console.log('tx.from', tx.from)
@@ -51,12 +48,9 @@ export const simulateBundle = async (signedTransactions: string[], simulationBlo
     const params = [
         {
         txs: signedTransactions,
-        blockNumber: `0x${simulationBlock.toString(16)}`,
-        stateBlockNumber: `0x${(simulationBlock).toString(16)}`,
-        coinbase: block.miner,
-        timestamp: block.timestamp,
-        gasLimit: block.gasLimit.toNumber(),
-        difficulty: block.difficulty
+        blockNumber: `0x${blockNumber.toString(16)}`,
+        stateBlockNumber: `0x${(stateBlockNumber).toString(16)}`,
+        timestamp: timestamp,
         }
     ]
     // console.log('params', params)
@@ -91,7 +85,7 @@ export const simulateBundle = async (signedTransactions: string[], simulationBlo
     const coinbaseDiff = formatEther(simResult.coinbaseDiff)
 
     console.log(
-        `block_number=${simulationBlock},coinbase_diff=${coinbaseDiff},eth_sent_to_coinbase=${formatEther(simResult.ethSentToCoinbase)},totalGasUsed=${totalGasUsed},gasPrice=${simResult.coinbaseDiff / totalGasUsed / 1e9}`
+        `block_number=${blockNumber},state_block_number=${stateBlockNumber},coinbase_diff=${coinbaseDiff},eth_sent_to_coinbase=${formatEther(simResult.ethSentToCoinbase)},totalGasUsed=${totalGasUsed},gasPrice=${simResult.coinbaseDiff / totalGasUsed / 1e9}`
     )
     return simResult
 }
