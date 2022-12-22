@@ -55,6 +55,8 @@ export const simulateBundle = async (signedTransactions: string[], blockNumber: 
     let totalGasUsed = 0
     try {
         const { body, headers } = await getRpcRequest(params, "eth_callBundle", authSigner)
+        console.log("body", body)
+        console.log("headers", headers)
         const res: any = await axios.post(env.MEV_GETH_HTTP_URL, body, {
             headers
         })

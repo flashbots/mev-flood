@@ -54,10 +54,8 @@ async function main() {
         await wallet.signTransaction(depositTx),
         await wallet.signTransaction(transferTx),
     ]
-    console.log(bundle)
-    const flashbots = await getFlashbotsProvider(getAdminWallet())
+    console.log(JSON.stringify(bundle))
     const simResult = await simulateBundle(bundle, currentBlock + 1, simBlock)
-    // const simResult = await flashbots.simulate(bundle, currentBlock + 1, simBlock)
     console.log("sim result", simResult)
 }
 
