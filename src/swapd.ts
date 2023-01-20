@@ -19,7 +19,9 @@ const randInRange = (min: number, max: number): BigNumber => {
 
 async function main() {
     // get cli args
-    const {startIdx, endIdx, swapsPerBlock} = getSwapdArgs()
+    const {startIdx, endIdx, actionsPerBlock, numPairs, program, modes} = getSwapdArgs()
+    const isArbd = program === modes.arbd
+    console.log("numPairs", numPairs)
     const walletSet = getWalletSet(startIdx, endIdx)
 
     // get deployment params (// TODO: specify deployment via cli params)
@@ -128,7 +130,7 @@ async function main() {
         let swaps: string[] = []
         for (const wallet of walletSet) {
             let nonce = await PROVIDER.getTransactionCount(wallet.address)
-            for (let i = 0; i < swapsPerBlock; i++) {
+            for (let i = 0; i < actionsPerBlock; i++) {
                 // pick random uni factory
                 const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
                 // pick random path
