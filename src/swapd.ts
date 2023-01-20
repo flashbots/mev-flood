@@ -35,32 +35,40 @@ async function main() {
 
     // check token balances for each wallet, mint more if needed
     const adminWallet = getAdminWallet().connect(PROVIDER)
+    let signedDeposits: string[] = []
     let signedMints: string[] = []
     let adminNonce = await adminWallet.getTransactionCount()
     for (const wallet of walletSet) {
         let wethBalance: BigNumber = await wethContract.callStatic.balanceOf(wallet.address)
-        if (wethBalance.lte(20)) {
+        if (wethBalance.lte(ETH.mul(20))) {
             let nonce = await wallet.connect(PROVIDER).getTransactionCount()
             // mint 20 ETH
             const tx = populateTxFully(await wethContract.populateTransaction.deposit({value: ETH.mul(20)}), nonce, {
                 gasLimit: 50000,
                 from: wallet.address,
             })
-            const signedMint = await wallet.signTransaction(tx)
-            signedMints.push(signedMint)
+            const signedDeposit = await wallet.signTransaction(tx)
+            signedDeposits.push(signedDeposit)
         }
         let daiBalance: BigNumber = await daiContract.callStatic.balanceOf(wallet.address)
         if (daiBalance.lte(50000)) {
             // mint 50k DAI to wallet from admin account (DAI deployer)
-            const mintTx = await adminWallet.signTransaction(populateTxFully(await daiContract.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce, {
+            const mintTx = await adminWallet.signTransaction(populateTxFully(await daiContract.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce++, {
                 gasLimit: 60000,
-                from: adminWallet.address
+                from: adminWallet.address,
             }))
-            adminNonce += 1
             signedMints.push(mintTx)
         }
     }
+    const depositPromises = signedDeposits.map(tx => PROVIDER.sendTransaction(tx))
     const mintPromises = signedMints.map(tx => PROVIDER.sendTransaction(tx))
+    if (depositPromises.length > 0) {
+        const depositResults = await Promise.all(depositPromises)
+        console.log(`deposited for ${depositResults.length} accounts`)
+        await depositResults[depositResults.length - 1].wait(1) // wait for last tx to be included before proceeding
+    } else {
+        console.log("no deposits required")
+    }
     if (mintPromises.length > 0) {
         const mintResults = await Promise.all(mintPromises)
         console.log(`minted for ${mintResults.length} accounts`)
@@ -124,19 +132,28 @@ async function main() {
             // pick random path
             const path = coinToss() ? [wethContract.address, daiContract.address] : [daiContract.address, wethContract.address]
             // pick random amountIn: [500..10000] USD
-            const amountInUSD = randInRange(500, 10000)
+            const amountInUSD = randInRange(500, 5000)
             // if weth out (path_0 == weth) then amount should be (1 ETH / 2000 DAI) * amountIn
             const amountIn = path[0] == wethContract.address ? amountInUSD.div(2000) : amountInUSD
             const tokenInName = path[0] === wethContract.address ? "WETH" : "DAI"
             const tokenOutName = path[1] === wethContract.address ? "WETH" : "DAI"
 
             console.log(`${wallet.address} trades ${formatEther(amountIn).padEnd(6, "0")} ${tokenInName.padEnd(4, " ")} for ${tokenOutName}`)
-
             swaps.push(await signSwap(atomicSwapContract, uniFactory, wallet, amountIn, path))
+            console.log("pushed signed swap")
         }
         
-        const swapPromises = swaps.map(tx => PROVIDER.sendTransaction(tx))
-        const swapResults = await Promise.all(swapPromises)
+        const swapPromises = swaps.map(tx => {
+            try {
+                return PROVIDER.sendTransaction(tx)
+            } catch (e) {
+                console.warn("swap failed", e)
+                return new Promise((resolve, reject) => {
+                    resolve(undefined)
+                })
+            }
+        })
+        const swapResults = await Promise.allSettled(swapPromises)
         console.log(`swapped with ${swapResults.length} wallets`)
     })
 

@@ -113,7 +113,7 @@ const main = async () => {
         let uniV2Factory_B = await getCloneDeployment(contracts.UniV2Factory, getAdminNonce(), [adminWallet.address])
         // custom router
         let atomicSwap = await getCloneDeployment(contracts.AtomicSwap, getAdminNonce(), [weth.contractAddress])
-        console.log("deploying base contracts: 3 DAI tokens, WETH, uniswapV2factory...")
+        console.log("deploying base contracts: DAI, WETH, uniswapV2Factory_A, uniswapV2Factory_B, atomicSwap")
 
         deployments = {
             dai,            // erc20
@@ -128,10 +128,9 @@ const main = async () => {
         addr_uniV2Factory_B = uniV2Factory_B.contractAddress
         addr_atomicSwap = atomicSwap.contractAddress
 
-        for (const deployment of Object.values(deployments)) {
-            await (await PROVIDER.sendTransaction(deployment.signedDeployTx)).wait(1)
-            console.log("OK.")
-        }
+        const deployPromises = Object.values(deployments).map(deployment => PROVIDER.sendTransaction(deployment.signedDeployTx))
+        const deployResults = await Promise.all(deployPromises)
+        await deployResults[deployResults.length - 1].wait(1)
         
         // ### deploy liq pairs
         const dai_weth_A = await getPairDeployment(addr_uniV2Factory_A, addr_dai, addr_weth, getAdminNonce())

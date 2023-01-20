@@ -9,6 +9,9 @@ build
 # unique JSON files
 src/output
 
-# foundry
+# forge
 cache
 out
+
+# anvil
+chaindata

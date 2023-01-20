@@ -43,6 +43,16 @@ export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: 
     )
 }
 
+// /**
+//  * Signs a circular arbitrage: given tokens (A, B), each with a pair on exchanges (U, V) swap A -> B on U, B -> A on V
+//  * @param atomicSwapContract 
+//  * @param tokenAddress 
+//  * @returns 
+//  */
+// export const signArb = async (atomicSwapContract: Contract, tokenA: string, tokenB: string, factoryA: string, factoryB: string) => {
+//     await atomicSwapContract.populateTransaction.backrun()
+// }
+
 export const dir = async () => {
     const dirname = `src/output/${env.CHAIN_NAME}`
     try {
