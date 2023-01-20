@@ -38,12 +38,13 @@ export const sendBundle = async (signedTransactions: string[], targetBlock: numb
       })).data
 }
 
-export const simulateBundle = async (signedTransactions: string[], blockNumber: number, stateBlockNumber: number, timestamp?: number) => {    
+export const simulateBundle = async (signedTransactions: string[], blockNumber: number, stateBlockNumber?: number, timestamp?: number) => {
     signedTransactions.forEach((rawTx) => {
         const tx = parseTransaction(rawTx)
         console.log('tx.from', tx.from)
         console.log('tx.to', tx.to)
     })
+    stateBlockNumber = stateBlockNumber || await PROVIDER.getBlockNumber()
 
     const params = [{
         txs: signedTransactions,
