@@ -232,7 +232,10 @@ export const getSwapdArgs = () => {
     const helpMessage = (program: string) => `randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)
 
 Usage:
-    yarn ${program} <first_wallet_index> <last_wallet_index>
+    yarn ${program} <first_wallet_index> [<last_wallet_index>] [OPTIONS...]
+
+Options:
+    ${textColors.Bright}-n, --swaps-per-block${textColors.Reset}       Number of swaps each wallet will make in each block.
 
 Example:
     # run with a single wallet
@@ -240,12 +243,25 @@ Example:
 
     # run with 25 wallets
     yarn ${program} 0 25
+
+    # run with 10 wallets, each sending 5 swaps per block
+    yarn ${program} 10 21 -n 5
 `
-    // TODO: DRY this out
-    if (process.argv.length > 2) {
-        if (process.argv[2].includes("help")) {
+    // TODO: replace these horrible arg parsers
+    const args = process.argv.slice(2)
+    let swapsPerBlock = 1
+    if (args.length > 0) {
+        if (args[0].includes("help")) {
             console.log(helpMessage("swapd"))
             process.exit(0)
+        } else if (args.includes("--swaps-per-block") || args.includes("-n")) {
+            const flagIndex = Math.max(args.indexOf("--swaps-per-block"), args.indexOf("-n"))
+            if (args.length > flagIndex + 1) {
+                swapsPerBlock = parseInt(args[flagIndex + 1])
+                console.log("SWAPS PER BLOCK", swapsPerBlock)
+            } else {
+                console.error(`${textColors.Yellow}argument missing for option "${args[flagIndex]}". defaulting to 1${textColors.Reset}`)
+            }
         }
     } else {
         console.error("one or two wallet indices are required")
@@ -253,9 +269,9 @@ Example:
         process.exit(1)
     }
     
-    let [startIdx, endIdx] = process.argv.slice(2)
-    if (!endIdx) {
+    let [startIdx, endIdx] = args
+    if (!endIdx || endIdx[0] == '-') {
         endIdx = `${parseInt(startIdx) + 1}`
     }
-    return {startIdx, endIdx}
+    return {startIdx, endIdx, swapsPerBlock}
 }

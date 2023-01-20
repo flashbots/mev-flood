@@ -19,7 +19,7 @@ const randInRange = (min: number, max: number): BigNumber => {
 
 async function main() {
     // get cli args
-    const {startIdx, endIdx} = getSwapdArgs()
+    const {startIdx, endIdx, swapsPerBlock} = getSwapdArgs()
     const walletSet = getWalletSet(startIdx, endIdx)
 
     // get deployment params (// TODO: specify deployment via cli params)
@@ -127,20 +127,23 @@ async function main() {
         // generate swaps
         let swaps: string[] = []
         for (const wallet of walletSet) {
-            // pick random uni factory
-            const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
-            // pick random path
-            const path = coinToss() ? [wethContract.address, daiContract.address] : [daiContract.address, wethContract.address]
-            // pick random amountIn: [500..10000] USD
-            const amountInUSD = randInRange(500, 5000)
-            // if weth out (path_0 == weth) then amount should be (1 ETH / 2000 DAI) * amountIn
-            const amountIn = path[0] == wethContract.address ? amountInUSD.div(2000) : amountInUSD
-            const tokenInName = path[0] === wethContract.address ? "WETH" : "DAI"
-            const tokenOutName = path[1] === wethContract.address ? "WETH" : "DAI"
+            let nonce = await PROVIDER.getTransactionCount(wallet.address)
+            for (let i = 0; i < swapsPerBlock; i++) {
+                // pick random uni factory
+                const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
+                // pick random path
+                const path = coinToss() ? [wethContract.address, daiContract.address] : [daiContract.address, wethContract.address]
+                // pick random amountIn: [500..10000] USD
+                const amountInUSD = randInRange(500, 2000)
+                // if weth out (path_0 == weth) then amount should be (1 ETH / 2000 DAI) * amountIn
+                const amountIn = path[0] == wethContract.address ? amountInUSD.div(2000) : amountInUSD
+                const tokenInName = path[0] === wethContract.address ? "WETH" : "DAI"
+                const tokenOutName = path[1] === wethContract.address ? "WETH" : "DAI"
 
-            console.log(`${wallet.address} trades ${formatEther(amountIn).padEnd(6, "0")} ${tokenInName.padEnd(4, " ")} for ${tokenOutName}`)
-            swaps.push(await signSwap(atomicSwapContract, uniFactory, wallet, amountIn, path))
-            console.log("pushed signed swap")
+                console.log(`${wallet.address} trades ${formatEther(amountIn).padEnd(6, "0")} ${tokenInName.padEnd(4, " ")} for ${tokenOutName}`)
+                swaps.push(await signSwap(atomicSwapContract, uniFactory, wallet, amountIn, path, nonce++))
+                console.log("pushed signed swap")
+            }
         }
         
         const swapPromises = swaps.map(tx => {
@@ -148,13 +151,13 @@ async function main() {
                 return PROVIDER.sendTransaction(tx)
             } catch (e) {
                 console.warn("swap failed", e)
-                return new Promise((resolve, reject) => {
-                    resolve(undefined)
+                return new Promise((_, reject) => {
+                    reject("swap failed")
                 })
             }
         })
         const swapResults = await Promise.allSettled(swapPromises)
-        console.log(`swapped with ${swapResults.length} wallets`)
+        console.log(`${swapResults.length} swaps executed with ${walletSet.length} wallet${walletSet.length == 1 ? '' : 's'}`)
     })
 
     console.log("OK!")
