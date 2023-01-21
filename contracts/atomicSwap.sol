@@ -89,7 +89,7 @@ contract AtomicSwap {
         address _startFactory, // factory of pair we'll buy token from
         address _endFactory, // factory of pair we'll sell token to
         uint256 _amountIn // amount of WETH to spend on tokens
-    ) public {
+    ) external {
         uint256 startBalance = weth.balanceOf(address(this));
 
         address[] memory startPath = new address[](2);
@@ -120,5 +120,18 @@ contract AtomicSwap {
         weth.withdraw(tipAmount);
         block.coinbase.transfer(tipAmount); // pay validator
         weth.transfer(msg.sender, weth.balanceOf(address(this))); // send surplus to caller (inefficient!)
+    }
+
+    // executes a two-dex circular arb
+    // swap _tokenSettle -> _tokenArb on _startFactory's pair
+    // swap _tokenArb -> _tokenSettle on _endFactory's pair
+    function arb(
+        address _tokenArb,
+        address _tokenSettle,
+        address _startFactory,
+        address _endFactory,
+        uint256 _amountIn
+    ) external {
+        return;
     }
 }

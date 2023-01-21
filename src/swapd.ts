@@ -2,38 +2,31 @@ import { BigNumber, Contract, utils } from 'ethers'
 import { formatEther } from 'ethers/lib/utils'
 import { getSwapdArgs } from './lib/cliArgs'
 import contracts from './lib/contracts'
-import { ETH, MAX_U256, populateTxFully, PROVIDER } from './lib/helpers'
+import { coinToss, randInRange, populateTxFully, ETH, MAX_U256, PROVIDER } from './lib/helpers'
 
 import { getDeployment, getExistingDeploymentFilename, signSwap } from "./lib/liquid"
 import { getAdminWallet, getWalletSet } from './lib/wallets'
-
-const coinToss = (): boolean => {
-    return Math.floor(Math.random() * 2) % 2 == 0
-}
-
-const randInRange = (min: number, max: number): BigNumber => {
-    return ETH.mul(
-        Math.floor(Math.random() * (max - min) + min)
-    )
-}
 
 async function main() {
     // get cli args
     const {startIdx, endIdx, actionsPerBlock, numPairs, program, modes} = getSwapdArgs()
     const isArbd = program === modes.arbd
     console.log("numPairs", numPairs)
+
     const walletSet = getWalletSet(startIdx, endIdx)
 
     // get deployment params (// TODO: specify deployment via cli params)
     const filename = await getExistingDeploymentFilename()
     console.log("filename", filename)
     const {deployments} = await getDeployment()
+
+    deployments
     
     const atomicSwapContract = new Contract(deployments.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
     const uniFactoryA = new Contract(deployments.uniV2Factory_A.contractAddress, contracts.UniV2Factory.abi)
     const uniFactoryB = new Contract(deployments.uniV2Factory_B.contractAddress, contracts.UniV2Factory.abi)
     const wethContract = new Contract(deployments.weth.contractAddress, contracts.WETH.abi, PROVIDER)
-    const daiContract = new Contract(deployments.dai.contractAddress, contracts.DAI.abi, PROVIDER)
+    let daiContracts: Contract[] = deployments.dai.map(dai => new Contract(dai.contractAddress, contracts.DAI.abi, PROVIDER))
 
     // check token balances for each wallet, mint more if needed
     const adminWallet = getAdminWallet().connect(PROVIDER)
@@ -52,14 +45,16 @@ async function main() {
             const signedDeposit = await wallet.signTransaction(tx)
             signedDeposits.push(signedDeposit)
         }
-        let daiBalance: BigNumber = await daiContract.callStatic.balanceOf(wallet.address)
-        if (daiBalance.lte(50000)) {
-            // mint 50k DAI to wallet from admin account (DAI deployer)
-            const mintTx = await adminWallet.signTransaction(populateTxFully(await daiContract.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce++, {
-                gasLimit: 60000,
-                from: adminWallet.address,
-            }))
-            signedMints.push(mintTx)
+        for (const dai of daiContracts) {
+            let daiBalance: BigNumber = await dai.callStatic.balanceOf(wallet.address)
+            if (daiBalance.lte(50000)) {
+                // mint 50k DAI to wallet from admin account (DAI deployer)
+                const mintTx = await adminWallet.signTransaction(populateTxFully(await dai.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce++, {
+                    gasLimit: 60000,
+                    from: adminWallet.address,
+                }))
+                signedMints.push(mintTx)
+            }
         }
     }
     const depositPromises = signedDeposits.map(tx => PROVIDER.sendTransaction(tx))
@@ -83,7 +78,6 @@ async function main() {
     let signedApprovals: string[] = []
     for (const wallet of walletSet) {
         const allowanceWeth: BigNumber = await wethContract.callStatic.allowance(wallet.address, atomicSwapContract.address)
-        const allowanceDai: BigNumber = await daiContract.callStatic.allowance(wallet.address, atomicSwapContract.address)
         let nonce = await PROVIDER.getTransactionCount(wallet.address)
         if (allowanceWeth.lte(ETH.mul(50))) {
             const approveTx = populateTxFully(
@@ -96,15 +90,19 @@ async function main() {
             const signedTx = await wallet.signTransaction(approveTx)
             signedApprovals.push(signedTx)
         }
-        if (allowanceDai.lte(ETH.mul(100000))) {
-            const approveTx = populateTxFully(
-                await daiContract.populateTransaction.approve(atomicSwapContract.address, MAX_U256), 
-                nonce, 
-                {
-                    from: wallet.address, gasLimit: 50000
-                })
-            const signedTx = await wallet.signTransaction(approveTx)
-            signedApprovals.push(signedTx)
+
+        for (const dai of daiContracts) {
+            const allowance: BigNumber = await dai.callStatic.allowance(wallet.address, atomicSwapContract.address)
+            if (allowance.lte(ETH.mul(100000))) {
+                const approveTx = populateTxFully(
+                    await dai.populateTransaction.approve(atomicSwapContract.address, MAX_U256), 
+                    nonce, 
+                    {
+                        from: wallet.address, gasLimit: 50000
+                    })
+                const signedTx = await wallet.signTransaction(approveTx)
+                signedApprovals.push(signedTx)
+            }
         }
     }
     const approvalPromises = signedApprovals.map(tx => {
@@ -133,10 +131,13 @@ async function main() {
             for (let i = 0; i < actionsPerBlock; i++) {
                 // pick random uni factory
                 const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
+                const daiContract = daiContracts.length > 1 ? daiContracts[randInRange(0, daiContracts.length)] : 
+                    daiContracts[0]
                 // pick random path
                 const path = coinToss() ? [wethContract.address, daiContract.address] : [daiContract.address, wethContract.address]
                 // pick random amountIn: [500..10000] USD
-                const amountInUSD = randInRange(500, 2000)
+                const amountInUSD = ETH.mul(randInRange(500, 2000))
+                console.log("amountInUSD")
                 // if weth out (path_0 == weth) then amount should be (1 ETH / 2000 DAI) * amountIn
                 const amountIn = path[0] == wethContract.address ? amountInUSD.div(2000) : amountInUSD
                 const tokenInName = path[0] === wethContract.address ? "WETH" : "DAI"

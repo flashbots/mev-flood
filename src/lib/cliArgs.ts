@@ -1,4 +1,16 @@
-import { textColors } from './helpers'
+import { textColors, } from './helpers'
+
+export const getOption = (args: string[], flagIndex: number) => {
+    if (args.length > flagIndex + 1) {
+        return parseInt(args[flagIndex + 1])
+    } else {
+        throw new Error(`option '${args[flagIndex]}' was not specified`)
+    }
+}
+
+export const getFlagIndex = (args: string[], fullName: string, shortName?: string) => {
+    return Math.max(args.indexOf(fullName), shortName ? args.indexOf(shortName) : -1)
+}
 
 /**
  * Get CLI args for "search" scripts (dumb-search, smart-search, fake-search)
@@ -149,6 +161,7 @@ export const getDeployUniswapV2Args = () => {
     let shouldApproveTokens = true
     let shouldTestSwap = true
     let autoAccept = false
+    let numPairs = 2
 
     const helpMessage = `
     ${textColors.Bright}script.liquid${textColors.Reset}: deploy a uniswap v2 environment w/ bootstrapped liquidity.
@@ -164,7 +177,11 @@ Options:
     --bootstrap-only *  Only bootstrap liquidity, don't deploy contracts.
     --approve-only *    Only approve uni router to spend your tokens.
     --swap-only *       Only test swap.
-    -y                  Auto-accept prompts (non-interactive mode)
+    -p, --num-pairs     Number of DAI pairs to deploy (if deploying). 
+                        Half that number of DAI tokens (rounding up) will be created, 
+                        and a unique WETH_DAI pair will be deployed on each UniswapV2 
+                        clone for each DAI token.
+    -y                  Auto-accept prompts (non-interactive mode).
 
     (*) passing multiple --X-only params will cause none of them to execute.
 
@@ -177,6 +194,8 @@ Example:
 
     # enable degen mode
     yarn script.liquid --swap-only -y
+
+    # deploy 4 DAI contracts 
 `
     if (process.argv.length > 2) {
         const args = process.argv.slice(2)
@@ -214,6 +233,9 @@ Example:
             shouldMintTokens = false
             shouldApproveTokens = false
         }
+        if (args.includes("--num-pairs") || args.includes("-p")) {
+            numPairs = getOption(args, getFlagIndex(args, "--num-pairs", "-p"))
+        }
         if (args.includes("-y")) {
             autoAccept = true
         }
@@ -225,6 +247,7 @@ Example:
         shouldMintTokens,
         shouldTestSwap,
         autoAccept,
+        numPairs,
     }
 }
 
@@ -280,18 +303,6 @@ ${textColors.Underscore}Examples:${textColors.Reset}
     let numPairs = program === modes.arbd ? 2 : 1
     let minProfit = 100
     let maxProfit = 0 // 0 is interpreted as unlimited
-
-    const getOption = (flagIndex: number) => {
-        if (args.length > flagIndex + 1) {
-            return parseInt(args[flagIndex + 1])
-        } else {
-            throw new Error(`option '${args[flagIndex]}' was not specified`)
-        }
-    }
-
-    const getFlagIndex = (fullName: string, shortName?: string) => {
-        return Math.max(args.indexOf(fullName), shortName ? args.indexOf(shortName) : -1)
-    }
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -299,20 +310,20 @@ ${textColors.Underscore}Examples:${textColors.Reset}
             process.exit(0)
         } else {
             if (args.includes(xPerBlockFlag) || args.includes("-n")) {
-                const flagIndex = getFlagIndex(xPerBlockFlag)
-                actionsPerBlock = getOption(flagIndex)
+                const flagIndex = getFlagIndex(args, xPerBlockFlag)
+                actionsPerBlock = getOption(args, flagIndex)
             }
             if (args.includes("--num-pairs") || args.includes("-p")) {
-                const flagIndex = getFlagIndex("--num-pairs", "-p")
-                numPairs = Math.max(getOption(flagIndex), numPairs)
+                const flagIndex = getFlagIndex(args, "--num-pairs", "-p")
+                numPairs = Math.max(getOption(args, flagIndex), numPairs)
             }
             if (args.includes("--min-profit") || args.includes("-m")) {
-                const flagIndex = getFlagIndex("--min-profit", "-m")
-                minProfit = getOption(flagIndex)
+                const flagIndex = getFlagIndex(args, "--min-profit", "-m")
+                minProfit = getOption(args, flagIndex)
             }
             if (args.includes("--max-profit") || args.includes("-m")) {
-                const flagIndex = getFlagIndex("--max-profit", "-m")
-                maxProfit = getOption(flagIndex)
+                const flagIndex = getFlagIndex(args, "--max-profit", "-m")
+                maxProfit = getOption(args, flagIndex)
             }
         }
     } else {

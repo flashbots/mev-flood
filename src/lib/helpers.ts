@@ -14,6 +14,14 @@ export const PROVIDER = new providers.JsonRpcProvider(env.RPC_URL, {chainId: env
 const adminWallet = getAdminWallet()
 export const getFlashbotsProvider = async (wallet?: Wallet) => FlashbotsBundleProvider.create(PROVIDER, wallet || adminWallet, env.MEV_GETH_HTTP_URL)
 
+export const coinToss = (): boolean => {
+    return Math.floor(Math.random() * 2) % 2 == 0
+}
+
+export const randInRange = (min: number, max: number): number => {
+    return Math.floor(Math.random() * (max - min) + min)
+}
+
 /**
  * Now in seconds (UTC).
  */

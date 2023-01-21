@@ -5,24 +5,37 @@ import fs from "fs/promises"
 import { populateTxFully, PROVIDER, TransactionRequest } from './helpers'
 import env from '../lib/env'
 
-export type ContractDeployment = {
+export interface ContractDeployment {
     contractAddress: string,
     deployTx: TransactionRequest,
     signedDeployTx: string,
 }
 
-export type Deployments = {
-    dai: ContractDeployment,           // erc20
+export interface LiquidDeployment {
+    dai: ContractDeployment[],           // erc20
     weth: ContractDeployment,           // erc20
     uniV2Factory_A: ContractDeployment,   // univ2 factory (creates univ2 pairs)
     uniV2Factory_B: ContractDeployment,   // univ2 factory (creates univ2 pairs)
     atomicSwap: ContractDeployment,
-    dai_weth_A?: ContractDeployment,      // univ2 pair on Uni_A
-    dai_weth_B?: ContractDeployment,      // univ2 pair on Uni_B
+    dai_weth_A?: ContractDeployment[],      // univ2 pairs on Uni_A
+    dai_weth_B?: ContractDeployment[],      // univ2 pairs on Uni_B
+}
+
+export const getLiquidDeploymentTransactions = (deployment: LiquidDeployment): string[] => {
+    let dai_weth_A_deploy = deployment.dai_weth_A ? deployment.dai_weth_A.map(d => d.signedDeployTx) : []
+    let dai_weth_B_deploy = deployment.dai_weth_B ? deployment.dai_weth_B.map(d => d.signedDeployTx) : []
+    let txs = [
+    ...deployment.dai.map(d => d.signedDeployTx),
+    deployment.weth.signedDeployTx,
+    deployment.uniV2Factory_A.signedDeployTx,
+    deployment.uniV2Factory_B.signedDeployTx,
+    deployment.atomicSwap.signedDeployTx,
+    ].concat(...dai_weth_A_deploy).concat(...dai_weth_B_deploy)
+    return txs
 }
 
 export type DeploymentsFile = {
-    deployments: Deployments,
+    deployments: LiquidDeployment,
     allSignedTxs: string[],
 }
 

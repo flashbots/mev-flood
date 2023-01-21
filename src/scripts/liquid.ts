@@ -5,8 +5,8 @@ import { getDeployUniswapV2Args } from '../lib/cliArgs';
 
 import contracts, { ContractSpec } from "../lib/contracts"
 import env from '../lib/env';
-import { ETH, PROVIDER, textColors, populateTxFully } from '../lib/helpers';
-import { signSwap, getNewDeploymentFilename, getNewLiquidityFilename, getExistingDeploymentFilename, ContractDeployment, DeploymentsFile, Deployments, getDeployment } from '../lib/liquid';
+import { ETH, PROVIDER, textColors, populateTxFully, randInRange } from '../lib/helpers';
+import { signSwap, getNewDeploymentFilename, getNewLiquidityFilename, getExistingDeploymentFilename, ContractDeployment, DeploymentsFile, getDeployment, LiquidDeployment, getLiquidDeploymentTransactions } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 
 /** Used for signing only, NOT connected to a provider. */
@@ -57,6 +57,7 @@ const main = async () => {
         shouldBootstrapLiquidity,
         shouldMintTokens,
         shouldTestSwap,
+        numPairs,
     } = getDeployUniswapV2Args()
 
     try {
@@ -88,15 +89,15 @@ const main = async () => {
         readline.question("press Enter to continue...")
     }
 
-    let addr_dai: string
+    let addrs_dai: string[] = []
     let addr_weth: string
     let addr_uniV2Factory_A: string
     let addr_uniV2Factory_B: string
-    let addr_dai_weth_A: string
-    let addr_dai_weth_B: string
+    let addrs_dai_weth_A: string[] = []
+    let addrs_dai_weth_B: string[] = []
     let addr_atomicSwap: string
     // to be returned at end
-    let deployments: Deployments | undefined = undefined // the contracts we will interact with
+    let deployments: LiquidDeployment | undefined  = undefined// the contracts we will interact with
     let signedTxs: string[] = []
 
     // defined after we get contract addresses, either from new deployment or from file
@@ -104,9 +105,13 @@ const main = async () => {
 
     // deploy on local devnet
     if (shouldDeploy) {
-        // ### get contract deployments
-        // tokens
-        let dai = await getCloneDeployment(contracts.DAI, getAdminNonce(), [env.CHAIN_ID])
+        let daiDeployments: ContractDeployment[] = []
+        let numDaiTokens = (numPairs + (numPairs % 2)) / 2 // round up to the nearest even int, then divide by 2
+        for (let i = 0; i < numDaiTokens; i++) {
+            let dai = await getCloneDeployment(contracts.DAI, getAdminNonce(), [env.CHAIN_ID])
+            addrs_dai.push(dai.contractAddress)
+            daiDeployments.push(dai)
+        }
         let weth = await getCloneDeployment(contracts.WETH, getAdminNonce()) // weth has no constructor args
         // uniswapv2 factories
         let uniV2Factory_A = await getCloneDeployment(contracts.UniV2Factory, getAdminNonce(), [adminWallet.address])
@@ -115,59 +120,71 @@ const main = async () => {
         let atomicSwap = await getCloneDeployment(contracts.AtomicSwap, getAdminNonce(), [weth.contractAddress])
         console.log("deploying base contracts: DAI, WETH, uniswapV2Factory_A, uniswapV2Factory_B, atomicSwap")
 
+        addr_weth = weth.contractAddress
+        addr_uniV2Factory_A = uniV2Factory_A.contractAddress
+        addr_uniV2Factory_B = uniV2Factory_B.contractAddress
+        addr_atomicSwap = atomicSwap.contractAddress
         deployments = {
-            dai,            // erc20
+            dai: daiDeployments,            // erc20
             weth,           // erc20
             uniV2Factory_A, // univ2 factory (creates univ2 pairs)
             uniV2Factory_B, // univ2 factory (creates univ2 pairs)
             atomicSwap,     // custom router
         }
-        addr_dai = dai.contractAddress
-        addr_weth = weth.contractAddress
-        addr_uniV2Factory_A = uniV2Factory_A.contractAddress
-        addr_uniV2Factory_B = uniV2Factory_B.contractAddress
-        addr_atomicSwap = atomicSwap.contractAddress
 
-        const deployPromises = Object.values(deployments).map(deployment => PROVIDER.sendTransaction(deployment.signedDeployTx))
+        let signed_deployments = getLiquidDeploymentTransactions(deployments)
+
+        // TODO: replace `Object.values(deployments)` with an array of deployments derived from LiquidDeployment struct.
+        const deployPromises = signed_deployments.map(tx => PROVIDER.sendTransaction(tx))
         const deployResults = await Promise.all(deployPromises)
         await deployResults[deployResults.length - 1].wait(1)
         
         // ### deploy liq pairs
-        const dai_weth_A = await getPairDeployment(addr_uniV2Factory_A, addr_dai, addr_weth, getAdminNonce())
-        const dai_weth_B = await getPairDeployment(addr_uniV2Factory_B, addr_dai, addr_weth, getAdminNonce())
-        addr_dai_weth_A = dai_weth_A.contractAddress
-        addr_dai_weth_B = dai_weth_B.contractAddress
+        let dai_weth_A_deployments = []
+        let dai_weth_B_deployments = []
+        for (let i = 0; i < numDaiTokens; i++) {
+            const addr_dai = addrs_dai[i]
+            const dai_weth_A = await getPairDeployment(addr_uniV2Factory_A, addr_dai, addr_weth, getAdminNonce())
+            addrs_dai_weth_A.push(dai_weth_A.contractAddress)
+            dai_weth_A_deployments.push(dai_weth_A)
 
-        const pairDeployments = [
-            dai_weth_A,
-            dai_weth_B,
-        ]
-        for (const deployment of pairDeployments) {
+            const dai_weth_B = await getPairDeployment(addr_uniV2Factory_B, addr_dai, addr_weth, getAdminNonce())
+            addrs_dai_weth_B.push(dai_weth_B.contractAddress)
+            dai_weth_B_deployments.push(dai_weth_B)
+        }
+
+        const pairDeployments = dai_weth_A_deployments.concat(dai_weth_B_deployments)
+        let pairHandles = (await Promise.all(pairDeployments.map(deployment => {
             console.log("deploying pair...")
-            await (await PROVIDER.sendTransaction(deployment.signedDeployTx)).wait(1)
-            console.log("OK.")
+            return PROVIDER.sendTransaction(deployment.signedDeployTx)
+        }))).map(pendingTx => pendingTx.wait());
+        await pairHandles[pairHandles.length - 1];
+
+        console.log("pairs deployed")
+        let appendix = {
+            dai_weth_A: dai_weth_A_deployments,
+            dai_weth_B: dai_weth_B_deployments,
         }
         deployments = {
             ...deployments,
-            dai_weth_A,
-            dai_weth_B,
+            ...appendix,
         }
     } else { // read contracts from `output/${NODE_ENV}/uniDeployment${X}.json`
         const filename = await getExistingDeploymentFilename()
         console.log(`reading config from ${filename}`)
         const uniDeployments = await getDeployment()
-        addr_dai = uniDeployments.deployments.dai.contractAddress
+        addrs_dai = uniDeployments.deployments.dai.map(dai => dai.contractAddress)
         addr_weth = uniDeployments.deployments.weth.contractAddress
-        addr_dai_weth_A = uniDeployments.deployments.dai_weth_A?.contractAddress || ''
-        addr_dai_weth_B = uniDeployments.deployments.dai_weth_B?.contractAddress || ''
+        addrs_dai_weth_A = uniDeployments.deployments.dai_weth_A?.map(d => d.contractAddress) || []
+        addrs_dai_weth_B = uniDeployments.deployments.dai_weth_B?.map(d => d.contractAddress) || []
         addr_uniV2Factory_A = uniDeployments.deployments.uniV2Factory_A.contractAddress
         addr_uniV2Factory_B = uniDeployments.deployments.uniV2Factory_B.contractAddress
         addr_atomicSwap = uniDeployments.deployments.atomicSwap.contractAddress
         console.log("contract addrs", {
-            addr_dai,
+            addrs_dai,
             addr_weth,
-            addr_dai_weth_A,
-            addr_dai_weth_B,
+            addrs_dai_weth_A,
+            addrs_dai_weth_B,
             addr_uniV2Factory_A,
             addr_uniV2Factory_B,
             addr_atomicSwap,
@@ -175,40 +192,45 @@ const main = async () => {
     }
 
     const wethContract = new Contract(addr_weth, contracts.WETH.abi).connect(PROVIDER)
-    const daiContract = new Contract(addr_dai, contracts.DAI.abi).connect(PROVIDER)
+    const daiContracts = addrs_dai.map(addr => new Contract(addr, contracts.DAI.abi).connect(PROVIDER))
     const uniV2FactoryContract_A = new Contract(addr_uniV2Factory_A, contracts.UniV2Factory.abi).connect(PROVIDER)
     const uniV2FactoryContract_B = new Contract(addr_uniV2Factory_B, contracts.UniV2Factory.abi).connect(PROVIDER)
     const atomicSwapContract = new Contract (addr_atomicSwap, contracts.AtomicSwap.abi).connect(PROVIDER)
-    const daiWethPair_A = new Contract(addr_dai_weth_A, contracts.UniV2Pair.abi).connect(PROVIDER)
-    const daiWethPair_B = new Contract(addr_dai_weth_B, contracts.UniV2Pair.abi).connect(PROVIDER)
+    let daiWethPairs_A = addrs_dai_weth_A.map(addr => new Contract(addr, contracts.DAI.abi).connect(PROVIDER))
+    let daiWethPairs_B = addrs_dai_weth_B.map(addr => new Contract(addr, contracts.DAI.abi).connect(PROVIDER))
 
     getBalances = async () => {
         const isWeth0 = async (pair: Contract) => {
             const token0: string = await pair.token0()
             return token0.toLowerCase() === addr_weth.toLowerCase()
         }
-        const reservesDaiWeth_A: any[] = await daiWethPair_A.getReserves()
-        const reservesDaiWeth_B: any[] = await daiWethPair_B.getReserves()
+        const daiBalances = async (of: string) => {
+            utils.formatEther(await Promise.all(daiContracts.map(daiContract => daiContract.balanceOf(of))))
+        }
+        const reservesDaiWeth_A = await Promise.all(daiWethPairs_A.map(contract => contract.getReserves()))
+        const reservesDaiWeth_B = await Promise.all(daiWethPairs_B.map(contract => contract.getReserves()))
+        // const reservesDaiWeth_A: any[] = await daiWethPairs_A[i].getReserves()
+        // const reservesDaiWeth_B: any[] = await daiWethPair_B.getReserves()
         return {
             admin: {
                 weth: utils.formatEther(await wethContract.balanceOf(adminWallet.address)),
-                dai: utils.formatEther(await daiContract.balanceOf(adminWallet.address)),
+                dai: await daiBalances(adminWallet.address),
             },
             user: {
                 weth: utils.formatEther(await wethContract.balanceOf(userWallet.address)),
-                dai: utils.formatEther(await daiContract.balanceOf(userWallet.address)),
+                dai: await daiBalances(userWallet.address),
             },
             swapContract: {
                 weth: utils.formatEther(await wethContract.balanceOf(addr_atomicSwap)),
-                dai: utils.formatEther(await daiContract.balanceOf(addr_atomicSwap)),
+                dai: await daiBalances(addr_atomicSwap),
             },
             pricesPerWeth: {
-                dai_Univ2_A: utils.formatEther(await isWeth0(daiWethPair_A) ?
-                    (reservesDaiWeth_A[1].mul(ETH)).div(reservesDaiWeth_A[0] > 0 ? reservesDaiWeth_A[0] : 1) :
-                    (reservesDaiWeth_A[0].mul(ETH)).div(reservesDaiWeth_A[1] > 0 ? reservesDaiWeth_A[1] : 1)),
-                dai_Univ2_B: utils.formatEther(await isWeth0(daiWethPair_B) ?
-                    (reservesDaiWeth_B[1].mul(ETH)).div(reservesDaiWeth_B[0] > 0 ? reservesDaiWeth_B[0] : 1) :
-                    (reservesDaiWeth_B[0].mul(ETH)).div(reservesDaiWeth_B[1] > 0 ? reservesDaiWeth_B[1] : 1)),
+                dai_Univ2_A: await Promise.all(daiWethPairs_A.map(async pair => utils.formatEther(await isWeth0(pair) ?
+                (reservesDaiWeth_A[1].mul(ETH)).div(reservesDaiWeth_A[0] > 0 ? reservesDaiWeth_A[0] : 1) :
+                (reservesDaiWeth_A[0].mul(ETH)).div(reservesDaiWeth_A[1] > 0 ? reservesDaiWeth_A[1] : 1)))),
+                dai_Univ2_B: await Promise.all(daiWethPairs_B.map(async pair => utils.formatEther(await isWeth0(pair) ?
+                (reservesDaiWeth_B[1].mul(ETH)).div(reservesDaiWeth_B[0] > 0 ? reservesDaiWeth_B[0] : 1) :
+                (reservesDaiWeth_B[0].mul(ETH)).div(reservesDaiWeth_B[1] > 0 ? reservesDaiWeth_B[1] : 1)))),
             },
             reserves: {
                 uni_A: reservesDaiWeth_A.slice(0, 2).map(r => utils.formatEther(r)),
@@ -224,29 +246,30 @@ const main = async () => {
         const DAI_USER_MINT_AMOUNT = ETH.mul(50000) // mint 50k DAI for user
 
         // mint DAI for admin
-        let signedTx = await adminWallet.signTransaction(populateTxFully(
-            await daiContract.populateTransaction.mint(
-                adminWallet.address, DAI_ADMIN_MINT_AMOUNT
-            ),
-            getAdminNonce()
-        ))
-        signedTxs.push(signedTx)
-        console.log(`minting DAI for admin ${adminWallet.address}...`)
-        await (await PROVIDER.sendTransaction(signedTx)).wait(1)
-
-        // mint DAI for user
-        signedTx = await adminWallet.signTransaction(populateTxFully(
-            await daiContract.populateTransaction.mint(
-                userWallet.address, DAI_USER_MINT_AMOUNT
-            ),
-            getAdminNonce()
-        ))
-        signedTxs.push(signedTx)
-        console.log(`minting DAI for user ${userWallet.address}...`)
-        await (await PROVIDER.sendTransaction(signedTx)).wait(1)
+        for (const dai of daiContracts) {
+            let signedTx = await adminWallet.signTransaction(populateTxFully(
+                await dai.populateTransaction.mint(
+                    adminWallet.address, DAI_ADMIN_MINT_AMOUNT
+                ),
+                getAdminNonce()
+            ))
+            signedTxs.push(signedTx)
+            console.log(`minting DAI for admin ${adminWallet.address}...`)
+            await (await PROVIDER.sendTransaction(signedTx)).wait(1)
+            // mint DAI for user
+            signedTx = await adminWallet.signTransaction(populateTxFully(
+                await dai.populateTransaction.mint(
+                    userWallet.address, DAI_USER_MINT_AMOUNT
+                ),
+                getAdminNonce()
+            ))
+            signedTxs.push(signedTx)
+            console.log(`minting DAI for user ${userWallet.address}...`)
+            await (await PROVIDER.sendTransaction(signedTx)).wait(1)
+        }
 
         // mint WETH for admin
-        signedTx = await adminWallet.signTransaction(populateTxFully({
+        let signedTx = await adminWallet.signTransaction(populateTxFully({
             value: WETH_ADMIN_MINT_AMOUNT,
             to: addr_weth,
             data: "0xd0e30db0" // deposit
@@ -282,7 +305,7 @@ const main = async () => {
         }
         // approve pair contracts to spend my tokens
         const tokens = [
-            daiContract,
+            ...daiContracts,
             wethContract,
         ]
         const approvers = [
@@ -307,16 +330,15 @@ const main = async () => {
         console.log("factory_A num pairs", factoryPairsLength_A)
         console.log("factory_B num pairs", factoryPairsLength_B)
 
-        const addr_dai_weth_A: string = await uniV2FactoryContract_A.getPair(addr_weth, addr_dai)
-        const addr_dai_weth_B: string = await uniV2FactoryContract_B.getPair(addr_weth, addr_dai)
-        console.log("addr_dai_weth_A", addr_dai_weth_A)
-        console.log("addr_dai_weth_B", addr_dai_weth_B)
-
         // deposit liquidity into WETH/DAI pairs
         // TODO: this should be a router function
-        const daiWethPairAddrs = [addr_dai_weth_A, addr_dai_weth_B]
+        const daiWethPairAddrs = [...addrs_dai_weth_A, ...addrs_dai_weth_B]
         for (const pairAddr of daiWethPairAddrs) {
             const pairContract = new Contract(pairAddr, contracts.UniV2Pair.abi)
+            let tokenA = await pairContract.callStatic.tokenA()
+            let daiAddr = tokenA.toLowerCase() === deployments?.weth.contractAddress.toLowerCase() ? await pairContract.callStatic.tokenB() : tokenA
+            const daiContract = new Contract(daiAddr, contracts.DAI.abi)
+            console.log("DAI", daiAddr)
             
             let signedTx = await adminWallet.signTransaction( // deposit WETH into pair
                 populateTxFully(
@@ -355,7 +377,10 @@ const main = async () => {
     if (shouldTestSwap) {
         // swap 1 WETH for DAI on Uni_A
         const amountIn = ETH.mul(50)
+        const addr_dai = addrs_dai[randInRange(0, addrs_dai.length-1)]
+
         const path = [addr_weth, addr_dai]
+        // TODO: dynamic path length
 
         try {
             // use custom router to swap
@@ -367,8 +392,12 @@ const main = async () => {
             console.error("failed to swap", e)
         }
         try {
-            const reserves_A: BigNumber[] = (await daiWethPair_A.getReserves()).slice(0,2)
-            const reserves_B: BigNumber[] = (await daiWethPair_B.getReserves()).slice(0,2)
+            const daiWethPair_A = await uniV2FactoryContract_A.callStatic.getPair(...path)
+            const pairContractA = new Contract(daiWethPair_A, contracts.UniV2Pair.abi, PROVIDER)
+            const daiWethPair_B = await uniV2FactoryContract_B.callStatic.getPair(...path)
+            const pairContractB = new Contract(daiWethPair_B, contracts.UniV2Pair.abi, PROVIDER)
+            const reserves_A: BigNumber[] = (await pairContractA.callStatic.getReserves()).slice(0,2)
+            const reserves_B: BigNumber[] = (await pairContractB.callStatic.getReserves()).slice(0,2)
 
             const priceHigherOnA = reserves_A[0].div(reserves_A[1]).gt(reserves_B[0].div(reserves_B[1]))
             const start_factory = priceHigherOnA ? addr_uniV2Factory_A : addr_uniV2Factory_B
@@ -397,13 +426,14 @@ const main = async () => {
     const endBalance = await adminWallet.connect(PROVIDER).getBalance()
     console.log(`balance: ${utils.formatEther(endBalance)} ETH (spent ${utils.formatEther(startBalance.sub(endBalance))})`)
     
-    const deploymentsSignedTxs = deployments ? Object.values(deployments)
-        .map(d => d.signedDeployTx) : []
-    const allSignedTxs = deploymentsSignedTxs.concat(signedTxs)
-    if (allSignedTxs.length > 0) {
-        const filename = shouldDeploy ? await getNewDeploymentFilename() : await getNewLiquidityFilename()
-        await fs.writeFile(filename, JSON.stringify({deployments, allSignedTxs}), {encoding: "utf8"})
-        console.log(`Setup complete. Check output at ${textColors.Bright}${filename}${textColors.Reset}`)
+    if (deployments){
+        const deploymentsSignedTxs: string[] = getLiquidDeploymentTransactions(deployments)
+        const allSignedTxs = deploymentsSignedTxs.concat(signedTxs)
+        if (allSignedTxs.length > 0) {
+            const filename = shouldDeploy ? await getNewDeploymentFilename() : await getNewLiquidityFilename()
+            await fs.writeFile(filename, JSON.stringify({deployments, allSignedTxs}), {encoding: "utf8"})
+            console.log(`Setup complete. Check output at ${textColors.Bright}${filename}${textColors.Reset}`)
+        }
     }
 }
 
