@@ -196,21 +196,23 @@ const main = async () => {
     const uniV2FactoryContract_A = new Contract(addr_uniV2Factory_A, contracts.UniV2Factory.abi).connect(PROVIDER)
     const uniV2FactoryContract_B = new Contract(addr_uniV2Factory_B, contracts.UniV2Factory.abi).connect(PROVIDER)
     const atomicSwapContract = new Contract (addr_atomicSwap, contracts.AtomicSwap.abi).connect(PROVIDER)
-    let daiWethPairs_A = addrs_dai_weth_A.map(addr => new Contract(addr, contracts.DAI.abi).connect(PROVIDER))
-    let daiWethPairs_B = addrs_dai_weth_B.map(addr => new Contract(addr, contracts.DAI.abi).connect(PROVIDER))
+    let daiWethPairs_A = addrs_dai_weth_A.map(addr => new Contract(addr, contracts.UniV2Pair.abi).connect(PROVIDER))
+    let daiWethPairs_B = addrs_dai_weth_B.map(addr => new Contract(addr, contracts.UniV2Pair.abi).connect(PROVIDER))
 
     getBalances = async () => {
+        /**
+         * returns `true` if token0 of pair is WETH.
+         * @param pair univ2 pair contract
+         */
         const isWeth0 = async (pair: Contract) => {
             const token0: string = await pair.token0()
             return token0.toLowerCase() === addr_weth.toLowerCase()
         }
         const daiBalances = async (of: string) => {
-            utils.formatEther(await Promise.all(daiContracts.map(daiContract => daiContract.balanceOf(of))))
+            (await Promise.all(daiContracts.map(daiContract => daiContract.balanceOf(of)))).map(bal => BigNumber.from(bal))
         }
         const reservesDaiWeth_A = await Promise.all(daiWethPairs_A.map(contract => contract.getReserves()))
         const reservesDaiWeth_B = await Promise.all(daiWethPairs_B.map(contract => contract.getReserves()))
-        // const reservesDaiWeth_A: any[] = await daiWethPairs_A[i].getReserves()
-        // const reservesDaiWeth_B: any[] = await daiWethPair_B.getReserves()
         return {
             admin: {
                 weth: utils.formatEther(await wethContract.balanceOf(adminWallet.address)),
@@ -225,16 +227,16 @@ const main = async () => {
                 dai: await daiBalances(addr_atomicSwap),
             },
             pricesPerWeth: {
-                dai_Univ2_A: await Promise.all(daiWethPairs_A.map(async pair => utils.formatEther(await isWeth0(pair) ?
-                (reservesDaiWeth_A[1].mul(ETH)).div(reservesDaiWeth_A[0] > 0 ? reservesDaiWeth_A[0] : 1) :
-                (reservesDaiWeth_A[0].mul(ETH)).div(reservesDaiWeth_A[1] > 0 ? reservesDaiWeth_A[1] : 1)))),
-                dai_Univ2_B: await Promise.all(daiWethPairs_B.map(async pair => utils.formatEther(await isWeth0(pair) ?
-                (reservesDaiWeth_B[1].mul(ETH)).div(reservesDaiWeth_B[0] > 0 ? reservesDaiWeth_B[0] : 1) :
-                (reservesDaiWeth_B[0].mul(ETH)).div(reservesDaiWeth_B[1] > 0 ? reservesDaiWeth_B[1] : 1)))),
+                dai_Univ2_A: await Promise.all(daiWethPairs_A.map(async (pair, idx) => utils.formatEther(await isWeth0(pair) ?
+                (reservesDaiWeth_A[idx][1].mul(ETH)).div(reservesDaiWeth_A[idx][0] > 0 ? reservesDaiWeth_A[idx][0] : 1) : // price if token0 is WETH
+                (reservesDaiWeth_A[idx][0].mul(ETH)).div(reservesDaiWeth_A[idx][1] > 0 ? reservesDaiWeth_A[idx][1] : 1)))), // price if token0 is _not_ WETH
+                dai_Univ2_B: await Promise.all(daiWethPairs_B.map(async (pair, idx) => utils.formatEther(await isWeth0(pair) ?
+                (reservesDaiWeth_B[idx][1].mul(ETH)).div(reservesDaiWeth_B[idx][0] > 0 ? reservesDaiWeth_B[idx][0] : 1) : // price if token0 is WETH
+                (reservesDaiWeth_B[idx][0].mul(ETH)).div(reservesDaiWeth_B[idx][1] > 0 ? reservesDaiWeth_B[idx][1] : 1)))), // price if token0 is _not_ WETH
             },
             reserves: {
-                uni_A: reservesDaiWeth_A.slice(0, 2).map(r => utils.formatEther(r)),
-                uni_B: reservesDaiWeth_B.slice(0, 2).map(r => utils.formatEther(r)),
+                uni_A: reservesDaiWeth_A.map(reserves => reserves.slice(0, 2).map((r: any) => utils.formatEther(r))),
+                uni_B: reservesDaiWeth_B.map(reserves => reserves.slice(0, 2).map((r: any) => utils.formatEther(r))),
             }
         }
     }
@@ -332,17 +334,17 @@ const main = async () => {
 
         // deposit liquidity into WETH/DAI pairs
         // TODO: this should be a router function
-        const daiWethPairAddrs = [...addrs_dai_weth_A, ...addrs_dai_weth_B]
-        for (const pairAddr of daiWethPairAddrs) {
-            const pairContract = new Contract(pairAddr, contracts.UniV2Pair.abi)
-            let tokenA = await pairContract.callStatic.tokenA()
-            let daiAddr = tokenA.toLowerCase() === deployments?.weth.contractAddress.toLowerCase() ? await pairContract.callStatic.tokenB() : tokenA
-            const daiContract = new Contract(daiAddr, contracts.DAI.abi)
+        const daiWethPairs = [...daiWethPairs_A, ...daiWethPairs_B]
+        for (const pairContract of daiWethPairs) {
+            console.log("daiWethPairAddrs", daiWethPairs)
+            let token0 = await pairContract.callStatic.token0()
+            let daiAddr = token0.toLowerCase() === deployments?.weth.contractAddress.toLowerCase() ? await pairContract.callStatic.token1() : token0
             console.log("DAI", daiAddr)
+            const daiContract = new Contract(daiAddr, contracts.DAI.abi)
             
             let signedTx = await adminWallet.signTransaction( // deposit WETH into pair
                 populateTxFully(
-                    await wethContract.populateTransaction.transfer(pairAddr, WETH_DEPOSIT_AMOUNT),
+                    await wethContract.populateTransaction.transfer(pairContract.address, WETH_DEPOSIT_AMOUNT),
                     getAdminNonce()
                 )
             )
@@ -352,7 +354,7 @@ const main = async () => {
 
             signedTx = await adminWallet.signTransaction( // deposit DAI into pair
                 populateTxFully(
-                    await daiContract.populateTransaction.transfer(pairAddr, DAI_DEPOSIT_AMOUNT),
+                    await daiContract.populateTransaction.transfer(pairContract.address, DAI_DEPOSIT_AMOUNT),
                     getAdminNonce()
                 )
             )
