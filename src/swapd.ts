@@ -122,7 +122,7 @@ async function main() {
         console.log("no approvals required")
     }
 
-    PROVIDER.on('block', async blockNum => {
+    const swapd = async (blockNum: number) => {
         console.log(`[BLOCK ${blockNum}]`)
         // generate swaps
         let swaps: string[] = []
@@ -161,9 +161,16 @@ async function main() {
         })
         const swapResults = await Promise.allSettled(swapPromises)
         console.log(`${swapResults.length} swaps executed with ${walletSet.length} wallet${walletSet.length == 1 ? '' : 's'}`)
-    })
+    }
 
-    console.log("OK!")
+    const arbd = (blockNum: number) => {
+        console.log(`[BLOCK ${blockNum}]`)
+        console.warn("unimplemented!")
+        // TODO: everything lol
+        //  - if isArbd, detect swaps to backrun, checking min/max profit flags b4 executing
+    }
+
+    PROVIDER.on('block', isArbd ? arbd : swapd)
 }
 
 main()
