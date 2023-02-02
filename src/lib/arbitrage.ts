@@ -59,14 +59,6 @@ const calculateSpotPrice = (
     }
 }
 
-const logReserves = (reserves0: BigNumber, reserves1: BigNumber, labels: {x: string, y: string}) => {
-    const s_reserves0 = formatEther(reserves0.toFixed(0))
-    const s_reserves1 = formatEther(reserves1.toFixed(0))
-    console.log(
-        `reserves0\t${s_reserves0} ${labels.x}\nreserves1\t${s_reserves1} ${labels.y}`
-    )
-}
-
 /**
  * Convenience function to calculate a swap outcome and log relevant data.
  * @param reserves0: reserves of token0.
@@ -88,11 +80,7 @@ export const simulateSwap = (
     console.log(
         `\n-- swapping ${formatEther(amount_in.toFixed(0))} ${assetName(swap0For1, labels)} for ${assetName(!swap0For1, labels)}`
     )
-    const spot = calculateSpotPrice(reserves0, reserves1, k, amount_in, swap0For1)
-    logReserves(spot.reserves0, spot.reserves1, labels)
-    console.log(`amountOut\t${spot.amountOut} ${assetName(!swap0For1, labels)}`)
-    console.log(`price\t\t${spot.price} ${labels.x}/${labels.y}`)
-    return spot
+    return calculateSpotPrice(reserves0, reserves1, k, amount_in, swap0For1)
 }
 
 /** Calculates amount of tokens to swap for the optimal arb.
@@ -129,10 +117,7 @@ export const calculateOptimalArbAmountIn = (
             .done()
         ).done()
 
-        const amountIn = math.divide(numerator, denominator) as BigNumber
-        console.log("amountIn", amountIn)
-
-        return amountIn
+        return math.divide(numerator, denominator) as BigNumber
     }
     else {
         console.debug("SWAP_1_FOR_0")
@@ -153,11 +138,12 @@ export const calculateOptimalArbAmountIn = (
             .done()
         ).done()
 
-        const amountIn = math.divide(numerator, denominator) as BigNumber
-        console.log("amountIn", amountIn)
-
-        return amountIn
+        return math.divide(numerator, denominator) as BigNumber
     }
+}
+
+const logPrice = (label: string, reserves: {reserves0: BigNumber, reserves1: BigNumber}) => {
+    console.log(`price (${label})`, math.bignumber(reserves.reserves0.div(reserves.reserves1)))
 }
 
 /**
@@ -183,9 +169,14 @@ export const calculateBackrunProfit = (
     user_amount_in: BigNumber,
     userSwap0For1: boolean,
     labels: {x: string, y: string},
-) => {
+): BigNumber => {
     // assume we'll do the opposite of the user after their trade
     let backrun_direction = !userSwap0For1
+    const logPrices = () => {
+        logPrice("A", {reserves0: reserves0_A, reserves1: reserves1_A})
+        logPrice("B", {reserves0: reserves0_B, reserves1: reserves1_B})
+    }
+    logPrices()
 
     // calculate price impact from user trade
     const user_swap = simulateSwap(reserves0_A, reserves1_A, k_A, user_amount_in, userSwap0For1, labels)
@@ -193,10 +184,7 @@ export const calculateBackrunProfit = (
     // simulate updating reserves on exchange A
     reserves0_A = user_swap["reserves0"]
     reserves1_A = user_swap["reserves1"]
-    console.log("A")
-    logReserves(reserves0_A, reserves1_A, labels)
-    console.log("B")
-    logReserves(reserves0_B, reserves1_B, labels)
+    logPrices()
 
     // calculate optimal buy amount on exchange A
     let backrun_amount = calculateOptimalArbAmountIn(
@@ -211,7 +199,7 @@ export const calculateBackrunProfit = (
     }
     // if it's negative again, we don't have a good arb
     if (backrun_amount.lt(0)) {
-        return 0
+        return math.bignumber(0)
     }
 
     // execute backrun swap; opposite user's trade direction on same exchange
@@ -223,7 +211,7 @@ export const calculateBackrunProfit = (
     // "update reserves" on exchange A
     reserves0_A = backrun_buy["reserves0"]
     reserves1_A = backrun_buy["reserves1"]
-    logReserves(reserves0_A, reserves1_A, labels)
+    logPrices()
 
     // execute settlement swap; circular arb completion
     // same direction as user (opposite the backrun) on other exchange
@@ -235,18 +223,15 @@ export const calculateBackrunProfit = (
     // "update reserves" on exchange B
     reserves0_B = backrun_sell["reserves0"]
     reserves1_B = backrun_sell["reserves1"]
-    console.log("A")
-    logReserves(reserves0_A, reserves1_A, labels)
-    console.log("B")
-    logReserves(reserves0_B, reserves1_B, labels)
+    logPrices()
 
     // return profit
     const profit = backrun_sell["amountOut"].sub(backrun_amount)
     if (!userSwap0For1 || backrun_direction == userSwap0For1) {
         // convert profit to standard price format (x/y)
         console.log("SWAPPIN PRICE QUOTIENT")
-        return profit.mul(reserves1_B).div(reserves0_B)
+        return math.bignumber(profit.mul(reserves1_B).div(reserves0_B))
     } else {
-        return profit
+        return math.bignumber(profit)
     }
 }

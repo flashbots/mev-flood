@@ -239,8 +239,6 @@ async function main() {
                 const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, PROVIDER)
                 const reservesA = await pairA.getReserves()
                 const reservesB = await pairB.getReserves()
-                console.debug("reservesA", reservesA)
-                console.debug("reservesB", reservesB)
 
                 // TODO: only calculate each `k` once
                 const kA = reservesA[0].mul(reservesA[1])
@@ -263,6 +261,12 @@ async function main() {
                     {x: findTokenName(token0A), y: findTokenName(token1A)}
                 )
                 console.debug("estimated profit", utils.formatEther(estimatedProfit.toFixed(0)))
+                // TODO: calculate gas cost dynamically (accurately)
+                const gasCost = math.bignumber(150000).mul(1e9)
+                if (math.bignumber(estimatedProfit).gt(gasCost)) {
+                    console.log("DOING THE ARBITRAGE...")
+                    // TODO...
+                }
             }
         }
         // checking profit against min/max profit flags b4 executing
