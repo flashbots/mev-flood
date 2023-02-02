@@ -1,6 +1,7 @@
 import { BigNumber, Wallet, providers, utils } from "ethers"
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { id as ethersId } from "ethers/lib/utils"
+import mathjs from "mathjs"
 
 import env from "./env"
 import { getAdminWallet } from './wallets'
@@ -110,4 +111,12 @@ export const textColors = {
         type: 2,
         chainId: env.CHAIN_ID,
     }
+}
+
+/**
+ * Extracts 4-byte function signature from calldata.
+ * @param calldata raw calldata (`tx.data`) from tx.
+ */
+export const extract4Byte = (calldata: string) => {
+    return calldata.substring(2, 10)
 }

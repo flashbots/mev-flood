@@ -1,17 +1,33 @@
-import { BigNumber, Contract, utils } from 'ethers'
-import { formatEther } from 'ethers/lib/utils'
+import { BigNumber, Contract, Transaction, utils } from 'ethers'
+import { formatEther, formatUnits } from 'ethers/lib/utils'
+import { calculateBackrunProfit } from './lib/arbitrage'
 import { getSwapdArgs } from './lib/cliArgs'
 import contracts from './lib/contracts'
-import { coinToss, randInRange, populateTxFully, ETH, MAX_U256, PROVIDER } from './lib/helpers'
+import { coinToss, randInRange, populateTxFully, ETH, MAX_U256, PROVIDER, TransactionRequest, extract4Byte } from './lib/helpers'
+import math, { numify } from "./lib/math"
 
-import { getDeployment, getExistingDeploymentFilename, signSwap } from "./lib/liquid"
+import { ContractDeployment, getDeployment, getExistingDeploymentFilename, signSwap } from "./lib/liquid"
 import { getAdminWallet, getWalletSet } from './lib/wallets'
+
+// TODO: use this!
+interface SwapParams {
+    // address[] memory path,
+    path: string[]
+    // uint256 amountIn,
+    amountIn: BigNumber
+    // address factory,
+    factory: string
+    // address recipient,
+    recipient: string
+    // bool fromThis
+    fromThis: boolean
+}
 
 async function main() {
     // get cli args
     const {startIdx, endIdx, actionsPerBlock, numPairs, program, modes} = getSwapdArgs()
     const isArbd = program === modes.arbd
-    console.log("numPairs", numPairs)
+    // TODO: actually use numPairs lol
 
     const walletSet = getWalletSet(startIdx, endIdx)
 
@@ -19,12 +35,10 @@ async function main() {
     const filename = await getExistingDeploymentFilename()
     console.log("filename", filename)
     const {deployments} = await getDeployment()
-
-    deployments
     
     const atomicSwapContract = new Contract(deployments.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
-    const uniFactoryA = new Contract(deployments.uniV2Factory_A.contractAddress, contracts.UniV2Factory.abi)
-    const uniFactoryB = new Contract(deployments.uniV2Factory_B.contractAddress, contracts.UniV2Factory.abi)
+    const uniFactoryA = new Contract(deployments.uniV2Factory_A.contractAddress, contracts.UniV2Factory.abi, PROVIDER)
+    const uniFactoryB = new Contract(deployments.uniV2Factory_B.contractAddress, contracts.UniV2Factory.abi, PROVIDER)
     const wethContract = new Contract(deployments.weth.contractAddress, contracts.WETH.abi, PROVIDER)
     let daiContracts: Contract[] = deployments.dai.map(dai => new Contract(dai.contractAddress, contracts.DAI.abi, PROVIDER))
 
@@ -122,6 +136,10 @@ async function main() {
         console.log("no approvals required")
     }
 
+    /**
+     * juicy swap generator. Generates random univ2 swaps from wallets specified in args.
+     * @param blockNum new block number from RPC provider.
+     */
     const swapd = async (blockNum: number) => {
         console.log(`[BLOCK ${blockNum}]`)
         // generate swaps
@@ -131,13 +149,13 @@ async function main() {
             for (let i = 0; i < actionsPerBlock; i++) {
                 // pick random uni factory
                 const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
+                // TODO: use `numPairs` here
                 const daiContract = daiContracts.length > 1 ? daiContracts[randInRange(0, daiContracts.length)] : 
                     daiContracts[0]
                 // pick random path
                 const path = coinToss() ? [wethContract.address, daiContract.address] : [daiContract.address, wethContract.address]
                 // pick random amountIn: [500..10000] USD
                 const amountInUSD = ETH.mul(randInRange(500, 2000))
-                console.log("amountInUSD")
                 // if weth out (path_0 == weth) then amount should be (1 ETH / 2000 DAI) * amountIn
                 const amountIn = path[0] == wethContract.address ? amountInUSD.div(2000) : amountInUSD
                 const tokenInName = path[0] === wethContract.address ? "WETH" : "DAI"
@@ -163,14 +181,102 @@ async function main() {
         console.log(`${swapResults.length} swaps executed with ${walletSet.length} wallet${walletSet.length == 1 ? '' : 's'}`)
     }
 
-    const arbd = (blockNum: number) => {
-        console.log(`[BLOCK ${blockNum}]`)
-        console.warn("unimplemented!")
-        // TODO: everything lol
-        //  - if isArbd, detect swaps to backrun, checking min/max profit flags b4 executing
+    const findTokenName = (addr: string) => {
+        // if it's either WETH or one of the DAI tokens
+        if (addr === deployments.weth.contractAddress) {
+            return "WETH"
+        } else {
+            for (let i = 0; i < deployments.dai.length; i++) {
+                if (deployments.dai[i].contractAddress === addr) {
+                    return `DAI${i+1}`
+                }
+            }
+        }
+        // if it's any other top-level contract
+        for (const deployment of Object.entries(deployments)) {
+            const key: string = deployment[0]
+            const val: ContractDeployment = deployment[1]
+            if (val.contractAddress === addr) {
+                return key
+            }
+        }
+        return "-?-"
     }
 
-    PROVIDER.on('block', isArbd ? arbd : swapd)
+    /**
+     * backrun-arbitrage daemon; watches mempool for juicy swaps and backruns them w/ an arb when profitable. 
+     * Arbs are generated from wallet set passed in args; will cause conflicts often.
+     * @param pendingTx pending tx from mempool.
+     */
+    const arbd = async (pendingTx: Transaction) => {
+        console.log(`[pending tx ${pendingTx.hash}]`)
+        if (pendingTx.to === atomicSwapContract.address) {
+            // swap detected
+            // TODO: hmmmm we need a side daemon that caches the reserves (on new block);
+            // for now we can just pull the reserves for every tx but
+            // long term we can't be doin' that
+
+            // decode tx to get pair
+            // we're expecting a call to `swap` on atomicSwap
+            const fnSignature = extract4Byte(pendingTx.data)
+            if (fnSignature === "0cc73263") {
+                // swap detected
+                const decodedTxData = utils.defaultAbiCoder.decode([
+                    "address[] path", 
+                    "uint256 amountIn",
+                    "address factory",
+                    "address recipient",
+                    "bool fromThis",
+                ], `0x${pendingTx.data.substring(10)}`)
+                const path = decodedTxData[0]
+                // get reserves
+                // TODO: make a helper function to do this; this block is getting ugly
+                const pairAddressA = await uniFactoryA.getPair(path[0], path[1])
+                const pairAddressB = await uniFactoryB.getPair(path[0], path[1])
+                // TODO: cache these contracts or use something more efficient than
+                // instantiating new Contracts every time
+                const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, PROVIDER)
+                const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, PROVIDER)
+                const reservesA = await pairA.getReserves()
+                const reservesB = await pairB.getReserves()
+                console.debug("reservesA", reservesA)
+                console.debug("reservesB", reservesB)
+
+                // TODO: only calculate each `k` once
+                const kA = reservesA[0].mul(reservesA[1])
+                const kB = reservesB[0].mul(reservesB[1])
+
+                // we can assume that the pair ordering is the same on both pairs
+                // bc they are the same contract, so they order the same way
+                const token0A = await pairA.callStatic.token0()
+                const token1A = await pairA.callStatic.token1()
+                const estimatedProfit = calculateBackrunProfit(
+                    numify(reservesA[0]),
+                    numify(reservesA[1]),
+                    numify(kA),
+                    numify(reservesB[0]),
+                    numify(reservesB[1]),
+                    numify(kB),
+                    numify(decodedTxData[1]),
+                    path[0] === token0A,
+                    // TODO: add a local addr:name cache
+                    {x: findTokenName(token0A), y: findTokenName(token1A)}
+                )
+                console.debug("estimated profit", utils.formatEther(estimatedProfit.toFixed(0)))
+            }
+        }
+        // checking profit against min/max profit flags b4 executing
+
+        console.warn("unfinished!")
+    }
+
+    if (isArbd) {
+        // watch mempool
+        PROVIDER.on('pending', arbd)
+    } else {
+        // watch blocks
+        PROVIDER.on('block', swapd)
+    }
 }
 
 main()

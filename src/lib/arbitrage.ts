@@ -1,14 +1,18 @@
-// const FEE = 0.997
-const FEE = 1
-// token0 = USD, token1 = ETH
-const assetNames = ["USD", "ETH"]
+import { formatEther } from 'ethers/lib/utils'
+import { BigNumber } from 'mathjs'
+import math from "./math"
+
+const FEE = 0.997
+// const FEE = 1
 
 /**
  * Convenience function for picking the asset name given the trade direction.
  * @param swap_usdc_for_eth
  */
-const assetName = (swap_usdc_for_eth: boolean) => {
-    return assetNames[swap_usdc_for_eth ? 1 : 0]
+const assetName = (swap_usdc_for_eth: boolean, labels: {x: string, y: string}) => {
+    // const assetNames = ["USD", "ETH"]
+    const assetNames = [labels.x, labels.y]
+    return assetNames[swap_usdc_for_eth ? 0 : 1]
 }
 
 /** Calculate spot price for a given pair. Specific to univ2 `exactInputSingle`, fees ignored.
@@ -20,36 +24,46 @@ const assetName = (swap_usdc_for_eth: boolean) => {
  * @returns Price returned is ALWAYS defined as token0 per token1.
  */
 const calculateSpotPrice = (
-    x: number, y: number, k: number, amount_in: number, swap_x_for_y: boolean
-) =>{
-
+    x: BigNumber, y: BigNumber, k: BigNumber, amount_in: BigNumber, swap_x_for_y: boolean
+): {reserves0: BigNumber, reserves1: BigNumber, amountOut: BigNumber, price: BigNumber} => {
     if (swap_x_for_y) {
-        const dx = amount_in
-        const dy = y - (k / (x + dx))
-        const price = dx / dy
+        const dx = amount_in as BigNumber
+        const dy = math.subtract(
+            y,
+            math.divide(k,
+                math.add(x, dx)
+            )
+        ) as BigNumber
+        const price = math.divide(dx, dy) as BigNumber
         return {
-            reserves0: x + dx,
-            reserves1: y - dy,
-            amount_out: dy,
+            reserves0: x.add(dx),
+            reserves1: y.sub(dy),
+            amountOut: dy,
             price,
         }
     }
     else {
-        const dy = amount_in
-        const dx = x - (k / (y + dy))
-        const price = dx / dy
+        const dy = amount_in as BigNumber
+        const dx = math.subtract(
+            x, math.divide(k,
+                math.add(y, dy)
+            )
+        ) as BigNumber
+        const price = math.divide(dx, dy) as BigNumber
         return {
-            reserves0: x - dx,
-            reserves1: y + dy,
-            amount_out: dx,
+            reserves0: x.sub(dx),
+            reserves1: y.add(dy),
+            amountOut: dx,
             price,
         }
     }
 }
 
-const logReserves = (reserves0: number, reserves1: number) => {
+const logReserves = (reserves0: BigNumber, reserves1: BigNumber, labels: {x: string, y: string}) => {
+    const s_reserves0 = formatEther(reserves0.toFixed(0))
+    const s_reserves1 = formatEther(reserves1.toFixed(0))
     console.log(
-        `reserves0\t${reserves0} ${assetNames[0]}\nreserves1\t${reserves1} ${assetNames[1]}`
+        `reserves0\t${s_reserves0} ${labels.x}\nreserves1\t${s_reserves1} ${labels.y}`
     )
 }
 
@@ -59,20 +73,25 @@ const logReserves = (reserves0: number, reserves1: number) => {
  * @param reserves1: reserves of token1.
  * @param k: product constant.
  * @param amount_in: amount of tokens to send in exchange for other tokens.
- * @param swap_0_for_1: determines trade direction.
+ * @param swap0For1: determines trade direction.
  * @returns Price returned is ALWAYS defined as token0 per token1.
  */
-const swap = (
-    reserves0: number, reserves1: number, k: number, amount_in: number, swap_0_for_1: boolean
+export const simulateSwap = (
+    reserves0: BigNumber,
+    reserves1: BigNumber,
+    k: BigNumber,
+    amount_in: BigNumber,
+    swap0For1: boolean,
+    labels: {x: string, y: string}
 ) => {
 
     console.log(
-        `-- swapping ${amount_in} ${assetName(swap_0_for_1)} for ${assetName(! swap_0_for_1)}`
+        `\n-- swapping ${formatEther(amount_in.toFixed(0))} ${assetName(swap0For1, labels)} for ${assetName(!swap0For1, labels)}`
     )
-    const spot = calculateSpotPrice(reserves0, reserves1, k, amount_in, swap_0_for_1)
-    logReserves(spot.reserves0, spot.reserves1)
-    console.log(`amount_out\t${spot.amount_out} ${assetName(! swap_0_for_1)}`)
-    console.log(`price\t\t${spot.price} ${assetNames[0]}/${assetNames[1]}`)
+    const spot = calculateSpotPrice(reserves0, reserves1, k, amount_in, swap0For1)
+    logReserves(spot.reserves0, spot.reserves1, labels)
+    console.log(`amountOut\t${spot.amountOut} ${assetName(!swap0For1, labels)}`)
+    console.log(`price\t\t${spot.price} ${labels.x}/${labels.y}`)
     return spot
 }
 
@@ -81,29 +100,63 @@ const swap = (
  * @param reserve1_A: Reserves of token1 on exchange A.
  * @param reserve0_B: Reserves of token0 on exchange B.
  * @param reserve1_B: Reserves of token1 on exchange B.
- * @param swap_0_for_1: Determines trade direction.
+ * @param swap0For1: Determines trade direction.
  */
-const calculateOptimalArbAmountIn = (
-    reserve0_A: number,
-    reserve1_A: number,
-    reserve0_B: number,
-    reserve1_B: number,
-    swap_0_for_1: boolean,
-) => {
+export const calculateOptimalArbAmountIn = (
+    reserve0_A: BigNumber,
+    reserve1_A: BigNumber,
+    reserve0_B: BigNumber,
+    reserve1_B: BigNumber,
+    swap0For1: boolean,
+): BigNumber => {
 
-    if (swap_0_for_1) {
-        const price_A = reserve1_A / reserve0_A
-        const price_B = reserve0_B / reserve1_B
-        const numerator = Math.sqrt(price_A * price_B * FEE * FEE) - 1
-        const denominator = (FEE / reserve0_A) + (FEE * FEE * price_A / reserve1_B)
-        return numerator / denominator
+    if (swap0For1) {
+        console.debug("SWAP_0_FOR_1")
+        const priceA = reserve1_A.div(reserve0_A)
+        const priceB = reserve0_B.div(reserve1_B)
+
+        const numerator = math.sqrt(
+            priceA.mul(priceB).mul(FEE).mul(FEE)
+        ).sub(1)
+
+        const denominator = math.chain(
+            math.divide(FEE, reserve0_A)
+        ).add(
+            math.chain(FEE)
+            .multiply(FEE)
+            .multiply(priceA)
+            .divide(reserve1_B)
+            .done()
+        ).done()
+
+        const amountIn = math.divide(numerator, denominator) as BigNumber
+        console.log("amountIn", amountIn)
+
+        return amountIn
     }
     else {
-        const price_A = reserve0_A / reserve1_A
-        const price_B = reserve1_B / reserve0_B
-        const numerator = Math.sqrt(price_A * price_B * FEE * FEE) - 1
-        const denominator = (FEE / reserve1_A) + (FEE * FEE * price_A / reserve0_B)
-        return numerator / denominator
+        console.debug("SWAP_1_FOR_0")
+        const priceA = reserve0_A.div(reserve1_A)
+        const priceB = reserve1_B.div(reserve0_B)
+
+        const numerator = math.sqrt(
+            priceA.mul(priceB).mul(FEE).mul(FEE)
+        ).sub(1)
+
+        const denominator = math.chain(
+            math.divide(FEE, reserve1_A)
+        ).add(
+            math.chain(FEE)
+            .multiply(FEE)
+            .multiply(priceA)
+            .divide(reserve0_B)
+            .done()
+        ).done()
+
+        const amountIn = math.divide(numerator, denominator) as BigNumber
+        console.log("amountIn", amountIn)
+
+        return amountIn
     }
 }
 
@@ -117,74 +170,83 @@ Assumes user is trading on exchange A.
  * @param reserves1_B: Reserves of token1 on exchange B.
  * @param k_B: Product constant of pair on exchange B.
  * @param user_amount_in: Amount of tokens the user sends for their swap.
- * @param user_swap_x_for_y: Determines trade direction.
+ * @param userSwap0For1: Determines trade direction.
+ * @returns profit is always denoted in token0/token1
  */
 export const calculateBackrunProfit = (
-    reserves0_A: number,
-    reserves1_A: number,
-    k_A: number,
-    reserves0_B: number,
-    reserves1_B: number,
-    k_B: number,
-    user_amount_in: number,
-    user_swap_x_for_y: boolean,
+    reserves0_A: BigNumber,
+    reserves1_A: BigNumber,
+    k_A: BigNumber,
+    reserves0_B: BigNumber,
+    reserves1_B: BigNumber,
+    k_B: BigNumber,
+    user_amount_in: BigNumber,
+    userSwap0For1: boolean,
+    labels: {x: string, y: string},
 ) => {
+    // assume we'll do the opposite of the user after their trade
+    let backrun_direction = !userSwap0For1
 
     // calculate price impact from user trade
-    const user_swap = swap(reserves0_A, reserves1_A, k_A, user_amount_in, user_swap_x_for_y)
+    const user_swap = simulateSwap(reserves0_A, reserves1_A, k_A, user_amount_in, userSwap0For1, labels)
 
-    // update reserves on exchange A
+    // simulate updating reserves on exchange A
     reserves0_A = user_swap["reserves0"]
     reserves1_A = user_swap["reserves1"]
+    console.log("A")
+    logReserves(reserves0_A, reserves1_A, labels)
+    console.log("B")
+    logReserves(reserves0_B, reserves1_B, labels)
 
     // calculate optimal buy amount on exchange A
-    const backrun_amount = calculateOptimalArbAmountIn(
-        reserves0_A, reserves1_A, reserves0_B, reserves1_B, ! user_swap_x_for_y
+    let backrun_amount = calculateOptimalArbAmountIn(
+        reserves0_A, reserves1_A, reserves0_B, reserves1_B, backrun_direction
+    )
+    if (backrun_amount.lt(0)) {
+        // switch directions; better arb the other way
+        backrun_direction = !backrun_direction
+        backrun_amount = calculateOptimalArbAmountIn(
+            reserves0_A, reserves1_A, reserves0_B, reserves1_B, backrun_direction
+        )
+    }
+    // if it's negative again, we don't have a good arb
+    if (backrun_amount.lt(0)) {
+        return 0
+    }
+
+    // execute backrun swap; opposite user's trade direction on same exchange
+    const backrun_buy = simulateSwap(
+        reserves0_A, reserves1_A, k_A, backrun_amount, backrun_direction,
+        labels
     )
 
-    // execute swap; opposite user's trade direction on same exchange
-    const backrun_buy = swap(
-        reserves0_A, reserves1_A, k_A, backrun_amount, ! user_swap_x_for_y
-    )
-
-    // update reserves on exchange A
+    // "update reserves" on exchange A
     reserves0_A = backrun_buy["reserves0"]
     reserves1_A = backrun_buy["reserves1"]
+    logReserves(reserves0_A, reserves1_A, labels)
 
-    // execute swap; same direction as user on other exchange
-    const backrun_sell = swap(
-        reserves0_B, reserves1_B, k_B, backrun_buy["amount_out"], user_swap_x_for_y
+    // execute settlement swap; circular arb completion
+    // same direction as user (opposite the backrun) on other exchange
+    const backrun_sell = simulateSwap(
+        reserves0_B, reserves1_B, k_B, backrun_buy["amountOut"], !backrun_direction,
+        labels
     )
 
-    // update reserves on exchange B
+    // "update reserves" on exchange B
     reserves0_B = backrun_sell["reserves0"]
     reserves1_B = backrun_sell["reserves1"]
+    console.log("A")
+    logReserves(reserves0_A, reserves1_A, labels)
+    console.log("B")
+    logReserves(reserves0_B, reserves1_B, labels)
 
     // return profit
-    return backrun_sell["amount_out"] - backrun_amount
+    const profit = backrun_sell["amountOut"].sub(backrun_amount)
+    if (!userSwap0For1 || backrun_direction == userSwap0For1) {
+        // convert profit to standard price format (x/y)
+        console.log("SWAPPIN PRICE QUOTIENT")
+        return profit.mul(reserves1_B).div(reserves0_B)
+    } else {
+        return profit
+    }
 }
-
-// def main():
-//     reserves0 = 2 * million
-//     reserves1 = 1000
-//     k = reserves0 * reserves1
-
-//     logReserves(reserves0, reserves1)
-
-//     # test
-//     # swap(reserves0, reserves1, k, 10000, True)
-//     # swap(reserves0, reserves1, k, 5, False)
-
-//     # assume both pools are equally priced at start
-//     user_swap_usdc_for_eth = True
-//     profit = calculateBackrunProfit(
-//         reserves0,
-//         reserves1,
-//         k,  # / exchange A
-//         reserves0,
-//         reserves1,
-//         k,  # / exchange B
-//         10000,
-//         user_swap_usdc_for_eth,
-//     )
-//     console.log("\nPROFIT\t\t{} {}".format(profit, assetName(! user_swap_usdc_for_eth)))

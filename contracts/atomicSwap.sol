@@ -63,6 +63,7 @@ contract AtomicSwap {
         address recipient,
         bool fromThis
     ) public {
+        // TODO: remove this; put in args
         IUniswapV2Pair pair = IUniswapV2Pair(
             IUniswapV2Factory(factory).getPair(path[0], path[1])
         );
