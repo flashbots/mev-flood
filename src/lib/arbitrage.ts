@@ -170,6 +170,10 @@ export const calculateBackrunProfit = (
     userSwap0For1: boolean,
     labels: {x: string, y: string},
 ): BigNumber => {
+    let settlementToken = 0
+    if (!userSwap0For1) {
+        settlementToken = 1
+    }
     // assume we'll do the opposite of the user after their trade
     let backrun_direction = !userSwap0For1
     const logPrices = () => {
@@ -196,13 +200,14 @@ export const calculateBackrunProfit = (
         backrun_amount = calculateOptimalArbAmountIn(
             reserves0_A, reserves1_A, reserves0_B, reserves1_B, backrun_direction
         )
+        settlementToken = settlementToken === 1 ? 0 : 1
     }
     // if it's negative again, we don't have a good arb
     if (backrun_amount.lt(0)) {
         return math.bignumber(0)
     }
 
-    // execute backrun swap; opposite user's trade direction on same exchange
+    // execute backrun swap on same exchange as user
     const backrun_buy = simulateSwap(
         reserves0_A, reserves1_A, k_A, backrun_amount, backrun_direction,
         labels
@@ -227,10 +232,12 @@ export const calculateBackrunProfit = (
 
     // return profit
     const profit = backrun_sell["amountOut"].sub(backrun_amount)
-    if (!userSwap0For1 || backrun_direction == userSwap0For1) {
-        // convert profit to standard price format (x/y)
+    // if we settle in token1, adjust the profit to be in terms of token0
+    if (settlementToken === 1) {
         console.log("SWAPPIN PRICE QUOTIENT")
-        return math.bignumber(profit.mul(reserves1_B).div(reserves0_B))
+        const price = reserves0_B.div(reserves1_B)
+        // convert profit to standard price format (x/y)
+        return math.bignumber(profit.div(price))
     } else {
         return math.bignumber(profit)
     }
