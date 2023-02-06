@@ -7,6 +7,7 @@ import {
     providers,
     Wallet
 } from "ethers"
+import { formatEther } from 'ethers/lib/utils'
 
 // lib
 import contracts, { ContractSpec } from "../contracts"
@@ -224,60 +225,70 @@ const liquid = async (options: LiquidOptions, provider: providers.JsonRpcProvide
     }
     
     if (shouldMintTokens) {
-        const WETH_ADMIN_MINT_AMOUNT = ETH.mul(options.wethMintAmountAdmin || 2500)
-        const WETH_USER_MINT_AMOUNT = ETH.mul(options.wethMintAmountUser || 500)
+        const adminMintAmount = options.wethMintAmountAdmin !== undefined ? BigNumber.from(options.wethMintAmountAdmin) : undefined
+        const userMintAmount = options.wethMintAmountUser !== undefined ? BigNumber.from(options.wethMintAmountUser) : undefined
+        const WETH_ADMIN_MINT_AMOUNT = ETH.mul(adminMintAmount || 2500)
+        const WETH_USER_MINT_AMOUNT = ETH.mul(userMintAmount || 500)
         const DAI_ADMIN_MINT_AMOUNT = WETH_ADMIN_MINT_AMOUNT.div(100).mul(90).mul(1300) // 90% 0f WETH will be paired w/ DAI @ 1300 DAI/WETH
         const DAI_USER_MINT_AMOUNT = ETH.mul(50000) // always mint 50k DAI for user
 
         // mint DAI for admin
-        let signedTx = await adminWallet.signTransaction(populateTxFully(
-            await daiContract.populateTransaction.mint(
-                adminWallet.address, DAI_ADMIN_MINT_AMOUNT
-            ),
-            getAdminNonce(),
-            overrides
-        ))
-        signedTxs.push(signedTx)
-        console.log(`minting DAI for admin ${adminWallet.address}...`)
-        await (await provider.sendTransaction(signedTx)).wait(1)
+        if (DAI_ADMIN_MINT_AMOUNT.gt(0)) {
+            let signedTx = await adminWallet.signTransaction(populateTxFully(
+                await daiContract.populateTransaction.mint(
+                    adminWallet.address, DAI_ADMIN_MINT_AMOUNT
+                ),
+                getAdminNonce(),
+                overrides
+            ))
+            signedTxs.push(signedTx)
+            console.log(`minting ${formatEther(DAI_ADMIN_MINT_AMOUNT)} DAI for admin ${adminWallet.address}...`)
+            await (await provider.sendTransaction(signedTx)).wait(1)
+        }
 
         // mint DAI for user
-        signedTx = await adminWallet.signTransaction(populateTxFully(
-            await daiContract.populateTransaction.mint(
-                userWallet.address, DAI_USER_MINT_AMOUNT
-            ),
-            getAdminNonce(),
-            overrides
-        ))
-        signedTxs.push(signedTx)
-        console.log(`minting DAI for user ${userWallet.address}...`)
-        await (await provider.sendTransaction(signedTx)).wait(1)
+        if (DAI_USER_MINT_AMOUNT.gt(0)) {
+            let signedTx = await adminWallet.signTransaction(populateTxFully(
+                await daiContract.populateTransaction.mint(
+                    userWallet.address, DAI_USER_MINT_AMOUNT
+                ),
+                getAdminNonce(),
+                overrides
+            ))
+            signedTxs.push(signedTx)
+            console.log(`minting ${formatEther(DAI_USER_MINT_AMOUNT)} DAI for user ${userWallet.address}...`)
+            await (await provider.sendTransaction(signedTx)).wait(1)
+        }
 
         // mint WETH for admin
-        signedTx = await adminWallet.signTransaction(populateTxFully({
-            value: WETH_ADMIN_MINT_AMOUNT,
-            to: addr_weth,
-            data: "0xd0e30db0" // deposit
-        },
-            getAdminNonce(),
-            overrides
-        ))
-        signedTxs.push(signedTx)
-        console.log(`minting WETH for admin ${adminWallet.address}...`)
-        await (await provider.sendTransaction(signedTx)).wait(1)
+        if (WETH_ADMIN_MINT_AMOUNT.gt(0)) {
+            let signedTx = await adminWallet.signTransaction(populateTxFully({
+                value: WETH_ADMIN_MINT_AMOUNT,
+                to: addr_weth,
+                data: "0xd0e30db0" // deposit
+            },
+                getAdminNonce(),
+                overrides
+            ))
+            signedTxs.push(signedTx)
+            console.log(`minting ${formatEther(WETH_ADMIN_MINT_AMOUNT)} WETH for admin ${adminWallet.address}...`)
+            await (await provider.sendTransaction(signedTx)).wait(1)
+        }
 
         // mint WETH for user
-        signedTx = await userWallet.signTransaction(populateTxFully({
-            value: WETH_USER_MINT_AMOUNT,
-            to: addr_weth,
-            data: "0xd0e30db0" // deposit
-        }, 
-            getUserNonce(), 
-            {from: userWallet.address, chainId: overrides.chainId}
-        ))
-        signedTxs.push(signedTx)
-        console.log(`minting WETH for user ${userWallet.address}...`)
-        await (await provider.sendTransaction(signedTx)).wait(1)
+        if (WETH_USER_MINT_AMOUNT.gt(0)) {
+            let signedTx = await userWallet.signTransaction(populateTxFully({
+                value: WETH_USER_MINT_AMOUNT,
+                to: addr_weth,
+                data: "0xd0e30db0" // deposit
+            }, 
+                getUserNonce(), 
+                {from: userWallet.address, chainId: overrides.chainId}
+            ))
+            signedTxs.push(signedTx)
+            console.log(`minting ${formatEther(WETH_USER_MINT_AMOUNT)} WETH for user ${userWallet.address}...`)
+            await (await provider.sendTransaction(signedTx)).wait(1)
+        }
 
         console.log("balances", await getBalances())
     }
