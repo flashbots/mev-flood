@@ -1,6 +1,7 @@
 import { BigNumber, ContractFactory, Wallet } from "ethers"
 import env from './env'
-import { GWEI, ETH, PROVIDER, now, TransactionRequest } from './helpers'
+import { GWEI, ETH, now, TransactionRequest } from './helpers'
+import { PROVIDER } from './providers'
 import contracts, { getContract } from './contracts'
 import { getAdminWallet } from './wallets'
 import { formatEther, formatUnits } from 'ethers/lib/utils'

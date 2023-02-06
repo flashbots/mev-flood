@@ -2,7 +2,9 @@ import { BigNumber, Contract, utils } from 'ethers'
 import { formatEther } from 'ethers/lib/utils'
 import { getSwapdArgs } from './lib/cliArgs'
 import contracts from './lib/contracts'
-import { ETH, MAX_U256, populateTxFully, PROVIDER } from './lib/helpers'
+import env from './lib/env'
+import { ETH, MAX_U256, populateTxFully } from './lib/helpers'
+import { PROVIDER } from './lib/providers'
 
 import { getDeployment, getExistingDeploymentFilename, signSwap } from "./lib/liquid"
 import { getAdminWallet, getWalletSet } from './lib/wallets'
@@ -45,6 +47,7 @@ async function main() {
             const tx = populateTxFully(await wethContract.populateTransaction.deposit({value: ETH.mul(20)}), nonce, {
                 gasLimit: 50000,
                 from: wallet.address,
+                chainId: env.CHAIN_ID,
             })
             const signedMint = await wallet.signTransaction(tx)
             signedMints.push(signedMint)
@@ -54,7 +57,8 @@ async function main() {
             // mint 50k DAI to wallet from admin account (DAI deployer)
             const mintTx = await adminWallet.signTransaction(populateTxFully(await daiContract.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce, {
                 gasLimit: 60000,
-                from: adminWallet.address
+                from: adminWallet.address,
+                chainId: env.CHAIN_ID,
             }))
             adminNonce += 1
             signedMints.push(mintTx)
@@ -80,7 +84,9 @@ async function main() {
                 await wethContract.populateTransaction.approve(atomicSwapContract.address, MAX_U256), 
                 nonce, 
                 {
-                    from: wallet.address, gasLimit: 50000
+                    from: wallet.address,
+                    gasLimit: 50000,
+                    chainId: env.CHAIN_ID,
                 })
             nonce += 1
             const signedTx = await wallet.signTransaction(approveTx)
@@ -91,7 +97,9 @@ async function main() {
                 await daiContract.populateTransaction.approve(atomicSwapContract.address, MAX_U256), 
                 nonce, 
                 {
-                    from: wallet.address, gasLimit: 50000
+                    from: wallet.address,
+                    gasLimit: 50000,
+                    chainId: env.CHAIN_ID,
                 })
             const signedTx = await wallet.signTransaction(approveTx)
             signedApprovals.push(signedTx)

@@ -1,7 +1,7 @@
 import { providers } from 'ethers'
 import { getSendProtectTxArgs } from '../lib/cliArgs'
 import env from '../lib/env'
-import { PROVIDER } from '../lib/helpers'
+import { PROVIDER } from '../lib/providers'
 import { createRevertingUniTx, getSampleLotteryTx } from '../lib/lottery'
 import { getAdminWallet } from '../lib/wallets'
 

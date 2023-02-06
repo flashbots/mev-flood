@@ -2,7 +2,8 @@ import { BigNumber, Contract, Wallet } from 'ethers'
 import { constants as fsConstants } from 'fs';
 import fs from "fs/promises"
 
-import { populateTxFully, PROVIDER, TransactionRequest } from './helpers'
+import { populateTxFully, TransactionRequest } from './helpers'
+import { PROVIDER } from './providers'
 import env from '../lib/env'
 
 export type ContractDeployment = {
@@ -38,7 +39,7 @@ export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: 
                 false
             ),
             nonce || await PROVIDER.getTransactionCount(sender.address),
-            {from: sender.address, gasLimit: 150000},
+            {from: sender.address, gasLimit: 150000, chainId: env.CHAIN_ID},
         )
     )
 }

@@ -1,6 +1,7 @@
 import { createDumbLotteryBundles } from './lib/lottery'
 import { getSearchWalletSet } from './lib/wallets'
-import { GWEI, PROVIDER } from './lib/helpers'
+import { GWEI } from './lib/helpers'
+import { PROVIDER } from './lib/providers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
 import { v4 as uuidv4 } from 'uuid';

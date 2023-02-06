@@ -1,4 +1,4 @@
-import { getFlashbotsProvider, getRpcRequest } from '../lib/helpers';
+import { getFlashbotsProvider } from '../lib/providers';
 import { getAdminWallet } from '../lib/wallets';
 
 async function main() {

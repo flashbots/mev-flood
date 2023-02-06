@@ -1,6 +1,7 @@
 import { createDumbLotteryBundles } from './lib/lottery'
 import { getSearchWalletSet } from './lib/wallets'
-import { GWEI, PROVIDER } from './lib/helpers'
+import { GWEI } from './lib/helpers'
+import { PROVIDER } from './lib/providers'
 import { sendBundle, cancelBundle } from './lib/flashbots'
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt } from 'crypto';

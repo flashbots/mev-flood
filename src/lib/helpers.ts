@@ -1,18 +1,10 @@
 import { BigNumber, Wallet, providers, utils } from "ethers"
-import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { id as ethersId } from "ethers/lib/utils"
-
-import env from "./env"
-import { getAdminWallet } from './wallets'
 
 export type TransactionRequest = providers.TransactionRequest
 export const GWEI = BigNumber.from(1e9)
 export const ETH = GWEI.mul(GWEI)
 export const MAX_U256 = BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-export const PROVIDER = new providers.JsonRpcProvider(env.RPC_URL, {chainId: env.CHAIN_ID, name: env.CHAIN_NAME})
-
-const adminWallet = getAdminWallet()
-export const getFlashbotsProvider = async (wallet?: Wallet) => FlashbotsBundleProvider.create(PROVIDER, wallet || adminWallet, env.MEV_GETH_HTTP_URL)
 
 /**
  * Now in seconds (UTC).
@@ -91,15 +83,15 @@ export const textColors = {
  * @param nonce 
  * @param fromOverride (default: `adminWallet.address`)
  */
- export const populateTxFully = (txRequest: TransactionRequest, nonce: number, overrides?: {from?: string, gasLimit?: number, baseFee?: BigNumber, priorityFee?: BigNumber}): TransactionRequest => {
+ export const populateTxFully = (txRequest: TransactionRequest, nonce: number, overrides?: TransactionRequest): TransactionRequest => {
     return {
         ...txRequest,
-        maxFeePerGas: overrides?.baseFee || GWEI.mul(42),
-        maxPriorityFeePerGas: overrides?.priorityFee || GWEI.mul(3),
+        maxFeePerGas: overrides?.maxFeePerGas || GWEI.mul(42),
+        maxPriorityFeePerGas: overrides?.maxPriorityFeePerGas || GWEI.mul(3),
         gasLimit: overrides?.gasLimit || 9000000,
-        from: overrides?.from || adminWallet.address,
+        from: overrides?.from,
         nonce,
         type: 2,
-        chainId: env.CHAIN_ID,
+        chainId: overrides?.chainId
     }
 }

@@ -5,12 +5,18 @@ import { getDeployUniswapV2Args } from '../lib/cliArgs';
 
 import contracts, { ContractSpec } from "../lib/contracts"
 import env from '../lib/env';
-import { ETH, PROVIDER, textColors, populateTxFully } from '../lib/helpers';
-import { signSwap, getNewDeploymentFilename, getNewLiquidityFilename, getExistingDeploymentFilename, ContractDeployment, DeploymentsFile, Deployments, getDeployment } from '../lib/liquid';
+import { ETH, textColors, populateTxFully } from '../lib/helpers';
+import { PROVIDER } from '../lib/providers';
+import { signSwap, getNewDeploymentFilename, getNewLiquidityFilename, getExistingDeploymentFilename, ContractDeployment, Deployments, getDeployment } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 
 /** Used for signing only, NOT connected to a provider. */
 const adminWallet = getAdminWallet()
+
+const overrides = {
+    from: adminWallet.address,
+    chainId: env.CHAIN_ID,
+}
 
 /**
  * Get signed tx to deploy a generic contract clone, as well as the address it will be deployed at.
@@ -21,7 +27,10 @@ const getCloneDeployment = async (contract: ContractSpec, nonce: number, args?: 
         process.exit(1)
     }
     const factory = new ContractFactory(JSON.stringify(contract.abi), contract.bytecode)
-    const txReq = populateTxFully(args ? factory.getDeployTransaction(...args) : factory.getDeployTransaction(), nonce)
+    const txReq = populateTxFully(args ? factory.getDeployTransaction(...args) : factory.getDeployTransaction(), 
+        nonce, 
+        overrides
+    )
     return {
         contractAddress: utils.getContractAddress({from: txReq.from || adminWallet.address, nonce}),
         deployTx: txReq,
@@ -31,7 +40,10 @@ const getCloneDeployment = async (contract: ContractSpec, nonce: number, args?: 
 
 const getPairDeployment = async (factoryAddress: string, token1Address: string, token2Address: string, nonce: number): Promise<ContractDeployment> => {
     const factoryContract = await new Contract(factoryAddress, contracts.UniV2Factory.abi)
-    const txReq = populateTxFully(await factoryContract.populateTransaction.createPair(token1Address, token2Address), nonce)
+    const txReq = populateTxFully(await factoryContract.populateTransaction.createPair(token1Address, token2Address), 
+        nonce,
+        overrides
+    )
     const signedTx = await adminWallet.signTransaction(txReq)
     const contractAddress = await factoryContract.connect(PROVIDER).callStatic.createPair(token1Address, token2Address)
 
@@ -229,7 +241,8 @@ const main = async () => {
             await daiContract.populateTransaction.mint(
                 adminWallet.address, DAI_ADMIN_MINT_AMOUNT
             ),
-            getAdminNonce()
+            getAdminNonce(),
+            overrides
         ))
         signedTxs.push(signedTx)
         console.log(`minting DAI for admin ${adminWallet.address}...`)
@@ -240,7 +253,8 @@ const main = async () => {
             await daiContract.populateTransaction.mint(
                 userWallet.address, DAI_USER_MINT_AMOUNT
             ),
-            getAdminNonce()
+            getAdminNonce(),
+            overrides
         ))
         signedTxs.push(signedTx)
         console.log(`minting DAI for user ${userWallet.address}...`)
@@ -251,7 +265,10 @@ const main = async () => {
             value: WETH_ADMIN_MINT_AMOUNT,
             to: addr_weth,
             data: "0xd0e30db0" // deposit
-        }, getAdminNonce()))
+        },
+            getAdminNonce(),
+            overrides
+        ))
         signedTxs.push(signedTx)
         console.log(`minting WETH for admin ${adminWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
@@ -261,7 +278,10 @@ const main = async () => {
             value: WETH_USER_MINT_AMOUNT,
             to: addr_weth,
             data: "0xd0e30db0" // deposit
-        }, getUserNonce(), {from: userWallet.address}))
+        }, 
+            getUserNonce(), 
+            {from: userWallet.address, chainId: overrides.chainId}
+        ))
         signedTxs.push(signedTx)
         console.log(`minting WETH for user ${userWallet.address}...`)
         await (await PROVIDER.sendTransaction(signedTx)).wait(1)
@@ -275,7 +295,7 @@ const main = async () => {
                 populateTxFully(
                     await token.populateTransaction.approve(spender, constants.MaxUint256),
                     owner.address == adminWallet.address ? getAdminNonce() : getUserNonce(),
-                    {from: owner.address}
+                    {from: owner.address, chainId: overrides.chainId}
                 )
             )
             signedTxs.push(signedTx)
@@ -322,7 +342,8 @@ const main = async () => {
             let signedTx = await adminWallet.signTransaction( // deposit WETH into pair
                 populateTxFully(
                     await wethContract.populateTransaction.transfer(pairAddr, WETH_DEPOSIT_AMOUNT),
-                    getAdminNonce()
+                    getAdminNonce(),
+                    overrides
                 )
             )
             signedTxs.push(signedTx)
@@ -332,7 +353,8 @@ const main = async () => {
             signedTx = await adminWallet.signTransaction( // deposit DAI into pair
                 populateTxFully(
                     await daiContract.populateTransaction.transfer(pairAddr, DAI_DEPOSIT_AMOUNT),
-                    getAdminNonce()
+                    getAdminNonce(),
+                    overrides
                 )
             )
             signedTxs.push(signedTx)
@@ -342,7 +364,8 @@ const main = async () => {
             signedTx = await adminWallet.signTransaction( // mint LP tokens
                 populateTxFully(
                     await pairContract.populateTransaction.mint(adminWallet.address),
-                    getAdminNonce()
+                    getAdminNonce(),
+                    overrides
                 )
             )
             signedTxs.push(signedTx)
@@ -385,6 +408,7 @@ const main = async () => {
                         amountIn.mul(50).div(100) // amount of WETH to spend on tokens // lazy approximation
                     ),
                     getAdminNonce(),
+                    overrides
                 )
             )
             const backrunRes = await (await PROVIDER.sendTransaction(signedBackrun)).wait(1)
