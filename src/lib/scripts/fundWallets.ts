@@ -20,7 +20,7 @@ import { GWEI } from '../helpers'
  * @param chainId chainId of target blockchain
 */
 const fundWallets = async (provider: providers.JsonRpcProvider, recipients: string[], adminWallet: Wallet, ethAmount: number, chainId: number) => {
-    const nonce = await adminWallet.getTransactionCount()
+    const nonce = await adminWallet.connect(provider).getTransactionCount()
     const amount = utils.parseEther(ethAmount.toString())
     const txs = recipients.map((address, i) => {
         const tx = {

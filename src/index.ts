@@ -13,6 +13,12 @@ class MevFlood {
         this.provider = provider
     }
 
+    /**
+     * Sends ETH to recipients from `this.adminWallet`.
+     * @param recipients addresses of accounts to receive ETH
+     * @param ethAmount amount of ETH to send each account
+     * @returns array of pending transactions
+     */
     async fundWallets(recipients: string[], ethAmount: number) {
         return scripts.fundWallets(
             this.provider,
