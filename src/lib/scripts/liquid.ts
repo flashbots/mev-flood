@@ -372,8 +372,8 @@ const liquid = async (options: LiquidOptions, provider: providers.JsonRpcProvide
     }
     
     if (shouldTestSwap) {
-        // swap 1 WETH for DAI on Uni_A
-        const amountIn = ETH.mul(50)
+        // swap 1/100 of user's (or 50 if unspecified) WETH for DAI on Uni_A
+        const amountIn = options.wethMintAmountUser ? ETH.mul(options.wethMintAmountUser).div(100) : ETH.mul(50)
         const path = [addr_weth, addr_dai]
 
         try {
