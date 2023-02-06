@@ -27,7 +27,7 @@ async function main() {
     // get deployment params (// TODO: specify deployment via cli params)
     const filename = await getExistingDeploymentFilename()
     console.log("filename", filename)
-    const {deployments} = await getDeployment()
+    const {deployments} = await getDeployment({})
     
     const atomicSwapContract = new Contract(deployments.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
     const uniFactoryA = new Contract(deployments.uniV2Factory_A.contractAddress, contracts.UniV2Factory.abi)
@@ -127,6 +127,7 @@ async function main() {
         // generate swaps
         let swaps: string[] = []
         for (const wallet of walletSet) {
+            const nonce = wallet.connect(PROVIDER).getTransactionCount()
             // pick random uni factory
             const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
             // pick random path
@@ -139,8 +140,8 @@ async function main() {
             const tokenOutName = path[1] === wethContract.address ? "WETH" : "DAI"
 
             console.log(`${wallet.address} trades ${formatEther(amountIn).padEnd(6, "0")} ${tokenInName.padEnd(4, " ")} for ${tokenOutName}`)
-
-            swaps.push(await signSwap(atomicSwapContract, uniFactory, wallet, amountIn, path))
+            
+            swaps.push(await signSwap(atomicSwapContract, uniFactory, wallet, amountIn, path, await nonce, env.CHAIN_ID))
         }
         
         const swapPromises = swaps.map(tx => PROVIDER.sendTransaction(tx))

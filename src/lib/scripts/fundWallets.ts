@@ -19,15 +19,16 @@ import { GWEI } from '../helpers'
  * @param amount amount of ETH to send (1 := 1 ETH or 1e18 wei)
  * @param chainId chainId of target blockchain
 */
-const fundWallets = async (provider: providers.JsonRpcProvider, recipients: string[], adminWallet: Wallet, ethAmount: number, chainId: number) => {
+const fundWallets = async (provider: providers.JsonRpcProvider, recipients: string[], adminWallet: Wallet, ethAmount: number) => {
     const nonce = await adminWallet.connect(provider).getTransactionCount()
     const amount = utils.parseEther(ethAmount.toString())
-    const txs = recipients.map((address, i) => {
+    const chainId = provider.network.chainId
+    const txs = recipients.map((recipient, i) => {
         const tx = {
             chainId: chainId,
             value: amount,
             from: adminWallet.address,
-            to: address,
+            to: recipient,
             nonce: nonce + i,
             gasPrice: GWEI.mul(15),
             gasLimit: 21000,

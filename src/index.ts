@@ -1,8 +1,9 @@
 /** module exports for using mev-flood as a library */
 import { Wallet, providers } from 'ethers'
+import { Deployments } from './lib/liquid'
 
 // lib
-import scripts from './lib/scripts'
+import scripts, { LiquidOptions } from './lib/scripts'
 
 class MevFlood {
     private adminWallet: Wallet
@@ -25,7 +26,16 @@ class MevFlood {
             recipients,
             this.adminWallet,
             ethAmount,
-            (await this.provider.getNetwork()).chainId
+        )
+    }
+
+    async liquid(options: LiquidOptions, userWallet: Wallet, deployment?: Deployments) {
+        return scripts.liquid(
+            options,
+            this.provider,
+            this.adminWallet,
+            userWallet,
+            deployment || "deployment.json"
         )
     }
 }

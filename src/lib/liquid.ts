@@ -3,8 +3,7 @@ import { constants as fsConstants } from 'fs';
 import fs from "fs/promises"
 
 import { populateTxFully, TransactionRequest } from './helpers'
-import { PROVIDER } from './providers'
-import env from '../lib/env'
+// import env from '../lib/env'
 
 export type ContractDeployment = {
     contractAddress: string,
@@ -27,7 +26,7 @@ export type DeploymentsFile = {
     allSignedTxs: string[],
 }
 
-export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: string, sender: Wallet, amountIn: BigNumber, path: string[], nonce?: number): Promise<string> => {
+export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: string, sender: Wallet, amountIn: BigNumber, path: string[], nonce: number, chainId: number): Promise<string> => {
     // use custom router to swap
     return await sender.signTransaction(
         populateTxFully(
@@ -38,14 +37,14 @@ export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: 
                 sender.address,
                 false
             ),
-            nonce || await PROVIDER.getTransactionCount(sender.address),
-            {from: sender.address, gasLimit: 150000, chainId: env.CHAIN_ID},
+            nonce,
+            {from: sender.address, gasLimit: 150000, chainId},
         )
     )
 }
 
 export const dir = async () => {
-    const dirname = `src/output/${env.CHAIN_NAME}`
+    const dirname = process.env.CHAIN_NAME ? `src/output/${process.env.CHAIN_NAME}` : 'deployments'
     try {
         await fs.access(dirname, fsConstants.R_OK | fsConstants.W_OK)
     } catch (e) {
@@ -77,7 +76,7 @@ export const getNewLiquidityFilename = async (): Promise<string> => {
  * @param deploymentNumber optional deployment number corresponding to a "uniDeployment{n}" file in src/output/{env}
  * @returns deployment specified by `deploymentNumber`, or newest deployment if no `deploymentNumber` is specified.
  */
-export const getDeployment = async (deploymentNumber?: number): Promise<DeploymentsFile> => {
-    const filename = await getExistingDeploymentFilename(deploymentNumber)
+export const getDeployment = async (options: {deploymentNumber?: number, filename?: string}): Promise<DeploymentsFile> => {
+    const filename = options.filename || await getExistingDeploymentFilename(options.deploymentNumber || undefined)
     return JSON.parse(await fs.readFile(filename, {encoding: "utf-8"}))
 }
