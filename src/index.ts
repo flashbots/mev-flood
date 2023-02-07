@@ -32,7 +32,7 @@ class MevFlood {
     }
 
     async liquid(options: LiquidOptions, userWallet: Wallet, deployments?: Deployments) {
-        return scripts.liquid(
+        return await scripts.liquid(
             options,
             this.provider,
             this.adminWallet,
@@ -42,7 +42,7 @@ class MevFlood {
     }
 
     async sendSwaps(options: SwapOptions, fromWallets: Wallet[], deployments: Deployments) {
-        return scripts.sendSwaps(options, this.provider, fromWallets, deployments)
+        return await scripts.sendSwaps(options, this.provider, fromWallets, deployments)
     }
 
     static async loadDeployment(filename: string): Promise<Deployments> {

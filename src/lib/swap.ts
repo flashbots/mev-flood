@@ -1,7 +1,7 @@
 import { BigNumber, Contract, providers, Wallet } from 'ethers'
 import { coinToss, ETH, MAX_U256, populateTxFully, randInRange } from './helpers'
 
-export const createRandomSwap = (uniFactoryAddress_A: string, uniFactoryAddress_B: string, daiAddresses: string[], wethAddress: string, minEth?: number, maxEth?: number) => {
+export const createRandomSwap = (uniFactoryAddress_A: string, uniFactoryAddress_B: string, daiAddresses: string[], wethAddress: string, minUSD?: number, maxUSD?: number) => {
     // pick random uni factory
     const uniFactory = coinToss() ? uniFactoryAddress_A : uniFactoryAddress_B
     // pick random DAI contract
@@ -9,7 +9,7 @@ export const createRandomSwap = (uniFactoryAddress_A: string, uniFactoryAddress_
     // pick random path
     const path = coinToss() ? [wethAddress, daiContractAddress] : [daiContractAddress, wethAddress]
     // pick random amountIn: [500..10000] USD
-    const amountInUSD = ETH.mul(randInRange(minEth || 500, maxEth || 10000))
+    const amountInUSD = ETH.mul(randInRange(minUSD || 500, maxUSD || 10000))
     // if weth out (path_0 == weth) then amount should be (1 ETH / 1300 DAI) * amountIn
     const amountIn = path[0] == wethAddress ? amountInUSD.div(1300) : amountInUSD
     const tokenInName = path[0] === wethAddress ? "WETH" : "DAI"

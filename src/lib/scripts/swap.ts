@@ -4,8 +4,8 @@ import { Deployments } from '../liquid'
 import { createRandomSwap, signSwap } from '../swap'
 
 export type SwapOptions = {
-    maxEth: number,
-    minEth: number,
+    maxUSD: number,
+    minUSD: number,
 }
 
 export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployments: Deployments) => {
@@ -18,10 +18,10 @@ export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRp
             deployments.uniV2Factory_B.contractAddress, 
             [deployments.dai.contractAddress], 
             deployments.weth.contractAddress, 
-            options.minEth, 
-            options.maxEth
+            options.minUSD, 
+            options.maxUSD
         )
-        const signedSwap = signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, await nonce, provider.network.chainId)
+        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, await nonce, provider.network.chainId)
         signedSwaps.push(signedSwap)
     }
     const swapPromises = signedSwaps.map(tx => provider.sendTransaction(tx))
