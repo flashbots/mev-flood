@@ -23,6 +23,14 @@ export const calculateBundleHash = (signedTxs: string[]) => {
     )
 }
 
+export const coinToss = (): boolean => {
+    return Math.floor(Math.random() * 2) % 2 == 0
+}
+
+export const randInRange = (min: number, max: number): number => {
+    return Math.floor(Math.random() * (max - min) + min)
+}
+
 /**
  * Standardized RPC request for talking to Bundle API (mev-geth) directly.
  * @param params 

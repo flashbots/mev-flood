@@ -1,13 +1,12 @@
-import fs from "fs/promises"
 import readline from "readline-sync"
 import { getDeployUniswapV2Args } from '../lib/cliArgs';
 
 import env from '../lib/env';
-import { textColors } from '../lib/helpers';
 import { PROVIDER } from '../lib/providers';
 import { getExistingDeploymentFilename, getNewDeploymentFilename, getNewLiquidityFilename } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 import scripts, {LiquidOptions} from '../lib/scripts';
+import MevFlood from '..';
 
 /** Prints txs:
  * build a set of contracts to deploy,
@@ -44,10 +43,9 @@ const main = async () => {
         deploymentFile
     )
     
-    if (allSignedTxs.length > 0) {
+    if (allSignedTxs.length > 0 && deployments) {
         const filename = args.shouldDeploy ? await getNewDeploymentFilename() : await getNewLiquidityFilename()
-        await fs.writeFile(filename, JSON.stringify({deployments, allSignedTxs}), {encoding: "utf8"})
-        console.log(`Setup complete. Check output at ${textColors.Bright}${filename}${textColors.Reset}`)
+        await MevFlood.saveDeployments(filename, deployments, allSignedTxs)
     }
 }
 

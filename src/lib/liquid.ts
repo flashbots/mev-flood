@@ -1,9 +1,7 @@
-import { BigNumber, Contract, Wallet } from 'ethers'
 import { constants as fsConstants } from 'fs';
 import fs from "fs/promises"
 
-import { populateTxFully, TransactionRequest } from './helpers'
-// import env from '../lib/env'
+import { TransactionRequest } from './helpers'
 
 export type ContractDeployment = {
     contractAddress: string,
@@ -24,23 +22,6 @@ export type Deployments = {
 export type DeploymentsFile = {
     deployments: Deployments,
     allSignedTxs: string[],
-}
-
-export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: string, sender: Wallet, amountIn: BigNumber, path: string[], nonce: number, chainId: number): Promise<string> => {
-    // use custom router to swap
-    return await sender.signTransaction(
-        populateTxFully(
-            await atomicSwapContract.populateTransaction.swap(
-                path,
-                amountIn,
-                uniFactoryAddress,
-                sender.address,
-                false
-            ),
-            nonce,
-            {from: sender.address, gasLimit: 150000, chainId},
-        )
-    )
 }
 
 export const dir = async () => {

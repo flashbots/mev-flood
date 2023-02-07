@@ -1,9 +1,11 @@
 /** module exports for using mev-flood as a library */
 import { Wallet, providers } from 'ethers'
-import { Deployments } from './lib/liquid'
+import fs from "fs/promises"
 
 // lib
-import scripts, { LiquidOptions } from './lib/scripts'
+import { textColors } from './lib/helpers'
+import { Deployments, getDeployment } from './lib/liquid'
+import scripts, { LiquidOptions, SwapOptions } from './lib/scripts'
 
 class MevFlood {
     private adminWallet: Wallet
@@ -29,14 +31,27 @@ class MevFlood {
         )
     }
 
-    async liquid(options: LiquidOptions, userWallet: Wallet, deployment?: Deployments) {
+    async liquid(options: LiquidOptions, userWallet: Wallet, deployments?: Deployments) {
         return scripts.liquid(
             options,
             this.provider,
             this.adminWallet,
             userWallet,
-            deployment || "deployment.json"
+            deployments || "deployment.json"
         )
+    }
+
+    async sendSwaps(options: SwapOptions, fromWallets: Wallet[], deployments: Deployments) {
+        return scripts.sendSwaps(options, this.provider, fromWallets, deployments)
+    }
+
+    static async loadDeployment(filename: string): Promise<Deployments> {
+        return (await getDeployment({filename})).deployments
+    }
+
+    static async saveDeployments(filename: string, deployments: Deployments, allSignedTxs: string[]) {
+        await fs.writeFile(filename, JSON.stringify({deployments, allSignedTxs}), {encoding: "utf8"})
+        console.log(`Setup complete. Check output at ${textColors.Bright}${filename}${textColors.Reset}`)
     }
 }
 

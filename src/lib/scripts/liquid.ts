@@ -12,7 +12,8 @@ import { formatEther } from 'ethers/lib/utils'
 // lib
 import contracts, { ContractSpec } from "../contracts"
 import { ETH, populateTxFully } from '../helpers'
-import { signSwap, ContractDeployment, Deployments, getDeployment } from '../liquid'
+import { ContractDeployment, Deployments, getDeployment } from '../liquid'
+import { signSwap } from '../swap'
 
 export interface LiquidOptions {
     shouldApproveTokens?: boolean,
