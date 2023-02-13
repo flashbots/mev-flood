@@ -55,7 +55,7 @@ export const calculateSpotPrice = (
  * @param reserveB_1: Reserves of token1 on exchange B.
  * @param settlementToken: Trade direction. If settlementToken == 1, calculates 0 -> 1 swap.
  */
-export const calculateOptimalArbAmountIn = (
+const calculateOptimalArbAmountIn = (
     reserveA_0: BigNumber,
     reserveA_1: BigNumber,
     reserveB_0: BigNumber,
@@ -185,6 +185,7 @@ export const calculateBackrunParams = (
         reservesA_0, reservesA_1, reservesB_0, reservesB_1, not(settlementToken)
     )
     if (backrunAmount.lte(0)) {
+        console.log("SWITCHING DIRECTION")
         // better arb the other way, so we'll settle in the other token
         settlementToken = not(settlementToken)
         backrunAmount = calculateOptimalArbAmountIn(
@@ -192,7 +193,7 @@ export const calculateBackrunParams = (
         )
     }
     // if it's negative again, there's no good arb opportunity
-    if (backrunAmount.lt(0)) {
+    if (backrunAmount.lte(0)) {
         return undefined
     }
 
@@ -214,7 +215,7 @@ export const calculateBackrunParams = (
     logPrices()
 
     // difference in tokens bought on exchange A and sold on exchange B
-    let profit = backrunSell.amountOut.sub(backrunAmount)
+    let profit = math.bignumber(backrunSell.amountOut.sub(backrunAmount))
     if (settlementToken !== wethIndex) {
         // if we settle in DAI, convert the profit to be in terms of WETH
         const price = wethIndex === 1 ? reservesB_0.div(reservesB_1) : reservesB_1.div(reservesB_0)

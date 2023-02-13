@@ -284,7 +284,7 @@ async function main() {
                     }
                     console.debug("estimated profit", utils.formatEther(backrunParams.profit.toFixed(0)))
                     // TODO: calculate gas cost dynamically (accurately)
-                    const gasCost = math.bignumber(100000).mul(20e9)
+                    const gasCost = math.bignumber(100000).mul(1e9).mul(20)
                     if (math.bignumber(backrunParams.profit).gt(gasCost)) {
                         console.log("DOING THE ARBITRAGE...")
                         const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
@@ -316,8 +316,16 @@ async function main() {
                             if ((await res.wait()).confirmations > 0){
                                 console.log("ARB LANDED")
                             }
-                            console.log(`[${wallet.address}] WETH balance\t${formatEther(await wethContract.balanceOf(wallet.address))}`)
-                            console.log(`[${wallet.address}] DAI${daiIdx+1} balance\t${formatEther(await daiContract.balanceOf(wallet.address))}`)
+                            const userBalances = {
+                                WETH: formatEther(await wethContract.balanceOf(wallet.address)),
+                                DAI: formatEther(await daiContract.balanceOf(wallet.address)),
+                            }
+                            const swapContractBalances = {
+                                WETH: formatEther(await wethContract.balanceOf(atomicSwapContract.address)),
+                                DAI: formatEther(await daiContract.balanceOf(atomicSwapContract.address)),
+                            }
+                            console.log(`[${wallet.address}] DAI${daiIdx+1}`, userBalances)
+                            console.log(`[atomicSwapContract]`, swapContractBalances)
                         } catch (e) {
                             type E = {
                                 code: string
