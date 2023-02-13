@@ -1,16 +1,16 @@
-import { BigNumber, Contract, Transaction, utils } from 'ethers'
-import { formatEther, formatUnits } from 'ethers/lib/utils'
-import { calculateBackrunProfit } from './lib/arbitrage'
+import { BigNumber, Contract, ethers, Transaction, utils } from 'ethers'
+import { formatEther } from 'ethers/lib/utils'
+import { calculateBackrunParams } from './lib/arbitrage'
 import { getSwapdArgs } from './lib/cliArgs'
 import contracts from './lib/contracts'
-import { coinToss, randInRange, populateTxFully, ETH, MAX_U256, PROVIDER, TransactionRequest, extract4Byte } from './lib/helpers'
+import { coinToss, randInRange, populateTxFully, ETH, MAX_U256, PROVIDER, extract4Byte } from './lib/helpers'
 import math, { numify } from "./lib/math"
 
 import { ContractDeployment, getDeployment, getExistingDeploymentFilename, signSwap } from "./lib/liquid"
 import { getAdminWallet, getWalletSet } from './lib/wallets'
 
 // TODO: use this!
-interface SwapParams {
+interface ISwapParams {
     // address[] memory path,
     path: string[]
     // uint256 amountIn,
@@ -21,6 +21,21 @@ interface SwapParams {
     recipient: string
     // bool fromThis
     fromThis: boolean
+}
+
+class SwapParams implements ISwapParams {
+    path: string[]
+    amountIn: BigNumber
+    factory: string
+    recipient: string
+    fromThis: boolean
+    constructor(params: utils.Result) {
+        this.path = params[0]
+        this.amountIn = params[1]
+        this.factory = params[2]
+        this.recipient = params[3]
+        this.fromThis = params[4]
+    }
 }
 
 async function main() {
@@ -40,13 +55,14 @@ async function main() {
     const uniFactoryA = new Contract(deployments.uniV2Factory_A.contractAddress, contracts.UniV2Factory.abi, PROVIDER)
     const uniFactoryB = new Contract(deployments.uniV2Factory_B.contractAddress, contracts.UniV2Factory.abi, PROVIDER)
     const wethContract = new Contract(deployments.weth.contractAddress, contracts.WETH.abi, PROVIDER)
-    let daiContracts: Contract[] = deployments.dai.map(dai => new Contract(dai.contractAddress, contracts.DAI.abi, PROVIDER))
+    const daiContracts: Contract[] = deployments.dai.map(dai => new Contract(dai.contractAddress, contracts.DAI.abi, PROVIDER))
 
     // check token balances for each wallet, mint more if needed
     const adminWallet = getAdminWallet().connect(PROVIDER)
     let signedDeposits: string[] = []
     let signedMints: string[] = []
     let adminNonce = await adminWallet.getTransactionCount()
+    console.log("using wallets", walletSet.map(w => w.address))
     for (const wallet of walletSet) {
         let wethBalance: BigNumber = await wethContract.callStatic.balanceOf(wallet.address)
         if (wethBalance.lte(ETH.mul(20))) {
@@ -183,11 +199,11 @@ async function main() {
 
     const findTokenName = (addr: string) => {
         // if it's either WETH or one of the DAI tokens
-        if (addr === deployments.weth.contractAddress) {
+        if (addr.toLowerCase() === deployments.weth.contractAddress.toLowerCase()) {
             return "WETH"
         } else {
             for (let i = 0; i < deployments.dai.length; i++) {
-                if (deployments.dai[i].contractAddress === addr) {
+                if (deployments.dai[i].contractAddress.toLowerCase() === addr.toLowerCase()) {
                     return `DAI${i+1}`
                 }
             }
@@ -210,66 +226,115 @@ async function main() {
      */
     const arbd = async (pendingTx: Transaction) => {
         console.log(`[pending tx ${pendingTx.hash}]`)
-        if (pendingTx.to === atomicSwapContract.address) {
-            // swap detected
-            // TODO: hmmmm we need a side daemon that caches the reserves (on new block);
-            // for now we can just pull the reserves for every tx but
-            // long term we can't be doin' that
-
-            // decode tx to get pair
-            // we're expecting a call to `swap` on atomicSwap
-            const fnSignature = extract4Byte(pendingTx.data)
-            if (fnSignature === "0cc73263") {
+        // const wallet = walletSet[0]
+        for (const wallet of walletSet) {
+            if (pendingTx.to === atomicSwapContract.address) {
+                // const nonce = await PROVIDER.getTransactionCount(wallet.address)
                 // swap detected
-                const decodedTxData = utils.defaultAbiCoder.decode([
-                    "address[] path", 
-                    "uint256 amountIn",
-                    "address factory",
-                    "address recipient",
-                    "bool fromThis",
-                ], `0x${pendingTx.data.substring(10)}`)
-                const path = decodedTxData[0]
-                // get reserves
-                // TODO: make a helper function to do this; this block is getting ugly
-                const pairAddressA = await uniFactoryA.getPair(path[0], path[1])
-                const pairAddressB = await uniFactoryB.getPair(path[0], path[1])
-                // TODO: cache these contracts or use something more efficient than
-                // instantiating new Contracts every time
-                const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, PROVIDER)
-                const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, PROVIDER)
-                const reservesA = await pairA.getReserves()
-                const reservesB = await pairB.getReserves()
+                // TODO: side daemon that caches the reserves on new blocks
+                // for now we can just pull the reserves for every tx but it's not ideal
+    
+                // decode tx to get pair
+                // we're expecting a call to `swap` on atomicSwap
+                const fnSignature = extract4Byte(pendingTx.data)
+                if (fnSignature === "0cc73263") {
+                    // swap detected
+                    const decodedTxData = utils.defaultAbiCoder.decode([
+                        "address[] path", 
+                        "uint256 amountIn",
+                        "address factory",
+                        "address recipient",
+                        "bool fromThis",
+                    ], `0x${pendingTx.data.substring(10)}`)
+                    const userSwap = new SwapParams(decodedTxData)
+    
+                    // get reserves
+                    // TODO: make a helper function to do this; this block is getting ugly
+                    const pairAddressA = await uniFactoryA.getPair(userSwap.path[0], userSwap.path[1])
+                    const pairAddressB = await uniFactoryB.getPair(userSwap.path[0], userSwap.path[1])
+                    // TODO: cache these contracts
+                    const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, PROVIDER)
+                    const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, PROVIDER)
+                    const reservesA = await pairA.getReserves()
+                    const reservesB = await pairB.getReserves()
+    
+                    // TODO: only calculate each `k` once
+                    const kA = reservesA[0].mul(reservesA[1])
+                    const kB = reservesB[0].mul(reservesB[1])
+    
+                    // we can assume that the pair ordering is the same on both pairs
+                    // bc they are the same contract, so they order the same way
+                    const token0: string = await pairA.callStatic.token0()
+                    const token1: string = await pairA.callStatic.token1()
+                    const wethIndex = token0.toLowerCase() === deployments.weth.contractAddress.toLowerCase() ? 0 : 1
+                    const backrunParams = calculateBackrunParams(
+                        numify(reservesA[0]),
+                        numify(reservesA[1]),
+                        numify(kA),
+                        numify(reservesB[0]),
+                        numify(reservesB[1]),
+                        numify(kB),
+                        numify(decodedTxData[1]),
+                        userSwap.path[0].toLowerCase() === token0.toLowerCase(),
+                        wethIndex
+                    )
+                    if (!backrunParams) {
+                        console.debug("not profitable")
+                        return
+                    }
+                    console.debug("estimated profit", utils.formatEther(backrunParams.profit.toFixed(0)))
+                    // TODO: calculate gas cost dynamically (accurately)
+                    const gasCost = math.bignumber(100000).mul(20e9)
+                    if (math.bignumber(backrunParams.profit).gt(gasCost)) {
+                        console.log("DOING THE ARBITRAGE...")
+                        const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
+                        const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
+                        const startFactory = userSwap.factory
+                        const endFactory = startFactory === uniFactoryA.address ? uniFactoryB.address : uniFactoryA.address
+                        const pairStart: string = startFactory === uniFactoryA.address ? pairAddressA : pairAddressB
+                        const pairEnd: string = startFactory === uniFactoryB.address ? pairAddressA : pairAddressB
+                        const amountIn = BigNumber.from(backrunParams.backrunAmount.toFixed(0))
 
-                // TODO: only calculate each `k` once
-                const kA = reservesA[0].mul(reservesA[1])
-                const kB = reservesB[0].mul(reservesB[1])
+                        console.log("tokenArb", findTokenName(tokenArb), tokenArb)
+                        console.log("tokenSettle", findTokenName(tokenSettle), tokenSettle)
 
-                // we can assume that the pair ordering is the same on both pairs
-                // bc they are the same contract, so they order the same way
-                const token0A = await pairA.callStatic.token0()
-                const token1A = await pairA.callStatic.token1()
-                const estimatedProfit = calculateBackrunProfit(
-                    numify(reservesA[0]),
-                    numify(reservesA[1]),
-                    numify(kA),
-                    numify(reservesB[0]),
-                    numify(reservesB[1]),
-                    numify(kB),
-                    numify(decodedTxData[1]),
-                    path[0] === token0A,
-                    // TODO: add a local addr:name cache
-                    {x: findTokenName(token0A), y: findTokenName(token1A)}
-                )
-                console.debug("estimated profit", utils.formatEther(estimatedProfit.toFixed(0)))
-                // TODO: calculate gas cost dynamically (accurately)
-                const gasCost = math.bignumber(150000).mul(1e9)
-                if (math.bignumber(estimatedProfit).gt(gasCost)) {
-                    console.log("DOING THE ARBITRAGE...")
-                    // TODO...
+                        const arbRequest = await atomicSwapContract.populateTransaction.arb(
+                            tokenArb,
+                            tokenSettle,
+                            startFactory,
+                            endFactory,
+                            pairStart,
+                            pairEnd,
+                            amountIn
+                        )
+                        const signedArb = wallet.signTransaction(populateTxFully(arbRequest, await PROVIDER.getTransactionCount(wallet.address), {from: wallet.address}))
+                        try {
+                            const res = await PROVIDER.sendTransaction(await signedArb)
+                            const daiAddress = wethIndex === 0 ? token1 : token0
+                            const daiIdx = daiContracts.map(c => c.address.toLowerCase()).indexOf(daiAddress.toLowerCase())
+                            const daiContract = daiContracts[daiIdx]
+                            if ((await res.wait()).confirmations > 0){
+                                console.log("ARB LANDED")
+                            }
+                            console.log(`[${wallet.address}] WETH balance\t${formatEther(await wethContract.balanceOf(wallet.address))}`)
+                            console.log(`[${wallet.address}] DAI${daiIdx+1} balance\t${formatEther(await daiContract.balanceOf(wallet.address))}`)
+                        } catch (e) {
+                            type E = {
+                                code: string
+                            }
+                            if ((e as E).code === ethers.errors.NONCE_EXPIRED) {
+                                console.warn("nonce expired")
+                            } else if ((e as E).code === ethers.errors.REPLACEMENT_UNDERPRICED) {
+                                console.warn("replacement underpriced")
+                            } else {
+                                console.error(e)
+                            }
+                        }
+                    }
                 }
             }
+            // checking profit against min/max profit flags b4 executing
         }
-        // checking profit against min/max profit flags b4 executing
 
         console.warn("unfinished!")
     }

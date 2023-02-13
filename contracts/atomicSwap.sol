@@ -20,9 +20,14 @@ contract AtomicSwap {
         owner = msg.sender;
     }
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not allowed");
+        _;
+    }
+
     fallback() external payable {}
 
-    function liquidate() public {
+    function liquidate() external onlyOwner {
         weth.transfer(owner, weth.balanceOf(address(this)));
     }
 
@@ -63,7 +68,6 @@ contract AtomicSwap {
         address recipient,
         bool fromThis
     ) public {
-        // TODO: remove this; put in args
         IUniswapV2Pair pair = IUniswapV2Pair(
             IUniswapV2Factory(factory).getPair(path[0], path[1])
         );
@@ -73,7 +77,7 @@ contract AtomicSwap {
             amountIn,
             path
         );
-        _swap( // send weth from contract
+        _swap(
             pair.token0() == path[0] ? amounts[0] : amounts[1],
             pair.token0() == path[0] ? amounts[1] : amounts[0],
             path[0],
@@ -83,8 +87,37 @@ contract AtomicSwap {
         );
     }
 
+    function swapCheaper(
+        address[] memory path,
+        uint256 amountIn,
+        address factory,
+        address recipient,
+        address _pair,
+        bool fromThis // true => use contract's balance; false => use sender's balance
+    ) public returns (uint256 amountOut) {
+        IUniswapV2Pair pair = IUniswapV2Pair(_pair);
+        uint256[] memory amounts = UniswapV2Library.getAmountsOut(
+            factory,
+            amountIn,
+            path
+        );
+        _swap(
+            pair.token0() == path[0] ? amounts[0] : amounts[1], // amount0Out
+            pair.token0() == path[0] ? amounts[1] : amounts[0], // amount1Out
+            path[0], // tokenInAddress
+            _pair,
+            recipient,
+            fromThis
+        );
+        amountOut = path[1] == pair.token0() ? amounts[0] : amounts[1];
+    }
+
+    // TODO:
+    // function swapCheapest(address _pair, uint256[] memory _amountsOut) public {}
+
     // assume we only settle in WETH
     // FYI this is _incredibly_ inefficient
+    /** deprecated */
     function backrun(
         address _token, // token we're going to buy and sell
         address _startFactory, // factory of pair we'll buy token from
@@ -124,15 +157,46 @@ contract AtomicSwap {
     }
 
     // executes a two-dex circular arb
-    // swap _tokenSettle -> _tokenArb on _startFactory's pair
-    // swap _tokenArb -> _tokenSettle on _endFactory's pair
     function arb(
         address _tokenArb,
         address _tokenSettle,
         address _startFactory,
         address _endFactory,
+        address _pairStart,
+        address _pairEnd,
         uint256 _amountIn
-    ) external {
-        return;
+    ) external returns (uint256 amountOut) {
+        // swap _tokenSettle -> _tokenArb on _startFactory's pair (pay into this contract)
+        address[] memory buyPath = new address[](2);
+        buyPath[0] = _tokenSettle;
+        buyPath[1] = _tokenArb;
+        swapCheaper(
+            buyPath,
+            _amountIn,
+            _startFactory,
+            address(this),
+            _pairStart,
+            false
+        );
+
+        // swap _tokenArb -> _tokenSettle on _endFactory's pair
+        address[] memory sellPath = new address[](2);
+        sellPath[0] = _tokenArb;
+        sellPath[1] = _tokenSettle;
+        IERC20 arbToken = IERC20(_tokenArb);
+        amountOut = swapCheaper(
+            sellPath,
+            arbToken.balanceOf(address(this)), // TODO make cheaper by being passed in
+            _endFactory,
+            msg.sender,
+            _pairEnd,
+            true
+        );
+
+        // // tip validator
+        // weth.withdraw();
+        // block.coinbase.transfer(_tip);
+        // IERC20 settleToken = IERC20(_tokenSettle);
+        // settleToken.transfer(msg.sender, settleToken.balanceOf(address(this)));
     }
 }
