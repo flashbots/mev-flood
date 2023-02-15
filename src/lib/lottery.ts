@@ -12,7 +12,7 @@ const adminWallet = getAdminWallet().connect(PROVIDER)
 
 const deployLotteryContract = async (): Promise<Contract> => {
     const factory = new ContractFactory(JSON.stringify(contracts.LotteryMEV.abi), contracts.LotteryMEV.bytecode)
-    let adminNonce = (await adminWallet.getTransactionCount()) + 1
+    let adminNonce = await adminWallet.getTransactionCount()
     const txReq = populateTxFully(factory.getDeployTransaction(), adminNonce)
     const signedDeployTx = await adminWallet.signTransaction(txReq)
     await PROVIDER.sendTransaction(signedDeployTx)
