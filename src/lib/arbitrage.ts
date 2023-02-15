@@ -1,8 +1,8 @@
 import { BigNumber } from 'mathjs'
 import math from "./math"
 
-const FEE = 0.997
-// const FEE = 1
+// const FEE = 0.997
+const FEE = 1
 
 /** Calculate spot price for a given pair. Specific to univ2 `exactInputSingle`, fees ignored.
  * @param x: reserves of token0.
@@ -151,10 +151,10 @@ export const calculateBackrunParams = (
 ): {profit: BigNumber, settlementToken: 0 | 1, backrunAmount: BigNumber} | undefined => {
     // convenience log
     const logPrices = () => {
-        logPrice("A", {reserves0: reservesA_0, reserves1: reservesA_1})
-        logPrice("B", {reserves0: reservesB_0, reserves1: reservesB_1})
-        // console.log({reservesA_0, reservesA_1})
-        // console.log({reservesB_0, reservesB_1})
+        const reservesA = {reserves0: reservesA_0, reserves1: reservesA_1}
+        const reservesB = {reserves0: reservesB_0, reserves1: reservesB_1}
+        logPrice("A", reservesA)
+        logPrice("B", reservesB)
     }
 
     // settlementToken is the FINAL node in the arb path
