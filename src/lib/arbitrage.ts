@@ -1,8 +1,7 @@
 import { BigNumber } from 'mathjs'
 import math from "./math"
 
-// const FEE = 0.997
-const FEE = 1
+const FEE = 0.997
 
 /** Calculate spot price for a given pair. Specific to univ2 `exactInputSingle`, fees ignored.
  * @param x: reserves of token0.
@@ -10,11 +9,10 @@ const FEE = 1
  * @param k: product constant.
  * @param amountIn: amount of tokens to send in exchange for other tokens.
  * @param swapXForY: determines trade direction.
- * @returns Price returned is ALWAYS defined as token0 per token1.
  */
-export const calculateSpotPrice = (
+export const calculatePostTradeReserves = (
     x: BigNumber, y: BigNumber, k: BigNumber, amountIn: BigNumber, swapXForY: boolean
-): {reserves0: BigNumber, reserves1: BigNumber, amountOut: BigNumber, price: BigNumber} => {
+): {reserves0: BigNumber, reserves1: BigNumber, amountOut: BigNumber} => {
     if (swapXForY) {
         const dx = amountIn as BigNumber
         const dy = math.subtract(
@@ -23,12 +21,10 @@ export const calculateSpotPrice = (
                 math.add(x, dx)
             )
         ) as BigNumber
-        const price = math.divide(dx, dy) as BigNumber
         return {
             reserves0: x.add(dx),
             reserves1: y.sub(dy),
-            amountOut: dy,
-            price,
+            amountOut: dy.mul(FEE),
         }
     }
     else {
@@ -38,12 +34,10 @@ export const calculateSpotPrice = (
                 math.add(y, dy)
             )
         ) as BigNumber
-        const price = math.divide(dx, dy) as BigNumber
         return {
             reserves0: x.sub(dx),
             reserves1: y.add(dy),
-            amountOut: dx,
-            price,
+            amountOut: dx.mul(FEE),
         }
     }
 }
@@ -135,7 +129,8 @@ Assumes user is trading on exchange A.
  * @param kB: Product constant of pair on exchange B.
  * @param userAmountIn: Amount of tokens the user sends for their swap.
  * @param userSwap0For1: Determines trade direction.
- * @param wethIndex: index of token in which we denote profit
+ * @param wethIndex: index of weth. Prices are calculated in terms of TOKEN/WETH.
+ * @param userExchange: Identifier of exchange that the user trades on; matches to param `reserves(A|B)_N`.
  * @returns profit is always denoted in terms of ETH
  */
 export const calculateBackrunParams = (
@@ -147,14 +142,53 @@ export const calculateBackrunParams = (
     kB: BigNumber,
     userAmountIn: BigNumber,
     userSwap0For1: boolean,
-    wethIndex: 0 | 1
+    wethIndex: 0 | 1,
+    userExchange: "A" | "B"
 ): {profit: BigNumber, settlementToken: 0 | 1, backrunAmount: BigNumber} | undefined => {
+    const otherExchange = userExchange === "A" ? "B" : "A"
+
     // convenience log
     const logPrices = () => {
         const reservesA = {reserves0: reservesA_0, reserves1: reservesA_1}
         const reservesB = {reserves0: reservesB_0, reserves1: reservesB_1}
         logPrice("A", reservesA)
         logPrice("B", reservesB)
+    }
+
+    const updateUserExchangeReserves = (reserves0: BigNumber, reserves1: BigNumber) => {
+        if (userExchange === "A") {
+            reservesA_0 = reserves0
+            reservesA_1 = reserves1
+        } else {
+            reservesB_0 = reserves0
+            reservesB_1 = reserves1
+        }
+    }
+
+    const updateOtherExchangeReserves = (reserves0: BigNumber, reserves1: BigNumber) => {
+        if (otherExchange === "A") {
+            reservesA_0 = reserves0
+            reservesA_1 = reserves1
+        } else {
+            reservesB_0 = reserves0
+            reservesB_1 = reserves1
+        }
+    }
+
+    /**
+     * Gets reserves of exchange that the user's transaction is on.
+     * 
+     * We do this because we need to know the difference between the exchange that the user is trading on, and our instantiated definition of "exchange A".
+     */
+    const getUserExchangeReserves = () => {
+        return userExchange === "A" ? {reserves0: reservesA_0, reserves1: reservesA_1, k: kA} : {reserves0: reservesB_0, reserves1: reservesB_1, k: kB}
+    }
+
+    /**
+     * Gets reserves of exchange that we sell our backrun-purchased tokens on.
+     */
+    const getOtherExchangeReserves = () => {
+        return otherExchange === "A" ? {reserves0: reservesA_0, reserves1: reservesA_1, k: kA} : {reserves0: reservesB_0, reserves1: reservesB_1, k: kB}
     }
 
     // settlementToken is the FINAL node in the arb path
@@ -172,24 +206,26 @@ export const calculateBackrunParams = (
     logPrices()
 
     // calculate price impact from user trade
-    // const userSwap = simulateSwap(reservesA_0, reservesA_1, kA, userAmountIn, userSwap0For1, labels)
-    const userSwap = calculateSpotPrice(reservesA_0, reservesA_1, kA, userAmountIn, userSwap0For1)
+    let userReserves = getUserExchangeReserves()
+    const userSwap = calculatePostTradeReserves(userReserves.reserves0, userReserves.reserves1, userReserves.k, userAmountIn, userSwap0For1)
 
-    // simulate updating reserves on exchange A
-    reservesA_0 = userSwap.reserves0
-    reservesA_1 = userSwap.reserves1
+    // update local reserves cache: user's exchange
+    updateUserExchangeReserves(userSwap.reserves0, userSwap.reserves1)
     logPrices()
+
+    userReserves = getUserExchangeReserves()
+    let otherReserves = getOtherExchangeReserves()
 
     // calculate optimal buy amount on exchange A (opposite of user)
     let backrunAmount = calculateOptimalArbAmountIn(
-        reservesA_0, reservesA_1, reservesB_0, reservesB_1, not(settlementToken)
+        userReserves.reserves0, userReserves.reserves1, otherReserves.reserves0, otherReserves.reserves1, not(settlementToken)
     )
     if (backrunAmount.lte(0)) {
         console.log("SWITCHING DIRECTION")
         // better arb the other way, so we'll settle in the other token
         settlementToken = not(settlementToken)
         backrunAmount = calculateOptimalArbAmountIn(
-            reservesA_0, reservesA_1, reservesB_0, reservesB_1, not(settlementToken)
+            userReserves.reserves0, userReserves.reserves1, otherReserves.reserves0, otherReserves.reserves1, not(settlementToken)
         )
     }
     // if it's negative again, there's no good arb opportunity
@@ -198,28 +234,27 @@ export const calculateBackrunParams = (
     }
 
     // "execute backrun" swap; opposite direction of user trade on same exchange
-    const backrunBuy = calculateSpotPrice(reservesA_0, reservesA_1, kA, backrunAmount, settlementToken === 0)
+    userReserves = getUserExchangeReserves()
+    const backrunBuy = calculatePostTradeReserves(userReserves.reserves0, userReserves.reserves1, userReserves.k, backrunAmount, settlementToken === 0)
 
-    // update exchange A's reserves
-    reservesA_0 = backrunBuy.reserves0
-    reservesA_1 = backrunBuy.reserves1
+    // update local reserves after backrunning user on same exchange
+    updateUserExchangeReserves(backrunBuy.reserves0, backrunBuy.reserves1)
     logPrices()
 
     // execute settlement swap; circular arb completion
     // same direction as user (opposite the backrun) on other exchange
-    const backrunSell = calculateSpotPrice(reservesB_0, reservesB_1, kB, backrunBuy.amountOut, settlementToken === 1)
+    const backrunSell = calculatePostTradeReserves(otherReserves.reserves0, otherReserves.reserves1, otherReserves.k, backrunBuy.amountOut, settlementToken === 1)
 
-    // "update reserves" on exchange B
-    reservesB_0 = backrunSell.reserves0
-    reservesB_1 = backrunSell.reserves1
+    // update local reserves on other exchange (not the one the user traded on)
+    updateOtherExchangeReserves(backrunSell.reserves0, backrunSell.reserves1)
     logPrices()
+    otherReserves = getOtherExchangeReserves()
 
     // difference in tokens bought on exchange A and sold on exchange B
     let profit = math.bignumber(backrunSell.amountOut.sub(backrunAmount))
     if (settlementToken !== wethIndex) {
         // if we settle in DAI, convert the profit to be in terms of WETH
-        const price = wethIndex === 1 ? reservesB_0.div(reservesB_1) : reservesB_1.div(reservesB_0)
-        // convert profit to standard price format (x/y)
+        const price = wethIndex === 1 ? otherReserves.reserves0.div(otherReserves.reserves1) : otherReserves.reserves1.div(otherReserves.reserves0)
         profit = math.bignumber(profit.div(price))
     } else {
         profit = math.bignumber(profit)

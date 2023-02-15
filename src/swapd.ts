@@ -169,7 +169,10 @@ async function main() {
             wethReserves: ((reservesB[0] as BigNumber).gt(reservesB[1]) ? reservesB[1] : reservesB[0]) as BigNumber,
             daiReserves: ((reservesB[0] as BigNumber).gt(reservesB[1]) ? reservesB[0] : reservesB[1]) as BigNumber,
         }
-        console.log({A, B})
+        console.log("reserves", {
+            A: {weth: A.wethReserves.toString(), dai: A.daiReserves.toString()},
+            B: {weth: B.wethReserves.toString(), dai: B.daiReserves.toString()},
+        })
         console.log("priceA", numify(A.daiReserves).div(numify(A.wethReserves)))
         console.log("priceB", numify(B.daiReserves).div(numify(B.wethReserves)))
 
@@ -178,13 +181,16 @@ async function main() {
         for (const wallet of walletSet) {
             let nonce = await PROVIDER.getTransactionCount(wallet.address)
             for (let i = 0; i < actionsPerBlock; i++) {
-                // pick random uni factory
-                const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
+                // TODO: pick random uni factory
+                // const uniFactory = coinToss() ? uniFactoryA.address : uniFactoryB.address
+                const uniFactory = uniFactoryA.address
                 // TODO: use `numPairs` here
                 const daiContract = daiContracts.length > 1 ? daiContracts[randInRange(0, daiContracts.length)] : 
                     daiContracts[0]
-                // pick random path
-                const path = coinToss() ? [wethContract.address, daiContract.address] : [daiContract.address, wethContract.address]
+                // TODO: pick random path
+                // const path = coinToss() ? [wethContract.address, daiContract.address] : [daiContract.address, wethContract.address]
+                // testing: always swap ETH -> DAI
+                const path = [wethContract.address, daiContract.address]
                 // pick random amountIn: [500..10000] USD
                 const amountInUSD = ETH.mul(randInRange(500, 2000))
                 // if weth out (path_0 == weth) then amount should be (1 ETH / 2000 DAI) * amountIn
@@ -295,7 +301,8 @@ async function main() {
                         numify(kB),
                         numify(decodedTxData[1]),
                         userSwap.path[0].toLowerCase() === token0.toLowerCase(),
-                        wethIndex
+                        wethIndex,
+                        userSwap.factory.toLowerCase() === uniFactoryA.address.toLowerCase() ? "A" : "B"
                     )
                     if (!backrunParams) {
                         console.debug("not profitable")

@@ -35,7 +35,8 @@ describe("arbitrage", () => {
             kB, // exchange B
             params.amountIn,
             params.swap0For1,
-            1
+            1,
+            "A"
         )
         if (!backrunParams) {
             return undefined
