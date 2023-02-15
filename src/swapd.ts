@@ -158,6 +158,21 @@ async function main() {
      */
     const swapd = async (blockNum: number) => {
         console.log(`[BLOCK ${blockNum}]`)
+        // log reserves on every block
+        const {reservesA, reservesB} = await getReserves(wethContract.address, daiContracts[0].address)
+        // hacky way to find weth; it should always be less than DAI
+        const A = {
+            wethReserves: ((reservesA[0] as BigNumber).gt(reservesA[1]) ? reservesA[1] : reservesA[0]) as BigNumber,
+            daiReserves: ((reservesA[0] as BigNumber).gt(reservesA[1]) ? reservesA[0] : reservesA[1]) as BigNumber,
+        }
+        const B = {
+            wethReserves: ((reservesB[0] as BigNumber).gt(reservesB[1]) ? reservesB[1] : reservesB[0]) as BigNumber,
+            daiReserves: ((reservesB[0] as BigNumber).gt(reservesB[1]) ? reservesB[0] : reservesB[1]) as BigNumber,
+        }
+        console.log({A, B})
+        console.log("priceA", numify(A.daiReserves).div(numify(A.wethReserves)))
+        console.log("priceB", numify(B.daiReserves).div(numify(B.wethReserves)))
+
         // generate swaps
         let swaps: string[] = []
         for (const wallet of walletSet) {
@@ -176,7 +191,6 @@ async function main() {
                 const amountIn = path[0] == wethContract.address ? amountInUSD.div(2000) : amountInUSD
                 const tokenInName = path[0] === wethContract.address ? "WETH" : "DAI"
                 const tokenOutName = path[1] === wethContract.address ? "WETH" : "DAI"
-
                 console.log(`${wallet.address} trades ${formatEther(amountIn).padEnd(6, "0")} ${tokenInName.padEnd(4, " ")} for ${tokenOutName}`)
                 swaps.push(await signSwap(atomicSwapContract, uniFactory, wallet, amountIn, path, nonce++))
                 console.log("pushed signed swap")
@@ -219,6 +233,18 @@ async function main() {
         return "-?-"
     }
 
+    const getReserves = async (token0: string, token1: string) => {
+        // get reserves
+        const pairAddressA = await uniFactoryA.getPair(token0, token1)
+        const pairAddressB = await uniFactoryB.getPair(token0, token1)
+        // TODO: cache these contracts
+        const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, PROVIDER)
+        const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, PROVIDER)
+        const reservesA = pairA.getReserves()
+        const reservesB = pairB.getReserves()
+        return {reservesA: await reservesA, reservesB: await reservesB, pairA, pairB}
+    }
+
     /**
      * backrun-arbitrage daemon; watches mempool for juicy swaps and backruns them w/ an arb when profitable. 
      * Arbs are generated from wallet set passed in args; will cause conflicts often.
@@ -249,19 +275,12 @@ async function main() {
                     const userSwap = new SwapParams(decodedTxData)
     
                     // get reserves
-                    // TODO: make a helper function to do this; this block is getting ugly
-                    const pairAddressA = await uniFactoryA.getPair(userSwap.path[0], userSwap.path[1])
-                    const pairAddressB = await uniFactoryB.getPair(userSwap.path[0], userSwap.path[1])
-                    // TODO: cache these contracts
-                    const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, PROVIDER)
-                    const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, PROVIDER)
-                    const reservesA = await pairA.getReserves()
-                    const reservesB = await pairB.getReserves()
-    
+                    const {reservesA, reservesB, pairA, pairB} = await getReserves(userSwap.path[0], userSwap.path[1])
+
                     // TODO: only calculate each `k` once
                     const kA = reservesA[0].mul(reservesA[1])
                     const kB = reservesB[0].mul(reservesB[1])
-    
+
                     // we can assume that the pair ordering is the same on both pairs
                     // bc they are the same contract, so they order the same way
                     const token0: string = await pairA.callStatic.token0()
@@ -283,6 +302,7 @@ async function main() {
                         return
                     }
                     console.debug("estimated profit", utils.formatEther(backrunParams.profit.toFixed(0)))
+                    // TODO: check profit against min/max profit flags b4 executing
                     // TODO: calculate gas cost dynamically (accurately)
                     const gasCost = math.bignumber(100000).mul(1e9).mul(20)
                     if (math.bignumber(backrunParams.profit).gt(gasCost)) {
@@ -291,8 +311,8 @@ async function main() {
                         const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
                         const startFactory = userSwap.factory
                         const endFactory = startFactory === uniFactoryA.address ? uniFactoryB.address : uniFactoryA.address
-                        const pairStart: string = startFactory === uniFactoryA.address ? pairAddressA : pairAddressB
-                        const pairEnd: string = startFactory === uniFactoryB.address ? pairAddressA : pairAddressB
+                        const pairStart: string = startFactory === uniFactoryA.address ? pairA.address : pairB.address
+                        const pairEnd: string = startFactory === uniFactoryB.address ? pairA.address : pairB.address
                         const amountIn = BigNumber.from(backrunParams.backrunAmount.toFixed(0))
 
                         console.log("tokenArb", findTokenName(tokenArb), tokenArb)
@@ -341,9 +361,7 @@ async function main() {
                     }
                 }
             }
-            // checking profit against min/max profit flags b4 executing
         }
-
         console.warn("unfinished!")
     }
 
