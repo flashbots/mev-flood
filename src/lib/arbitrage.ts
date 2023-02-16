@@ -15,12 +15,7 @@ export const calculatePostTradeReserves = (
 ): {reserves0: BigNumber, reserves1: BigNumber, amountOut: BigNumber} => {
     if (swapXForY) {
         const dx = amountIn as BigNumber
-        const dy = math.subtract(
-            y,
-            math.divide(k,
-                math.add(x, dx)
-            )
-        ) as BigNumber
+        const dy = y.sub(k.div(x.add(dx)))
         return {
             reserves0: x.add(dx),
             reserves1: y.sub(dy),
@@ -29,11 +24,7 @@ export const calculatePostTradeReserves = (
     }
     else {
         const dy = amountIn as BigNumber
-        const dx = math.subtract(
-            x, math.divide(k,
-                math.add(y, dy)
-            )
-        ) as BigNumber
+        const dx = x.sub(k.div(y.add(dy)))
         return {
             reserves0: x.sub(dx),
             reserves1: y.add(dy),
