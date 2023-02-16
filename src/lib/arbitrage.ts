@@ -3,7 +3,7 @@ import math from "./math"
 
 const FEE = 0.997
 
-/** Calculate spot price for a given pair. Specific to univ2 `exactInputSingle`, fees ignored.
+/** Calculate spot price for a given pair. Analogous to univ2 `exactInputSingle`.
  * @param x: reserves of token0.
  * @param y: reserves of token1.
  * @param k: product constant.
@@ -89,15 +89,15 @@ const calculateOptimalArbAmountIn = (
     }
 }
 
-/**
- * Convenience log
- */
-const logPrice = (label: string, reserves: {reserves0: BigNumber, reserves1: BigNumber}) => {
-    // assume the one with less in it is the base currency
-    let denominator = reserves.reserves0.lt(reserves.reserves1) ? reserves.reserves0 : reserves.reserves1
-    let numerator = denominator === reserves.reserves1 ? reserves.reserves0 : reserves.reserves1
-    console.debug(`price (${label})`, math.bignumber(numerator.div(denominator)))
-}
+// /**
+//  * Convenience log
+//  */
+// const logPrice = (label: string, reserves: {reserves0: BigNumber, reserves1: BigNumber}) => {
+//     // assume the one with less in it is the base currency
+//     let denominator = reserves.reserves0.lt(reserves.reserves1) ? reserves.reserves0 : reserves.reserves1
+//     let numerator = denominator === reserves.reserves1 ? reserves.reserves0 : reserves.reserves1
+//     console.debug(`price (${label})`, math.bignumber(numerator.div(denominator)))
+// }
 
 /**
  * ```
