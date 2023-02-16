@@ -1,7 +1,6 @@
 import { BigNumber, Wallet, providers, utils } from "ethers"
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { id as ethersId } from "ethers/lib/utils"
-import mathjs from "mathjs"
 
 import env from "./env"
 import { getAdminWallet } from './wallets'
