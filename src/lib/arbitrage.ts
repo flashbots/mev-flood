@@ -1,9 +1,9 @@
 import { BigNumber } from 'mathjs'
 import math from "./math"
 
-const FEE = 0.997
+const FEE = math.bignumber(0.997)
 
-/** Calculate spot price for a given pair. Analogous to univ2 `exactInputSingle`.
+/** Calculate spot reserves for a given trade. Analogous to univ2 `exactInputSingle`.
  * @param x: reserves of token0.
  * @param y: reserves of token1.
  * @param k: product constant.
@@ -54,16 +54,9 @@ const calculateOptimalArbAmountIn = (
         const numerator = math.sqrt(
             priceA.mul(priceB).mul(FEE).mul(FEE)
         ).sub(1)
-
-        const denominator = math.chain(
-            math.divide(FEE, reserveA_0)
-        ).add(
-            math.chain(FEE)
-            .multiply(FEE)
-            .multiply(priceA)
-            .divide(reserveB_1)
-            .done()
-        ).done()
+        const denominator = FEE.div(reserveA_0).add(
+            FEE.mul(FEE).mul(priceA).div(reserveB_1)
+        )
 
         return math.divide(numerator, denominator) as BigNumber
     }
@@ -74,16 +67,7 @@ const calculateOptimalArbAmountIn = (
         const numerator = math.sqrt(
             priceA.mul(priceB).mul(FEE).mul(FEE)
         ).sub(1)
-
-        const denominator = math.chain(
-            math.divide(FEE, reserveA_1)
-        ).add(
-            math.chain(FEE)
-            .multiply(FEE)
-            .multiply(priceA)
-            .divide(reserveB_0)
-            .done()
-        ).done()
+        const denominator = FEE.div(reserveA_1).add(FEE.mul(FEE).mul(priceA).div(reserveB_0))
 
         return math.divide(numerator, denominator) as BigNumber
     }
