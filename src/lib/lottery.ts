@@ -1,21 +1,33 @@
-import { BigNumber, ContractFactory, Wallet } from "ethers"
-import env from './env'
-import { GWEI, ETH, now, TransactionRequest } from './helpers'
-import { PROVIDER } from './providers'
-import contracts, { getContract } from './contracts'
-import { getAdminWallet } from './wallets'
+import { BigNumber, Contract, ContractFactory, utils, Wallet } from "ethers"
 import { formatEther, formatUnits } from 'ethers/lib/utils'
+
+import contracts, { getContract } from './contracts'
+import env from './env'
+import { GWEI, ETH, now, TransactionRequest, populateTxFully } from './helpers'
+import { PROVIDER } from './providers'
+import { getAdminWallet } from './wallets'
 
 const BID_VALUE = ETH.div(100)
 // TODO: clean up; don't instantiate contract here; getContract should never return undefined
-const lotteryContract = getContract(contracts.LotteryMEV)
+let lotteryContract = getContract(contracts.LotteryMEV)
 const adminWallet = getAdminWallet().connect(PROVIDER)
+
+const deployLotteryContract = async (): Promise<Contract> => {
+    const factory = new ContractFactory(JSON.stringify(contracts.LotteryMEV.abi), contracts.LotteryMEV.bytecode)
+    let adminNonce = await adminWallet.getTransactionCount()
+    const txReq = populateTxFully(factory.getDeployTransaction(), adminNonce)
+    const signedDeployTx = await adminWallet.signTransaction(txReq)
+    await PROVIDER.sendTransaction(signedDeployTx)
+    const lotteryAddress = utils.getContractAddress({from: txReq.from || adminWallet.address, nonce: adminNonce})
+    return new Contract(lotteryAddress, contracts.LotteryMEV.abi)
+}
 
 /** return a bunch of bundles that compete for the same opportunity */
 export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice: BigNumber): Promise<{bidTx: string, claimTx: string}[]> => {
     if (!lotteryContract) {
-        console.warn("lottery contract is undefined")
-        return []
+        console.log("lottery contract is undefined, attempting to deploy contract")
+        lotteryContract = await deployLotteryContract()
+        console.log(`lottery contract deployed at ${lotteryContract.address}`)
     }
     const bidTx = await lotteryContract.populateTransaction.bid()
     const claimTx = await lotteryContract.populateTransaction.claim()
@@ -58,8 +70,9 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice:
 
 export const createSmartLotteryTxs = async (walletSet: Wallet[]): Promise<string[]> => {
     if (!lotteryContract) {
-        console.warn("lottery contract is undefined")
-        return []
+        console.log("lottery contract is undefined, attempting to deploy contract")
+        lotteryContract = await deployLotteryContract()
+        console.log(`lottery contract deployed at ${lotteryContract.address}`)
     }
     const nonces = Promise.all(walletSet.map(wallet => wallet.connect(PROVIDER).getTransactionCount()))
     console.log(`lottery: ${contracts.LotteryMEV.address}`)
