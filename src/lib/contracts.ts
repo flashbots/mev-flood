@@ -9,7 +9,6 @@ export type ContractSpec = {
     bytecode?: string | any,
 }
 
-
 export default  {
     AtomicLottery: {
         abi: [
