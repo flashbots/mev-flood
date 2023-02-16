@@ -194,7 +194,7 @@ export const calculateBackrunParams = (
 
     let otherReserves = getOtherExchangeReserves()
 
-    // calculate optimal buy amount on exchange A (opposite of user)
+    // calculate optimal buy amount on same exchange as user, but opposite trade direction
     let backrunAmount = calculateOptimalArbAmountIn(
         userReserves.reserves0, userReserves.reserves1, otherReserves.reserves0, otherReserves.reserves1, not(settlementToken)
     )
