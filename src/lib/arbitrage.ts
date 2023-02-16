@@ -143,12 +143,12 @@ export const calculateBackrunParams = (
     const otherExchange = userExchange === "A" ? "B" : "A"
 
     // convenience log
-    const logPrices = () => {
-        const reservesA = {reserves0: reservesA_0, reserves1: reservesA_1}
-        const reservesB = {reserves0: reservesB_0, reserves1: reservesB_1}
-        logPrice("A", reservesA)
-        logPrice("B", reservesB)
-    }
+    // const logPrices = () => {
+    //     const reservesA = {reserves0: reservesA_0, reserves1: reservesA_1}
+    //     const reservesB = {reserves0: reservesB_0, reserves1: reservesB_1}
+    //     logPrice("A", reservesA)
+    //     logPrice("B", reservesB)
+    // }
 
     const updateUserExchangeReserves = (reserves0: BigNumber, reserves1: BigNumber) => {
         if (userExchange === "A") {
@@ -189,7 +189,7 @@ export const calculateBackrunParams = (
     // settlementToken is the FINAL node in the arb path
     let settlementToken: 0 | 1 = 0
     if (userSwap0For1) { 
-        /* user swapping 1 -> 0, we swap 0 -> 1 -> 0
+        /* user swapping 0 -> 1, we swap 1 -> 0 -> 1
                          |----|          |----|    |
                        exchange_A      exchange_A  |
                                               |----|
@@ -197,8 +197,7 @@ export const calculateBackrunParams = (
         */
         settlementToken = 1
     }
-    // assume we'll do the opposite of the user after their trade
-    logPrices()
+    // logPrices()
 
     // calculate price impact from user trade
     let userReserves = getUserExchangeReserves()
@@ -207,7 +206,7 @@ export const calculateBackrunParams = (
     // update local reserves cache: user's exchange
     updateUserExchangeReserves(userSwap.reserves0, userSwap.reserves1)
     userReserves = getUserExchangeReserves()
-    logPrices()
+    // logPrices()
 
     let otherReserves = getOtherExchangeReserves()
 
@@ -231,20 +230,17 @@ export const calculateBackrunParams = (
     // simulate backrun swap
     userReserves = getUserExchangeReserves()
     const backrunBuy = calculatePostTradeReserves(userReserves.reserves0, userReserves.reserves1, userReserves.k, backrunAmount, settlementToken === 0)
-
     // update local reserves after backrunning user on same exchange
     updateUserExchangeReserves(backrunBuy.reserves0, backrunBuy.reserves1)
     userReserves = getUserExchangeReserves()
-    logPrices()
+    // logPrices()
 
-    // execute settlement swap; circular arb completion
-    // same direction as user (opposite the backrun) on other exchange
+    // simulate settlement swap on other exchange; circular arb completion
     const backrunSell = calculatePostTradeReserves(otherReserves.reserves0, otherReserves.reserves1, otherReserves.k, backrunBuy.amountOut, settlementToken === 1)
-
     // update local reserves on other exchange (not the one the user traded on)
     updateOtherExchangeReserves(backrunSell.reserves0, backrunSell.reserves1)
     otherReserves = getOtherExchangeReserves()
-    logPrices()
+    // logPrices()
 
     // difference in tokens bought on exchange A and sold on exchange B
     const profit = math.bignumber(backrunSell.amountOut.sub(backrunAmount))
