@@ -9,7 +9,7 @@ export type ContractDeployment = {
     signedDeployTx: string,
 }
 
-export type Deployments = {
+export type Deployment = {
     dai: ContractDeployment,           // erc20
     weth: ContractDeployment,           // erc20
     uniV2Factory_A: ContractDeployment,   // univ2 factory (creates univ2 pairs)
@@ -20,7 +20,7 @@ export type Deployments = {
 }
 
 export type DeploymentsFile = {
-    deployments: Deployments,
+    deployments: Deployment,
     allSignedTxs: string[],
 }
 

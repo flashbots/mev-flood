@@ -5,7 +5,7 @@ import env from '../lib/env';
 import { PROVIDER } from '../lib/providers';
 import { getExistingDeploymentFilename, getNewDeploymentFilename, getNewLiquidityFilename } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
-import scripts, {LiquidOptions} from '../lib/scripts';
+import scripts, {LiquidParams} from '../lib/scripts';
 import MevFlood from '..';
 
 /** Prints txs:
@@ -34,7 +34,7 @@ const main = async () => {
         readline.question("press Enter to continue...")
     }
     const deploymentFile = await getExistingDeploymentFilename()
-    const options: LiquidOptions = args as LiquidOptions
+    const options: LiquidParams = args as LiquidParams
     const {allSignedTxs, deployments} = await scripts.liquid(
         options,
         PROVIDER,
@@ -45,7 +45,7 @@ const main = async () => {
     
     if (allSignedTxs.length > 0 && deployments) {
         const filename = args.shouldDeploy ? await getNewDeploymentFilename() : await getNewLiquidityFilename()
-        await MevFlood.saveDeployments(filename, deployments, allSignedTxs)
+        await MevFlood.saveDeployment(filename, deployments, allSignedTxs)
     }
 }
 

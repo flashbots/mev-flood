@@ -12,10 +12,10 @@ import { formatEther } from 'ethers/lib/utils'
 // lib
 import contracts, { ContractSpec } from "../contracts"
 import { ETH, populateTxFully } from '../helpers'
-import { ContractDeployment, Deployments, getDeployment } from '../liquid'
+import { ContractDeployment, Deployment, getDeployment } from '../liquid'
 import { signSwap } from '../swap'
 
-export interface LiquidOptions {
+export interface LiquidParams {
     shouldApproveTokens?: boolean,
     shouldDeploy?: boolean,
     shouldBootstrapLiquidity?: boolean,
@@ -25,7 +25,7 @@ export interface LiquidOptions {
     wethMintAmountUser?: number,
 }
 
-const liquid = async (options: LiquidOptions, provider: providers.JsonRpcProvider, adminWallet: Wallet, userWallet: Wallet, deploymentFile: string | Deployments) => {
+const liquid = async (options: LiquidParams, provider: providers.JsonRpcProvider, adminWallet: Wallet, userWallet: Wallet, deploymentFile: string | Deployment) => {
     // toggles for individual steps
     const defaultTrue = (value?: boolean) => {
         if (value === undefined) {
@@ -105,7 +105,7 @@ const liquid = async (options: LiquidOptions, provider: providers.JsonRpcProvide
     let addr_dai_weth_B: string
     let addr_atomicSwap: string
     // to be returned at end
-    let deployments: Deployments | undefined = undefined // the contracts we will interact with
+    let deployments: Deployment | undefined = undefined // the contracts we will interact with
     let signedTxs: string[] = []
 
     // defined after we get contract addresses, either from new deployment or from file
@@ -148,11 +148,11 @@ const liquid = async (options: LiquidOptions, provider: providers.JsonRpcProvide
         addr_dai_weth_A = dai_weth_A.contractAddress
         addr_dai_weth_B = dai_weth_B.contractAddress
 
-        const pairDeployments = [
+        const pairDeployment = [
             dai_weth_A,
             dai_weth_B,
         ]
-        for (const deployment of pairDeployments) {
+        for (const deployment of pairDeployment) {
             console.log("deploying pair...")
             await (await provider.sendTransaction(deployment.signedDeployTx)).wait(1)
             console.log("OK.")
@@ -163,7 +163,7 @@ const liquid = async (options: LiquidOptions, provider: providers.JsonRpcProvide
             dai_weth_B,
         }
     } else { // read contracts from `output/${NODE_ENV}/uniDeployment${X}.json`
-        const deployments: Deployments = (deploymentFile instanceof String) ? (await getDeployment({filename: deploymentFile as string})).deployments : deploymentFile as Deployments
+        const deployments: Deployment = (deploymentFile instanceof String) ? (await getDeployment({filename: deploymentFile as string})).deployments : deploymentFile as Deployment
         addr_dai = deployments.dai.contractAddress
         addr_weth = deployments.weth.contractAddress
         addr_dai_weth_A = deployments.dai_weth_A?.contractAddress || ''

@@ -2,8 +2,8 @@ import fundWallets from './fundWallets'
 import liquid from './liquid'
 import { sendSwaps } from './swap'
 
-export {LiquidOptions} from "./liquid"
-export {SwapOptions} from "./swap"
+export {LiquidParams} from "./liquid"
+export {SwapParams} from "./swap"
 
 export default {
     fundWallets,

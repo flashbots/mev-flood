@@ -1,14 +1,14 @@
 import { Contract, providers, Wallet } from 'ethers'
 import contracts from '../contracts'
-import { Deployments } from '../liquid'
+import { Deployment } from '../liquid'
 import { createRandomSwap, signSwap } from '../swap'
 
-export type SwapOptions = {
+export type SwapParams = {
     maxUSD: number,
     minUSD: number,
 }
 
-export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployments: Deployments) => {
+export const sendSwaps = async (options: SwapParams, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployments: Deployment) => {
     let signedSwaps = []
     for (const wallet of userWallets) {
         const nonce = wallet.connect(provider).getTransactionCount()
