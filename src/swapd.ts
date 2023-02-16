@@ -308,11 +308,17 @@ async function main() {
                         console.debug("not profitable")
                         return
                     }
-                    console.debug("estimated profit", utils.formatEther(backrunParams.profit.toFixed(0)))
+                    const settlesInWeth = backrunParams.settlementToken === wethIndex
+                    console.debug("estimated proceeds", `${utils.formatEther(backrunParams.profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
                     // TODO: check profit against min/max profit flags b4 executing
                     // TODO: calculate gas cost dynamically (accurately)
                     const gasCost = math.bignumber(100000).mul(1e9).mul(20)
-                    if (math.bignumber(backrunParams.profit).gt(gasCost)) {
+                    // normalize profit to ETH
+                    const avgReserves0 = backrunParams.otherReserves.reserves0.add(backrunParams.userReserves.reserves0).div(2)
+                    const avgReserves1 = backrunParams.otherReserves.reserves1.add(backrunParams.userReserves.reserves1).div(2)
+                    const avgPrice = wethIndex === 0 ? avgReserves1.div(avgReserves0) : avgReserves0.div(avgReserves1)
+                    const profit = settlesInWeth ? backrunParams.profit : backrunParams.profit.div(avgPrice)
+                    if (profit.gt(gasCost)) {
                         console.log("DOING THE ARBITRAGE...")
                         const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
                         const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
@@ -369,7 +375,6 @@ async function main() {
                 }
             }
         }
-        console.warn("unfinished!")
     }
 
     if (isArbd) {

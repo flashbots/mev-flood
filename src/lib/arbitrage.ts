@@ -118,6 +118,12 @@ const not = (tokenNumber: 0 | 1) => {
     return Math.abs(tokenNumber - 1) as 0 | 1
 }
 
+type Pool = {
+    reserves0: BigNumber,
+    reserves1: BigNumber,
+    k: BigNumber,
+}
+
 /**
 Simulates a backrun-arb given an initial state, returns the profit. 
 Assumes user is trading on exchange A.
@@ -144,7 +150,7 @@ export const calculateBackrunParams = (
     userSwap0For1: boolean,
     wethIndex: 0 | 1,
     userExchange: "A" | "B"
-): {profit: BigNumber, settlementToken: 0 | 1, backrunAmount: BigNumber} | undefined => {
+): {profit: BigNumber, settlementToken: 0 | 1, backrunAmount: BigNumber, userReserves: Pool, otherReserves: Pool} | undefined => {
     const otherExchange = userExchange === "A" ? "B" : "A"
 
     // convenience log
@@ -211,9 +217,9 @@ export const calculateBackrunParams = (
 
     // update local reserves cache: user's exchange
     updateUserExchangeReserves(userSwap.reserves0, userSwap.reserves1)
+    userReserves = getUserExchangeReserves()
     logPrices()
 
-    userReserves = getUserExchangeReserves()
     let otherReserves = getOtherExchangeReserves()
 
     // calculate optimal buy amount on exchange A (opposite of user)
@@ -239,6 +245,7 @@ export const calculateBackrunParams = (
 
     // update local reserves after backrunning user on same exchange
     updateUserExchangeReserves(backrunBuy.reserves0, backrunBuy.reserves1)
+    userReserves = getUserExchangeReserves()
     logPrices()
 
     // execute settlement swap; circular arb completion
@@ -247,22 +254,17 @@ export const calculateBackrunParams = (
 
     // update local reserves on other exchange (not the one the user traded on)
     updateOtherExchangeReserves(backrunSell.reserves0, backrunSell.reserves1)
-    logPrices()
     otherReserves = getOtherExchangeReserves()
+    logPrices()
 
     // difference in tokens bought on exchange A and sold on exchange B
-    let profit = math.bignumber(backrunSell.amountOut.sub(backrunAmount))
-    if (settlementToken !== wethIndex) {
-        // if we settle in DAI, convert the profit to be in terms of WETH
-        const price = wethIndex === 1 ? otherReserves.reserves0.div(otherReserves.reserves1) : otherReserves.reserves1.div(otherReserves.reserves0)
-        profit = math.bignumber(profit.div(price))
-    } else {
-        profit = math.bignumber(profit)
-    }
+    const profit = math.bignumber(backrunSell.amountOut.sub(backrunAmount))
 
     return {
         settlementToken,
         backrunAmount,
         profit,
+        userReserves,
+        otherReserves,
     }
 }
