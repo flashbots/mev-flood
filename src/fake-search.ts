@@ -1,5 +1,6 @@
 import { createRevertingUniTx } from './lib/lottery'
-import { calculateBundleHash, PROVIDER } from './lib/helpers'
+import { calculateBundleHash } from './lib/helpers'
+import { PROVIDER } from './lib/providers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { getAdminWallet } from './lib/wallets'
 import { v4 as uuidv4 } from 'uuid'

@@ -1,9 +1,7 @@
-import { BigNumber, Contract, Wallet } from 'ethers'
 import { constants as fsConstants } from 'fs';
 import fs from "fs/promises"
 
-import { populateTxFully, PROVIDER, TransactionRequest } from './helpers'
-import env from '../lib/env'
+import { TransactionRequest } from './helpers'
 
 export type ContractDeployment = {
     contractAddress: string,
@@ -11,40 +9,23 @@ export type ContractDeployment = {
     signedDeployTx: string,
 }
 
-export type Deployments = {
-    dai: ContractDeployment,           // erc20
-    weth: ContractDeployment,           // erc20
+export type Deployment = {
+    dai: ContractDeployment,              // erc20
+    weth: ContractDeployment,             // erc20
     uniV2Factory_A: ContractDeployment,   // univ2 factory (creates univ2 pairs)
     uniV2Factory_B: ContractDeployment,   // univ2 factory (creates univ2 pairs)
-    atomicSwap: ContractDeployment,
+    atomicSwap: ContractDeployment,       // custom univ2 interface
     dai_weth_A?: ContractDeployment,      // univ2 pair on Uni_A
     dai_weth_B?: ContractDeployment,      // univ2 pair on Uni_B
 }
 
 export type DeploymentsFile = {
-    deployments: Deployments,
+    deployments: Deployment,
     allSignedTxs: string[],
 }
 
-export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: string, sender: Wallet, amountIn: BigNumber, path: string[], nonce?: number): Promise<string> => {
-    // use custom router to swap
-    return await sender.signTransaction(
-        populateTxFully(
-            await atomicSwapContract.populateTransaction.swap(
-                path,
-                amountIn,
-                uniFactoryAddress,
-                sender.address,
-                false
-            ),
-            nonce || await PROVIDER.getTransactionCount(sender.address),
-            {from: sender.address, gasLimit: 150000},
-        )
-    )
-}
-
-export const dir = async () => {
-    const dirname = `src/output/${env.CHAIN_NAME}`
+const dir = async () => {
+    const dirname = process.env.CHAIN_NAME ? `src/output/${process.env.CHAIN_NAME}` : 'deployments'
     try {
         await fs.access(dirname, fsConstants.R_OK | fsConstants.W_OK)
     } catch (e) {
@@ -72,11 +53,14 @@ export const getNewLiquidityFilename = async (): Promise<string> => {
 }
 
 /**
- * Loads a deployment from `src/output/{env}/`.
- * @param deploymentNumber optional deployment number corresponding to a "uniDeployment{n}" file in src/output/{env}
- * @returns deployment specified by `deploymentNumber`, or newest deployment if no `deploymentNumber` is specified.
+ * Loads a deployment file.
+ * @param options Specifies how to load the file.
+ * @param options.filename Load file directly from a file path.
+ * @param options.deploymentNumber If process.env.CHAIN_NAME exists, load from *'src/output/{env.CHAIN_NAME}/'*. Otherwise load from *'./deployments/'*.
+ * }
+ * @returns deployment specified in options, or newest existing deployment if no option was specified.
  */
-export const getDeployment = async (deploymentNumber?: number): Promise<DeploymentsFile> => {
-    const filename = await getExistingDeploymentFilename(deploymentNumber)
+export const getDeployment = async (options: {deploymentNumber?: number, filename?: string}): Promise<DeploymentsFile> => {
+    const filename = options.filename || await getExistingDeploymentFilename(options.deploymentNumber || undefined)
     return JSON.parse(await fs.readFile(filename, {encoding: "utf-8"}))
 }

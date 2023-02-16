@@ -1,7 +1,7 @@
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { getCancelPrivateTxArgs } from '../lib/cliArgs'
 import env from '../lib/env'
-import { PROVIDER } from '../lib/helpers'
+import { PROVIDER } from '../lib/providers'
 import { getAdminWallet } from '../lib/wallets'
 
 async function main() {

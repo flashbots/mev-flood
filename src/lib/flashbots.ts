@@ -2,7 +2,8 @@ import axios from "axios"
 import { formatEther, id as ethersId, parseTransaction } from "ethers/lib/utils"
 
 import env from './env'
-import { getFlashbotsProvider, getRpcRequest, PROVIDER } from './helpers'
+import { getRpcRequest } from './helpers'
+import { PROVIDER} from "./providers"
 import { getAdminWallet } from './wallets'
 
 const authSigner = getAdminWallet()

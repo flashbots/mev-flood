@@ -1,6 +1,7 @@
 import { createSmartLotteryTxs } from './lib/lottery'
 import { getSearchWalletSet } from './lib/wallets'
-import { calculateBundleHash, PROVIDER } from './lib/helpers'
+import { calculateBundleHash } from './lib/helpers'
+import { PROVIDER } from './lib/providers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
 import { useMempool } from './lib/cliArgs'
 import { v4 as uuidv4 } from "uuid"

@@ -1,9 +1,11 @@
 import { BigNumber, Contract, ContractFactory, utils, Wallet } from "ethers"
-import env from './env'
-import { GWEI, ETH, PROVIDER, now, TransactionRequest, populateTxFully } from './helpers'
-import contracts, { getContract } from './contracts'
-import { getAdminWallet } from './wallets'
 import { formatEther, formatUnits } from 'ethers/lib/utils'
+
+import contracts, { getContract } from './contracts'
+import env from './env'
+import { GWEI, ETH, now, TransactionRequest, populateTxFully } from './helpers'
+import { PROVIDER } from './providers'
+import { getAdminWallet } from './wallets'
 
 const BID_VALUE = ETH.div(100)
 // TODO: clean up; don't instantiate contract here; getContract should never return undefined

@@ -1,6 +1,6 @@
 import { Contract } from 'ethers'
-import env from "./env"
 
+const env = process.env.CHAIN_ID ? {CHAIN_ID: parseInt(process.env.CHAIN_ID)} : {CHAIN_ID: 5}
 console.log("CHAIN_ID", env.CHAIN_ID)
 
 export type ContractSpec = {
@@ -9,7 +9,7 @@ export type ContractSpec = {
     bytecode?: string | any,
 }
 
-export default {
+export default  {
     AtomicLottery: {
         abi: [
             {

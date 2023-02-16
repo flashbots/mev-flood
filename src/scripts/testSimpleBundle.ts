@@ -1,7 +1,9 @@
 import contracts, { getContract } from "../lib/contracts"
+import env from '../lib/env'
 import { simulateBundle } from '../lib/flashbots'
-import { ETH, getFlashbotsProvider, GWEI, populateTxFully, PROVIDER } from '../lib/helpers'
-import { getAdminWallet, getTestWallet } from '../lib/wallets'
+import { ETH, GWEI, populateTxFully } from '../lib/helpers'
+import { PROVIDER } from '../lib/providers'
+import { getTestWallet } from '../lib/wallets'
 
 // TODO: write all args helpers like this
 const getArgs = () => {
@@ -45,8 +47,9 @@ async function main() {
     const options = {
         from: wallet.address,
         gasLimit: 55000,
-        baseFee: GWEI.mul(42),
-        priorityFee: GWEI.mul(3),
+        maxFeePerGas: GWEI.mul(42),
+        maxPriorityFeePerGas: GWEI.mul(3),
+        chainId: env.CHAIN_ID,
     }
     const depositTx = populateTxFully(await weth?.populateTransaction.deposit({value: ETH.div(100)}), nonce, options)
     const transferTx = populateTxFully(await weth?.populateTransaction.deposit({value: ETH.div(100)}), nonce + 1, options)

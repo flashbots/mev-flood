@@ -1,7 +1,8 @@
 import { Wallet, utils } from "ethers"
 import contracts from '../lib/contracts'
 import env from '../lib/env'
-import { GWEI, PROVIDER } from '../lib/helpers'
+import { GWEI } from '../lib/helpers'
+import { PROVIDER } from '../lib/providers'
 
 async function main() {
     const testWallet = new Wallet(env.TEST_PRIVATE_KEY, PROVIDER)
