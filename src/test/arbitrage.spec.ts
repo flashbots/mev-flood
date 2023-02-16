@@ -12,12 +12,7 @@ describe("arbitrage", () => {
         swap0For1: boolean,
         amountIn: BigNumber,
     }
-    
-    const assetName = (swap_usdc_for_eth: boolean, labels: {x: string, y: string}) => {
-        // const assetNames = ["USD", "ETH"]
-        const assetNames = [labels.x, labels.y]
-        return assetNames[swap_usdc_for_eth ? 0 : 1]
-    }
+
     const labels = {x: "USD", y: "ETH"}
     const ETH = math.bignumber(1).mul(1e9).mul(1e9)
     const getK = (pairReserves: PairReserves): BigNumber => pairReserves.reserves0.mul(pairReserves.reserves1) as BigNumber
@@ -41,7 +36,7 @@ describe("arbitrage", () => {
         if (!backrunParams) {
             return undefined
         }
-        console.debug(`\nPROFIT\t\t${utils.formatEther(backrunParams.profit.toFixed(0))} ${assetName(!user_swap_usdc_for_eth, labels)}`)
+        console.debug(`\nPROFIT\t\t${utils.formatEther(backrunParams.profit.toFixed(0))} ${backrunParams.settlementToken === 0 ? labels.x : labels.y}`)
         return backrunParams
     }
 
@@ -80,7 +75,6 @@ describe("arbitrage", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        console.debug("profit", br?.profit.toFixed(0))
         assert(math.bignumber(br?.profit).gt(0))
     })
 
@@ -99,7 +93,6 @@ describe("arbitrage", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        console.debug("profit", utils.formatEther((br?.profit || 0).toFixed(0)))
         assert(math.bignumber(br?.profit).gt(0))
     })
 
@@ -118,7 +111,6 @@ describe("arbitrage", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        console.debug("profit", utils.formatEther((br?.profit || 0).toFixed(0)))
         assert(math.bignumber(br?.profit).gt(0))
     })
 
@@ -137,7 +129,6 @@ describe("arbitrage", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        console.debug("profit", utils.formatEther((br?.profit || 0).toFixed(0)))
         assert(math.bignumber(br?.profit).gt(0))
     })
 
@@ -156,11 +147,6 @@ describe("arbitrage", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        console.debug("profit", utils.formatEther((br?.profit || 0).toFixed(0)))
         assert(math.bignumber(br?.profit).gt(0))
     })
-
-    // test
-    // simulateSwap(reserves0, reserves1, k, math.bignumber(10000).mul(ETH), true, labels)
-    // simulateSwap(reserves0, reserves1, k, math.bignumber(5).mul(ETH), false, labels)
 })
