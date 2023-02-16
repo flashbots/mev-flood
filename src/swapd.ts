@@ -301,7 +301,6 @@ async function main() {
                         numify(kB),
                         numify(decodedTxData[1]),
                         userSwap.path[0].toLowerCase() === token0.toLowerCase(),
-                        wethIndex,
                         userSwap.factory.toLowerCase() === uniFactoryA.address.toLowerCase() ? "A" : "B"
                     )
                     if (!backrunParams) {

@@ -126,9 +126,8 @@ Assumes user is trading on exchange A.
  * @param kB: Product constant of pair on exchange B.
  * @param userAmountIn: Amount of tokens the user sends for their swap.
  * @param userSwap0For1: Determines trade direction.
- * @param wethIndex: index of weth. Prices are calculated in terms of TOKEN/WETH.
  * @param userExchange: Identifier of exchange that the user trades on; matches to param `reserves(A|B)_N`.
- * @returns profit is always denoted in terms of ETH
+ * @returns profit is always denoted in terms of settlementToken (in return object).
  */
 export const calculateBackrunParams = (
     reservesA_0: BigNumber,
@@ -139,7 +138,6 @@ export const calculateBackrunParams = (
     kB: BigNumber,
     userAmountIn: BigNumber,
     userSwap0For1: boolean,
-    wethIndex: 0 | 1,
     userExchange: "A" | "B"
 ): {profit: BigNumber, settlementToken: 0 | 1, backrunAmount: BigNumber, userReserves: Pool, otherReserves: Pool} | undefined => {
     const otherExchange = userExchange === "A" ? "B" : "A"
@@ -230,7 +228,7 @@ export const calculateBackrunParams = (
         return undefined
     }
 
-    // "execute backrun" swap; opposite direction of user trade on same exchange
+    // simulate backrun swap
     userReserves = getUserExchangeReserves()
     const backrunBuy = calculatePostTradeReserves(userReserves.reserves0, userReserves.reserves1, userReserves.k, backrunAmount, settlementToken === 0)
 
