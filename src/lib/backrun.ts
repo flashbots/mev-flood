@@ -116,17 +116,17 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
                 return
             }
             const settlesInWeth = backrunParams.settlementToken === wethIndex
-            console.debug("estimated proceeds", `${utils.formatEther(backrunParams.profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
+            
             // TODO: check profit against min/max profit flags b4 executing
             // TODO: calculate gas cost dynamically (accurately)
-            const gasCost = math.bignumber(100000).mul(1e9).mul(20)
+            const gasCost = math.bignumber(100000).mul(1e9).mul(40)
             // normalize profit to ETH
             const reserves0 = backrunParams.otherReserves.reserves0
             const reserves1 = backrunParams.otherReserves.reserves1
-            const price = settlesInWeth ? 1 : wethIndex === 0 ? reserves1.div(reserves0) : reserves0.div(reserves1)
+            const price = wethIndex === 0 ? reserves1.div(reserves0) : reserves0.div(reserves1)
             const profit = settlesInWeth ? backrunParams.profit : backrunParams.profit.div(price)
             if (profit.gt(gasCost)) {
-                console.log("BACKRUN")
+                console.debug(`BACKRUN. estimated proceeds: ${utils.formatEther(profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
                 const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
                 const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
                 const startFactory = userSwap.factory
@@ -135,8 +135,8 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
                 const pairEnd: string = startFactory === deployment.uniV2FactoryA.contractAddress ? pairB.address : pairA.address
                 const amountIn = BigNumber.from(backrunParams.backrunAmount.toFixed(0))
 
-                console.log("tokenArb", findTokenName(tokenArb, deployment), tokenArb)
-                console.log("tokenSettle", findTokenName(tokenSettle, deployment), tokenSettle)
+                console.log("tokenArb", findTokenName(tokenArb, deployment))
+                console.log("tokenSettle", findTokenName(tokenSettle, deployment))
 
                 const arbRequest = await deployedContracts.atomicSwap.populateTransaction.arb(
                     tokenArb,
