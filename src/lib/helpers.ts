@@ -103,3 +103,11 @@ export const textColors = {
         chainId: overrides?.chainId
     }
 }
+
+/**
+ * Extracts 4-byte function signature from calldata.
+ * @param calldata raw calldata (`tx.data`) from tx.
+ */
+export const extract4Byte = (calldata: string) => {
+    return calldata.substring(2, 10)
+}
