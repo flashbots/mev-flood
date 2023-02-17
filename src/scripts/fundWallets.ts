@@ -11,8 +11,8 @@ async function main() {
     console.log("admin wallet", adminWallet.address)
 
     const mevFlood = new MevFlood(adminWallet, PROVIDER)
-    const fundedWallets = await mevFlood.fundWallets(minionWallets.map(wallet => wallet.address), 50)
-    console.log(`Sent txs (${fundedWallets.length})`)
+    await mevFlood.fundWallets(minionWallets.map(wallet => wallet.address), 50)
+    console.log("Sent txs")
 }
 
 main().then(() => {

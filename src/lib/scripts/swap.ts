@@ -28,4 +28,5 @@ export const sendSwaps = async (options: SwapParams, provider: providers.JsonRpc
     const swapPromises = signedSwaps.map(tx => provider.sendTransaction(tx))
     const swapResults = await Promise.all(swapPromises)
     console.log(`swapped with ${swapResults.length} wallets`)
+    return {swapResults, signedSwaps}
 }

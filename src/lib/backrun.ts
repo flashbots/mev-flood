@@ -148,12 +148,13 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
                     amountIn
                 )
                 const signedArb = wallet.signTransaction(populateTxFully(arbRequest, await provider.getTransactionCount(wallet.address), {from: wallet.address, chainId: provider.network.chainId}))
+                let arbSendResult
                 try {
-                    const res = await provider.sendTransaction(await signedArb)
+                    arbSendResult = await provider.sendTransaction(await signedArb)
                     const daiAddress = wethIndex === 0 ? token1 : token0
                     const daiIdx = deployedContracts.dai.map(c => c.address.toLowerCase()).indexOf(daiAddress.toLowerCase())
                     const daiContract = deployedContracts.dai[daiIdx]
-                    if ((await res.wait()).confirmations > 0){
+                    if ((await arbSendResult.wait()).confirmations > 0){
                         console.log("ARB LANDED")
                     }
                     const userBalances = {
@@ -177,6 +178,11 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
                     } else {
                         console.error(e)
                     }
+                }
+                return {
+                    arbRequest,
+                    signedArb,
+                    arbSendResult,
                 }
             }
         }

@@ -70,7 +70,7 @@ export class LiquidDeployment implements ILiquidDeployment {
      * Overwrite only the defined params.
      * @param deployment Deployment interface; undefined entries make no changes.
      */
-    public update(deployment: ILiquidDeploymentOptional) {
+    public update(deployment: ILiquidDeploymentOptional, allSignedTxs?: string[]) {
         // this.atomicSwap = deployment.atomicSwap || this.atomicSwap
         this.dai = deployment.dai || this.dai
         this.weth = deployment.weth || this.weth
@@ -79,6 +79,7 @@ export class LiquidDeployment implements ILiquidDeployment {
         this.atomicSwap = deployment.atomicSwap || this.atomicSwap
         this.daiWethA = deployment.daiWethA || this.daiWethA
         this.daiWethB = deployment.daiWethB || this.daiWethB
+        this.signedTxs = allSignedTxs
     }
 
     public getDeployedContracts(provider?: providers.JsonRpcProvider) {

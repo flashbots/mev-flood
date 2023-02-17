@@ -1,5 +1,8 @@
 import { Contract } from 'ethers'
-import env from "./env"
+
+const env = {
+  CHAIN_ID: process.env.CHAIN_ID ? process.env.CHAIN_ID : 31337,
+}
 
 export const getContract = (contract: {address: string, abi: any}) => {
   if (!contract.address || !contract.abi) {

@@ -451,11 +451,9 @@ const liquid = async (params: LiquidParams, provider: providers.JsonRpcProvider,
     // concat mints, deposits to contract deployments
     const deploymentsSignedTxs = deployment.getDeploymentTransactions()
     const allSignedTxs = deploymentsSignedTxs.concat(signedTxs)
+    deployment.update({}, allSignedTxs)
 
-    return {
-        allSignedTxs,
-        deployment,
-    }
+    return deployment
 }
 
 
