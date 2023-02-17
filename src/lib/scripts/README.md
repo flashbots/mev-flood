@@ -1,3 +1,5 @@
 # lib/scripts
 
-This directory is intended to contain the core code of the scripts in `src/scripts` so that the code can be run as a script (i.e. via `yarn <script>`) or re-used in external codebases.
+[This directory](./) is intended to contain the core logic of the scripts which can be run via yarn or re-used in external codebases.
+
+The files in the [parent directory](../) contain code that is used by these functions and elsewhere in the codebase.

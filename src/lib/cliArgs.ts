@@ -1,8 +1,13 @@
 import { textColors, } from './helpers'
 
-export const getOption = (args: string[], flagIndex: number) => {
-    if (args.length > flagIndex + 1) {
-        return parseInt(args[flagIndex + 1])
+export const getOption = (args: string[], flagIndex: number, argType?: "string" | "number" | "boolean") => {
+    if (args.length > flagIndex + 1 || argType === "boolean") {
+        if (!argType || argType === "number") // number is default
+            return parseInt(args[flagIndex + 1])
+        else if (argType === "boolean")
+            return true
+        else if (argType === "string")
+            return args[flagIndex + 1]
     } else {
         throw new Error(`option '${args[flagIndex]}' was not specified`)
     }
@@ -234,7 +239,7 @@ Example:
             shouldApproveTokens = false
         }
         if (args.includes("--num-pairs") || args.includes("-p")) {
-            numPairs = getOption(args, getFlagIndex(args, "--num-pairs", "-p"))
+            numPairs = getOption(args, getFlagIndex(args, "--num-pairs", "-p"), "number") as number
         }
         if (args.includes("-y")) {
             autoAccept = true
@@ -266,16 +271,33 @@ ${examples}
 `
 
 export const getSwapdArgs = () => {
-    const numSwapsFlag = `--num-swaps`
-    const numPairsFlag = `--num-pairs`
+    const minUsdFlag = "--min-usd"
+    const minUsdShort = "-m"
+    const maxUsdFlag = "--max-usd"
+    const maxUsdShort = "-M"
+    const numSwapsFlag = "--num-swaps"
+    const numSwapsShort = "-n"
+    const numPairsFlag = "--num-pairs"
+    const numPairsShort = "-p"
+    const exchangeFlag = "--exchange"
+    const exchangeShort = "-e"
+    const daiIndexFlag = "--dai-number"
+    const daiIndexShort = "-d"
+    const swapWethForDaiFlag = "--buy-dai"
+    const swapWethForDaiShort = "-b"
 
     const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)"
     const usage = `\
     yarn swapd <first_wallet_index> [last_wallet_index] [OPTIONS...]
 `
     const options = `\
-    -n  ${numSwapsFlag}\t\tNumber of swaps to execute per wallet.
-    -p  ${numPairsFlag}\t\tNumber of pairs to choose from; one is selected randomly.
+    ${minUsdShort}\t${minUsdFlag}\t\tMinimum amount to spend (USD value in either asset).
+    ${maxUsdShort}\t${maxUsdFlag}\t\tMaximum amount to spend (USD value in either asset).
+    ${numSwapsShort}\t${numSwapsFlag}\t\tNumber of swaps to execute per wallet.
+    ${numPairsShort}\t${numPairsFlag}\t\tNumber of pairs to choose from; one is selected randomly.
+    ${exchangeShort}\t${exchangeFlag}\t\tExchange to swap on ("A" or "B").
+    ${daiIndexShort}\t${daiIndexFlag}\t\tIndex of deployed DAI token to trade with.
+    ${swapWethForDaiShort}\t${swapWethForDaiFlag}\t\tSwaps WETH for DAI if set.
 `
     const examples = `\
     # run with a single wallet
@@ -285,10 +307,16 @@ export const getSwapdArgs = () => {
     yarn swapd 0 25
 
     # run with 10 wallets, each sending 5 swaps per block
-    yarn swapd 10 21 -n 5
+    yarn swapd 10 21 ${numSwapsShort} 5
 
     # do the same with 5 trading pairs to choose from
-    yarn swapd 10 21 -n 5 -p 5
+    yarn swapd 10 21 ${numSwapsShort} 5 ${numPairsFlag} 5
+
+    # swap with dai token 2 on exchange A
+    yarn swapd 13 ${exchangeShort} A -d 2
+
+    # swap up to $5000 worth of ETH into DAI
+    yarn swapd 13 ${maxUsdShort} 5000 ${swapWethForDaiFlag}
 `
     const helpMessage = genHelpMessage(description, usage, options, examples)
     // TODO: replace these horrible arg parsers
@@ -296,22 +324,46 @@ export const getSwapdArgs = () => {
     const args = process.argv.slice(2)
     let numSwaps = 1
     let numPairs = 1
-    let minProfit = 100
-    let maxProfit = 0 // 0 is interpreted as unlimited
+    let minUsd = 100
+    let maxUsd = 0 // 0 is interpreted as unlimited
+    let exchange = "A"
+    let daiIndex = 0
+    let swapWethForDai = true
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
             console.log(helpMessage)
             process.exit(0)
         } else {
-            if (args.includes(numSwapsFlag) || args.includes("-n")) {
+            if (args.includes(numSwapsFlag) || args.includes(numSwapsShort)) {
                 const flagIndex = getFlagIndex(args, numSwapsFlag)
-                numSwaps = getOption(args, flagIndex)
+                numSwaps = getOption(args, flagIndex) as number
             }
-            if (args.includes(numPairsFlag) || args.includes("-p")) {
-                const flagIndex = getFlagIndex(args, numPairsFlag, "-p")
-                numPairs = Math.max(getOption(args, flagIndex), numPairs)
+            if (args.includes(numPairsFlag) || args.includes(numPairsShort)) {
+                const flagIndex = getFlagIndex(args, numPairsFlag, numPairsShort)
+                numPairs = Math.max(getOption(args, flagIndex) as number, numPairs)
             }
+            if (args.includes(minUsdFlag) || args.includes(minUsdShort)) {
+                const flagIndex = getFlagIndex(args, minUsdFlag, minUsdShort)
+                minUsd = getOption(args, flagIndex) as number
+            }
+            if (args.includes(maxUsdFlag) || args.includes(maxUsdShort)) {
+                const flagIndex = getFlagIndex(args, maxUsdFlag, maxUsdShort)
+                maxUsd = getOption(args, flagIndex) as number
+            }
+            if (args.includes(exchangeFlag) || args.includes(exchangeShort)) {
+                const flagIndex = getFlagIndex(args, exchangeFlag, exchangeShort)
+                exchange = getOption(args, flagIndex, "string") as string
+            }
+            if (args.includes(daiIndexFlag) || args.includes(daiIndexShort)) {
+                const flagIndex = getFlagIndex(args, daiIndexFlag, daiIndexShort)
+                daiIndex = getOption(args, flagIndex, "number") as number
+            }
+            if (args.includes(swapWethForDaiFlag) || args.includes(swapWethForDaiShort)) {
+                const flagIndex = getFlagIndex(args, swapWethForDaiFlag, swapWethForDaiShort)
+                swapWethForDai = getOption(args, flagIndex, "boolean") as boolean
+            }
+
         }
     } else {
         console.error("one or two wallet indices are required")
@@ -325,8 +377,11 @@ export const getSwapdArgs = () => {
         endIdx: (!endIdx || endIdx[0] == '-') ? parseInt(startIdx) + 1 : parseInt(endIdx),
         numSwaps,
         numPairs,
-        minProfit,
-        maxProfit,
+        minUsd,
+        maxUsd,
+        exchange,
+        daiIndex,
+        swapWethForDai,
     }
 }
 
@@ -365,11 +420,11 @@ export const getArbdArgs = () => {
         } else {
             if (args.includes(minProfitFlag) || args.includes("-m")) {
                 const flagIndex = getFlagIndex(args, minProfitFlag, "-m")
-                minProfit = getOption(args, flagIndex)
+                minProfit = getOption(args, flagIndex) as number
             }
             if (args.includes(maxProfitFlag) || args.includes("-M")) {
                 const flagIndex = getFlagIndex(args, maxProfitFlag, "-M")
-                maxProfit = getOption(args, flagIndex)
+                maxProfit = getOption(args, flagIndex) as number
             }
         }
     } else {

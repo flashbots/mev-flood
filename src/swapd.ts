@@ -7,7 +7,7 @@ import { getAdminWallet, getWalletSet } from './lib/wallets'
 
 async function main() {
     // get cli args
-    const {startIdx, endIdx, numSwaps, numPairs} = getSwapdArgs()
+    const {startIdx, endIdx, numSwaps, numPairs, minUsd, maxUsd, daiIndex, swapWethForDai, exchange} = getSwapdArgs()
     // TODO: impl numPairs!
     // TODO: impl numSwaps!
 
@@ -30,7 +30,14 @@ async function main() {
         console.log(`[BLOCK ${blockNum}]`)
         // send random swaps
         try {
-            await sendSwaps({}, PROVIDER, walletSet, deployment)
+            await sendSwaps({
+                minUSD: minUsd,
+                maxUSD: maxUsd,
+                swapOnA: exchange !== undefined ? exchange === "A" : undefined,
+                swapWethForDai,
+                daiIndex,
+            },
+                PROVIDER, walletSet, deployment)
         } catch (_) {/* ignore errors, just spam it */}
     })
 }

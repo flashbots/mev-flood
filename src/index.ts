@@ -6,7 +6,8 @@ import { handleBackrun } from './lib/backrun'
 // lib
 import { textColors } from './lib/helpers'
 import { ILiquidDeployment, LiquidDeployment, loadDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
-import scripts, { LiquidParams, SwapParams } from './lib/scripts'
+import scripts, { LiquidParams } from './lib/scripts'
+import { SwapOptions } from './lib/swap'
 
 class MevFlood {
     private adminWallet: Wallet
@@ -83,7 +84,7 @@ class MevFlood {
      * @param fromWallets Array of wallets that will send the swaps.
      * @param deployment LiquidDeployment object containing contract information. See `MevFlood.loadDeployment` and `MevFlood.saveDeployment`.
      */
-    async sendSwaps(swapParams: SwapParams, fromWallets: Wallet[]) {
+    async sendSwaps(swapParams: SwapOptions, fromWallets: Wallet[]) {
         if (this.deployment)
             return await scripts.sendSwaps(swapParams, this.provider, fromWallets, this.deployment)
         else {
