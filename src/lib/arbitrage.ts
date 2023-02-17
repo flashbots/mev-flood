@@ -74,7 +74,7 @@ const calculateOptimalArbAmountIn = (
 }
 
 // /**
-//  * Convenience log
+//  * Convenience log for debuggin
 //  */
 // const logPrice = (label: string, reserves: {reserves0: BigNumber, reserves1: BigNumber}) => {
 //     // assume the one with less in it is the base currency
@@ -199,7 +199,7 @@ export const calculateBackrunParams = (
         userReserves.reserves0, userReserves.reserves1, otherReserves.reserves0, otherReserves.reserves1, not(settlementToken)
     )
     if (backrunAmount.lte(0)) {
-        console.log("SWITCHING DIRECTION")
+        console.log("SWITCHING TRADE DIRECTION")
         // better arb the other way, so we'll settle in the other token
         settlementToken = not(settlementToken)
         backrunAmount = calculateOptimalArbAmountIn(

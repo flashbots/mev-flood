@@ -28,7 +28,6 @@ async function main() {
 
     PROVIDER.on('block', async blockNum => {
         console.log(`[BLOCK ${blockNum}]`)
-        // send random swaps
         try {
             await sendSwaps({
                 minUSD: minUsd,

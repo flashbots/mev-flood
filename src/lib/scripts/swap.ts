@@ -1,4 +1,5 @@
 import { Contract, providers, Wallet } from 'ethers'
+import { formatEther } from 'ethers/lib/utils'
 import contracts from '../contracts'
 import { LiquidDeployment } from '../liquid'
 import { createRandomSwap, signSwap, SwapOptions } from '../swap'
@@ -15,6 +16,8 @@ export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRp
             deployments.weth.contractAddress, 
             options
         )
+        const wethForDai = swap.path[0].toLowerCase() === contracts.WETH.address.toLowerCase()
+        console.log(`swapping ${formatEther(swap.amountIn)} ${wethForDai ? "WETH" : "DAI"} for ${wethForDai ? "DAI" : "WETH"}`)
         const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, nonce, provider.network.chainId)
         signedSwaps.push(signedSwap)
     }

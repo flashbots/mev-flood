@@ -285,7 +285,7 @@ export const getSwapdArgs = () => {
     const daiIndexShort = "-d"
     const swapWethForDaiFlag = "--buy-dai"
     const swapWethForDaiShort = "-b"
-    const swapDaiForWethFlag = "--buy-weth"
+    const swapDaiForWethFlag = "--buy-eth"
     const swapDaiForWethShort = "-s"
 
     const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)"
