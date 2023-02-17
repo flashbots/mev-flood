@@ -62,6 +62,10 @@ export class LiquidDeployment implements ILiquidDeployment {
         this.signedTxs = allSignedTxs
     }
 
+    public inner() {
+        return this as ILiquidDeployment
+    }
+
     /**
      * Overwrite only the defined params.
      * @param deployment Deployment interface; undefined entries make no changes.

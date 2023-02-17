@@ -309,7 +309,7 @@ export const getSwapdArgs = () => {
                 numSwaps = getOption(args, flagIndex)
             }
             if (args.includes(numPairsFlag) || args.includes("-p")) {
-                const flagIndex = getFlagIndex(args, "--num-pairs", "-p")
+                const flagIndex = getFlagIndex(args, numPairsFlag, "-p")
                 numPairs = Math.max(getOption(args, flagIndex), numPairs)
             }
         }
@@ -320,12 +320,9 @@ export const getSwapdArgs = () => {
     }
     
     let [startIdx, endIdx] = args
-    if (!endIdx || endIdx[0] == '-') {
-        endIdx = `${parseInt(startIdx) + 1}`
-    }
     return {
-        startIdx,
-        endIdx,
+        startIdx: parseInt(startIdx),
+        endIdx: (!endIdx || endIdx[0] == '-') ? parseInt(startIdx) + 1 : parseInt(endIdx),
         numSwaps,
         numPairs,
         minProfit,
@@ -333,6 +330,7 @@ export const getSwapdArgs = () => {
     }
 }
 
+// TODO: specify deployment via cli params
 export const getArbdArgs = () => {
     const description = "Monitor mempool for arbitrage opportunities, backrun user when profit detected."
     const minProfitFlag = "--min-profit"
@@ -379,7 +377,8 @@ export const getArbdArgs = () => {
         console.log(helpMessage)
         process.exit(1)
     }
-    let walletIdx = args[0]
+    console.log(args)
+    let walletIdx = parseInt(args[0])
     return {
         walletIdx,
         minProfit,

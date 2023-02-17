@@ -12,7 +12,7 @@ export type SwapParams = {
 export const sendSwaps = async (options: SwapParams, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployments: LiquidDeployment) => {
     let signedSwaps = []
     for (const wallet of userWallets) {
-        const nonce = wallet.connect(provider).getTransactionCount()
+        const nonce = await wallet.connect(provider).getTransactionCount()
         const atomicSwapContract = new Contract(deployments.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
         const swap = createRandomSwap(
             deployments.uniV2FactoryA.contractAddress, 
@@ -22,7 +22,7 @@ export const sendSwaps = async (options: SwapParams, provider: providers.JsonRpc
             options.minUSD, 
             options.maxUSD
         )
-        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, await nonce, provider.network.chainId)
+        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, nonce, provider.network.chainId)
         signedSwaps.push(signedSwap)
     }
     const swapPromises = signedSwaps.map(tx => provider.sendTransaction(tx))

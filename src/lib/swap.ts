@@ -44,18 +44,18 @@ export const approveIfNeeded = async (
     provider: providers.JsonRpcProvider,
     walletSet: Wallet[],
     contracts: {
-        atomicSwapContract: Contract,
-        wethContract: Contract,
-        daiContracts: Contract[],
+        atomicSwap: Contract,
+        weth: Contract,
+        dai: Contract[],
     }) => {
     let signedApprovals: string[] = []
     const chainId = provider.network.chainId
     for (const wallet of walletSet) {
         let nonce = await provider.getTransactionCount(wallet.address)
-        const allowanceWeth: BigNumber = await contracts.wethContract.callStatic.allowance(wallet.address, contracts.atomicSwapContract.address)
+        const allowanceWeth: BigNumber = await contracts.weth.callStatic.allowance(wallet.address, contracts.atomicSwap.address)
         if (allowanceWeth.lte(ETH.mul(50))) {
             const approveTx = populateTxFully(
-                await contracts.wethContract.populateTransaction.approve(contracts.atomicSwapContract.address, MAX_U256), 
+                await contracts.weth.populateTransaction.approve(contracts.atomicSwap.address, MAX_U256), 
                 nonce, 
                 {
                     from: wallet.address,
@@ -66,11 +66,11 @@ export const approveIfNeeded = async (
                 signedApprovals.push(signedTx)
                 nonce += 1
         }
-        for (const daiContract of contracts.daiContracts) {
-            const allowanceDai: BigNumber = await daiContract.callStatic.allowance(wallet.address, contracts.atomicSwapContract.address)
+        for (const daiContract of contracts.dai) {
+            const allowanceDai: BigNumber = await daiContract.callStatic.allowance(wallet.address, contracts.atomicSwap.address)
             if (allowanceDai.lte(ETH.mul(100000))) {
                 const approveTx = populateTxFully(
-                    await daiContract.populateTransaction.approve(contracts.atomicSwapContract.address, MAX_U256),
+                    await daiContract.populateTransaction.approve(contracts.atomicSwap.address, MAX_U256),
                     nonce, 
                     {
                         from: wallet.address,
@@ -101,16 +101,16 @@ export const approveIfNeeded = async (
     }
 }
 
-export const mintIfNeeded = async (provider: providers.JsonRpcProvider, adminWallet: Wallet, adminNonce: number, walletSet: Wallet[], wethContract: Contract, daiContracts: Contract[]) => {
+export const mintIfNeeded = async (provider: providers.JsonRpcProvider, adminWallet: Wallet, adminNonce: number, walletSet: Wallet[], contracts: {weth: Contract, dai: Contract[]}) => {
     let signedDeposits = []
     let signedMints = []
 
     for (const wallet of walletSet) {
-        let wethBalance: BigNumber = await wethContract.callStatic.balanceOf(wallet.address)
+        let wethBalance: BigNumber = await contracts.weth.callStatic.balanceOf(wallet.address)
         if (wethBalance.lte(ETH.mul(20))) {
             let nonce = await wallet.connect(provider).getTransactionCount()
             // mint 20 WETH
-            const tx = populateTxFully(await wethContract.populateTransaction.deposit({value: ETH.mul(20)}), nonce, {
+            const tx = populateTxFully(await contracts.weth.populateTransaction.deposit({value: ETH.mul(20)}), nonce, {
                 gasLimit: 50000,
                 from: wallet.address,
                 chainId: provider.network.chainId,
@@ -119,11 +119,11 @@ export const mintIfNeeded = async (provider: providers.JsonRpcProvider, adminWal
             signedDeposits.push(signedDeposit)
         }
 
-        for (const dai of daiContracts) {
-            let daiBalance: BigNumber = await dai.callStatic.balanceOf(wallet.address)
+        for (const d of contracts.dai) {
+            let daiBalance: BigNumber = await d.callStatic.balanceOf(wallet.address)
             if (daiBalance.lte(ETH.mul(50000))) {
                 // mint 50k DAI to wallet from admin account (DAI deployer)
-                const mintTx = await adminWallet.signTransaction(populateTxFully(await dai.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce++, {
+                const mintTx = await adminWallet.signTransaction(populateTxFully(await d.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce++, {
                     gasLimit: 60000,
                     from: adminWallet.address,
                     chainId: provider.network.chainId

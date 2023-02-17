@@ -1,17 +1,17 @@
-import { getSwapdArgs } from './lib/cliArgs'
+import { handleBackrun } from './lib/backrun'
+import { getArbdArgs } from './lib/cliArgs'
 import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
-import { sendSwaps } from './lib/scripts/swap'
 import { approveIfNeeded, mintIfNeeded } from './lib/swap'
 import { getAdminWallet, getWalletSet } from './lib/wallets'
 
 async function main() {
     // get cli args
-    const {startIdx, endIdx, numSwaps, numPairs} = getSwapdArgs()
-    // TODO: impl numPairs!
-    // TODO: impl numSwaps!
+    const {walletIdx, minProfit, maxProfit} = getArbdArgs()
+    // TODO: impl minProfit!
+    // TODO: impl maxProfit!
 
-    const walletSet = getWalletSet(startIdx, endIdx)
+    const walletSet = getWalletSet(walletIdx, walletIdx + 1)
     const deployment = await loadDeployment({})
     const contracts = deployment.getDeployedContracts(PROVIDER)
 
@@ -26,12 +26,10 @@ async function main() {
     // check atomicSwap allowance for each wallet, approve max_uint if needed
     await approveIfNeeded(PROVIDER, walletSet, contracts)
 
-    PROVIDER.on('block', async blockNum => {
-        console.log(`[BLOCK ${blockNum}]`)
-        // send random swaps
-        try {
-            await sendSwaps({}, PROVIDER, walletSet, deployment)
-        } catch (_) {/* ignore errors, just spam it */}
+    PROVIDER.on('pending', async (pendingTx: any) => {
+        for (const wallet of walletSet) {
+            await handleBackrun(PROVIDER, deployment, wallet, pendingTx)
+        }
     })
 }
 
