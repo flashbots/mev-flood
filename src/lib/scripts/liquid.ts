@@ -12,7 +12,7 @@ import { formatEther } from 'ethers/lib/utils'
 // lib
 import contracts, { ContractSpec } from "../contracts"
 import { ETH, populateTxFully, randInRange } from '../helpers'
-import { ContractDeployment, LiquidDeployment, getDeployment, getLiquidDeploymentTransactions } from '../liquid'
+import { ContractDeployment, LiquidDeployment, loadDeployment, ILiquidDeployment } from '../liquid'
 import { signSwap } from '../swap'
 
 export interface LiquidParams {
@@ -137,16 +137,16 @@ const liquid = async (params: LiquidParams, provider: providers.JsonRpcProvider,
         atomicSwapAddress = atomicSwap.contractAddress
         console.log("deploying base contracts: DAI, WETH, uniswapV2factory...")
 
-        deployment = {
+        deployment = new LiquidDeployment({
             dai: daiDeployments,    // erc20
             weth,                   // erc20
             uniV2FactoryA,          // univ2 factory (creates univ2 pairs)
             uniV2FactoryB,          // univ2 factory (creates univ2 pairs)
             atomicSwap,             // custom router
-        }
+        })
 
         // deploy contracts we have so far
-        let signedDeployments = getLiquidDeploymentTransactions(deployment)
+        let signedDeployments = deployment.getDeploymentTransactions()
         const deployPromises = signedDeployments.map(tx => provider.sendTransaction(tx))
         const deployResults = await Promise.all(deployPromises)
         await Promise.all(deployResults.map(r => r.wait()))
@@ -177,12 +177,9 @@ const liquid = async (params: LiquidParams, provider: providers.JsonRpcProvider,
             daiWethA: daiWethDeploymentsA,
             daiWethB: daiWethDeploymentsB,
         }
-        deployment = {
-            ...deployment,
-            ...appendix,
-        }
+        deployment.update(appendix)
     } else { // read contracts from disk
-        deployment = (deploymentFile instanceof String) ? (await getDeployment({filename: deploymentFile as string})).deployment : deploymentFile as LiquidDeployment
+        deployment = (deploymentFile instanceof String) ? await loadDeployment({filename: deploymentFile as string}) : deploymentFile as LiquidDeployment
         daiAddrs = deployment.dai.map(d => d.contractAddress)
         wethAddress = deployment.weth.contractAddress
         daiWethAddrsA = deployment.daiWethA?.map(d => d.contractAddress) || []
@@ -360,7 +357,7 @@ const liquid = async (params: LiquidParams, provider: providers.JsonRpcProvider,
         const pairContracts = [...daiWethPairContractsA, ...daiWethPairContractsB]
         for (const pairContract of pairContracts) {
             let token0 = await pairContract.callStatic.token0()
-            let daiAddr = token0.toLowerCase() === deployment?.weth.contractAddress.toLowerCase() ? await pairContract.callStatic.token1() : token0
+            let daiAddr = token0.toLowerCase() === deployment.weth.contractAddress.toLowerCase() ? await pairContract.callStatic.token1() : token0
             const daiContract = new Contract(daiAddr, contracts.DAI.abi)
 
             let signedTx = await adminWallet.signTransaction( // deposit WETH into pair
@@ -451,8 +448,8 @@ const liquid = async (params: LiquidParams, provider: providers.JsonRpcProvider,
     const endBalance = await adminWallet.connect(provider).getBalance()
     console.log(`balance: ${utils.formatEther(endBalance)} ETH (spent ${utils.formatEther(startBalance.sub(endBalance))})`)
 
-    const deploymentsSignedTxs = deployment ? getLiquidDeploymentTransactions(deployment) : []
-    // concat mints, deposits & contract deployments
+    // concat mints, deposits to contract deployments
+    const deploymentsSignedTxs = deployment.getDeploymentTransactions()
     const allSignedTxs = deploymentsSignedTxs.concat(signedTxs)
 
     return {

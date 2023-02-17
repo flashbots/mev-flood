@@ -250,85 +250,72 @@ Example:
         numPairs,
     }
 }
-
-export const getSwapdArgs = () => {
-    // TODO: remove this. good lord.
-    const modes = {
-        swapd: "swapd",
-        arbd: "arbd",
-    }
-    const program = process.env.MODE
-    if (!program || !Object.keys(modes).includes(program)) {
-        console.error("environment variable MODE=<'swapd' || 'arbd'> is required")
-    }
-    const noun = program == modes.swapd ? "swap" : "arb"
-    const xPerBlockFlag = `--${noun}s-per-block`
-    const options = program == modes.swapd ? `` : 
-    // arbd
-    `${textColors.Bright}-m, --min-profit${textColors.Reset}\t\tMinimum profit an arbitrage should achieve, in gwei. (default=100)
-    ${textColors.Bright}-M, --max-profit${textColors.Reset}\t\tMaximum profit an arbitrage should achieve, in gwei. (default=inf)
-`
-
-    const helpMessage = () => `randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)
+//TODO: use a legit cli parser
+const genHelpMessage = (description: string, usage: string, options: string, examples: string) => `\
+${description}
 
 ${textColors.Underscore}Usage:${textColors.Reset}
-    yarn ${program} <first_wallet_index> [last_wallet_index] [OPTIONS...]
+${usage}
 
 ${textColors.Underscore}Options:${textColors.Reset}
     ${textColors.Bright}--help${textColors.Reset}\t\t\tPrint this help message.
-    ${textColors.Bright}-n, ${xPerBlockFlag}${textColors.Reset}\tNumber of ${noun}s each wallet will make in each block.
-    ${textColors.Bright}-p, --num-pairs${textColors.Reset}\t\tNumber of DAI_x/WETH pairs to trade with. Minimum is 2 for arbd.
-    ${options}
+${options}
 
 ${textColors.Underscore}Examples:${textColors.Reset}
+${examples}
+`
+
+export const getSwapdArgs = () => {
+    const numSwapsFlag = `--num-swaps`
+    const numPairsFlag = `--num-pairs`
+
+    const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)"
+    const usage = `\
+    yarn swapd <first_wallet_index> [last_wallet_index] [OPTIONS...]
+`
+    const options = `\
+    -n  ${numSwapsFlag}\t\tNumber of swaps to execute per wallet.
+    -p  ${numPairsFlag}\t\tNumber of pairs to choose from; one is selected randomly.
+`
+    const examples = `\
     # run with a single wallet
-    yarn ${program} 13
+    yarn swapd 13
 
     # run with 25 wallets
-    yarn ${program} 0 25
+    yarn swapd 0 25
 
-    # run with 10 wallets, each sending 5 ${noun}s per block
-    yarn ${program} 10 21 -n 5
+    # run with 10 wallets, each sending 5 swaps per block
+    yarn swapd 10 21 -n 5
 
     # do the same with 5 trading pairs to choose from
-    yarn ${program} 10 21 -n 5 -p 5
-
-    # include "help" anywhere in the command to print this message
-    yarn ${program} help
+    yarn swapd 10 21 -n 5 -p 5
 `
+    const helpMessage = genHelpMessage(description, usage, options, examples)
     // TODO: replace these horrible arg parsers
     
     const args = process.argv.slice(2)
-    let actionsPerBlock = 1
-    let numPairs = program === modes.arbd ? 2 : 1
+    let numSwaps = 1
+    let numPairs = 1
     let minProfit = 100
     let maxProfit = 0 // 0 is interpreted as unlimited
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
-            console.log(helpMessage())
+            console.log(helpMessage)
             process.exit(0)
         } else {
-            if (args.includes(xPerBlockFlag) || args.includes("-n")) {
-                const flagIndex = getFlagIndex(args, xPerBlockFlag)
-                actionsPerBlock = getOption(args, flagIndex)
+            if (args.includes(numSwapsFlag) || args.includes("-n")) {
+                const flagIndex = getFlagIndex(args, numSwapsFlag)
+                numSwaps = getOption(args, flagIndex)
             }
-            if (args.includes("--num-pairs") || args.includes("-p")) {
+            if (args.includes(numPairsFlag) || args.includes("-p")) {
                 const flagIndex = getFlagIndex(args, "--num-pairs", "-p")
                 numPairs = Math.max(getOption(args, flagIndex), numPairs)
-            }
-            if (args.includes("--min-profit") || args.includes("-m")) {
-                const flagIndex = getFlagIndex(args, "--min-profit", "-m")
-                minProfit = getOption(args, flagIndex)
-            }
-            if (args.includes("--max-profit") || args.includes("-m")) {
-                const flagIndex = getFlagIndex(args, "--max-profit", "-m")
-                maxProfit = getOption(args, flagIndex)
             }
         }
     } else {
         console.error("one or two wallet indices are required")
-        console.log(helpMessage())
+        console.log(helpMessage)
         process.exit(1)
     }
     
@@ -339,11 +326,63 @@ ${textColors.Underscore}Examples:${textColors.Reset}
     return {
         startIdx,
         endIdx,
-        actionsPerBlock,
+        numSwaps,
         numPairs,
         minProfit,
         maxProfit,
-        program,
-        modes,
+    }
+}
+
+export const getArbdArgs = () => {
+    const description = "Monitor mempool for arbitrage opportunities, backrun user when profit detected."
+    const minProfitFlag = "--min-profit"
+    const maxProfitFlag = "--max-profit"
+    const options = `\
+    -m, ${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in gwei. (default=100)
+    -M, ${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in gwei. (default=inf)
+`
+    const usage = `\
+    yarn swapd <first_wallet_index> [last_wallet_index] [OPTIONS...]
+`
+    const examples = `\
+    # run arb bot with wallet 13
+    yarn arbd 13
+
+    # run arb bot with minimum profit threshold of 0.2 ETH
+    yarn arbd -m 0.2
+
+    # run arb bot that only executes opportunities that profit between 1 - 10 ETH
+    yarn arbd -m 1 -M 10
+`
+    const helpMessage = genHelpMessage(description, usage, options, examples)
+
+    const args = process.argv.slice(2)
+    let minProfit = 100
+    let maxProfit = -1 // -1 is interpreted as unlimited
+
+    if (args.length > 0) {
+        if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
+            console.log(helpMessage)
+            process.exit(0)
+        } else {
+            if (args.includes(minProfitFlag) || args.includes("-m")) {
+                const flagIndex = getFlagIndex(args, minProfitFlag, "-m")
+                minProfit = getOption(args, flagIndex)
+            }
+            if (args.includes(maxProfitFlag) || args.includes("-M")) {
+                const flagIndex = getFlagIndex(args, maxProfitFlag, "-M")
+                maxProfit = getOption(args, flagIndex)
+            }
+        }
+    } else {
+        console.error("one or two wallet indices are required")
+        console.log(helpMessage)
+        process.exit(1)
+    }
+    let walletIdx = args[0]
+    return {
+        walletIdx,
+        minProfit,
+        maxProfit,
     }
 }

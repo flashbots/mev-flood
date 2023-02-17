@@ -4,7 +4,7 @@ import fs from "fs/promises"
 
 // lib
 import { textColors } from './lib/helpers'
-import { LiquidDeployment, getDeployment } from './lib/liquid'
+import { LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams, SwapParams } from './lib/scripts'
 
 class MevFlood {
@@ -63,7 +63,7 @@ class MevFlood {
      * @returns LiquidDeployment object.
      */
     static async loadDeployment(filename: string): Promise<LiquidDeployment> {
-        return (await getDeployment({filename})).deployment
+        return await loadDeploymentLib({filename})
     }
 
     /**
