@@ -9,7 +9,7 @@ export const createRandomSwap = (uniFactoryAddress_A: string, uniFactoryAddress_
     // pick random path
     const path = coinToss() ? [wethAddress, daiContractAddress] : [daiContractAddress, wethAddress]
     // pick random amountIn: [500..10000] USD
-    const amountInUSD = ETH.mul(randInRange(minUSD || 500, maxUSD || 10000))
+    const amountInUSD = ETH.mul(randInRange(minUSD || 100, maxUSD || 5000))
     // if weth out (path_0 == weth) then amount should be (1 ETH / 1300 DAI) * amountIn
     const amountIn = path[0] == wethAddress ? amountInUSD.div(1300) : amountInUSD
     const tokenInName = path[0] === wethAddress ? "WETH" : "DAI"
@@ -98,5 +98,55 @@ export const approveIfNeeded = async (
             await approvalResults[approvalResults.length - 1].wait(1) // wait for last tx to be included before proceeding
     } else {
         console.log("no approvals required")
+    }
+}
+
+export const mintIfNeeded = async (provider: providers.JsonRpcProvider, adminWallet: Wallet, adminNonce: number, walletSet: Wallet[], wethContract: Contract, daiContracts: Contract[]) => {
+    let signedDeposits = []
+    let signedMints = []
+
+    for (const wallet of walletSet) {
+        let wethBalance: BigNumber = await wethContract.callStatic.balanceOf(wallet.address)
+        if (wethBalance.lte(ETH.mul(20))) {
+            let nonce = await wallet.connect(provider).getTransactionCount()
+            // mint 20 WETH
+            const tx = populateTxFully(await wethContract.populateTransaction.deposit({value: ETH.mul(20)}), nonce, {
+                gasLimit: 50000,
+                from: wallet.address,
+                chainId: provider.network.chainId,
+            })
+            const signedDeposit = await wallet.signTransaction(tx)
+            signedDeposits.push(signedDeposit)
+        }
+
+        for (const dai of daiContracts) {
+            let daiBalance: BigNumber = await dai.callStatic.balanceOf(wallet.address)
+            if (daiBalance.lte(ETH.mul(50000))) {
+                // mint 50k DAI to wallet from admin account (DAI deployer)
+                const mintTx = await adminWallet.signTransaction(populateTxFully(await dai.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce++, {
+                    gasLimit: 60000,
+                    from: adminWallet.address,
+                    chainId: provider.network.chainId
+                }))
+                signedMints.push(mintTx)
+            }
+        }
+    }
+
+    const depositPromises = signedDeposits.map(tx => provider.sendTransaction(tx))
+    const mintPromises = signedMints.map(tx => provider.sendTransaction(tx))
+    if (depositPromises.length > 0) {
+        const depositResults = await Promise.all(depositPromises)
+        console.log(`deposited for ${depositResults.length} accounts`)
+        await depositResults[depositResults.length - 1].wait(1) // wait for last tx to be included before proceeding
+    } else {
+        console.log("no deposits required")
+    }
+    if (mintPromises.length > 0) {
+        const mintResults = await Promise.all(mintPromises)
+        console.log(`minted for ${mintResults.length} accounts`)
+        await mintResults[mintResults.length - 1].wait(1) // wait for last tx to be included before proceeding
+    } else {
+        console.log("no mints required")
     }
 }

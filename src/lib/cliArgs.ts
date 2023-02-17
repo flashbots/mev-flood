@@ -161,7 +161,7 @@ export const getDeployUniswapV2Args = () => {
     let shouldApproveTokens = true
     let shouldTestSwap = true
     let autoAccept = false
-    let numPairs = 2
+    let numPairs = 1
 
     const helpMessage = `
     ${textColors.Bright}script.liquid${textColors.Reset}: deploy a uniswap v2 environment w/ bootstrapped liquidity.
@@ -336,5 +336,14 @@ ${textColors.Underscore}Examples:${textColors.Reset}
     if (!endIdx || endIdx[0] == '-') {
         endIdx = `${parseInt(startIdx) + 1}`
     }
-    return {startIdx, endIdx, actionsPerBlock, numPairs, minProfit, maxProfit, program, modes}
+    return {
+        startIdx,
+        endIdx,
+        actionsPerBlock,
+        numPairs,
+        minProfit,
+        maxProfit,
+        program,
+        modes,
+    }
 }

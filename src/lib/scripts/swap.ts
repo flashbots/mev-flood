@@ -1,22 +1,23 @@
 import { Contract, providers, Wallet } from 'ethers'
 import contracts from '../contracts'
-import { Deployment } from '../liquid'
+import { LiquidDeployment } from '../liquid'
 import { createRandomSwap, signSwap } from '../swap'
 
 export type SwapParams = {
-    maxUSD: number,
-    minUSD: number,
+    maxUSD?: number,
+    minUSD?: number,
+    // TODO: add more
 }
 
-export const sendSwaps = async (options: SwapParams, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployments: Deployment) => {
+export const sendSwaps = async (options: SwapParams, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployments: LiquidDeployment) => {
     let signedSwaps = []
     for (const wallet of userWallets) {
         const nonce = wallet.connect(provider).getTransactionCount()
         const atomicSwapContract = new Contract(deployments.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
         const swap = createRandomSwap(
-            deployments.uniV2Factory_A.contractAddress, 
-            deployments.uniV2Factory_B.contractAddress, 
-            [deployments.dai.contractAddress], 
+            deployments.uniV2FactoryA.contractAddress, 
+            deployments.uniV2FactoryB.contractAddress, 
+            deployments.dai.map(c => c.contractAddress),
             deployments.weth.contractAddress, 
             options.minUSD, 
             options.maxUSD

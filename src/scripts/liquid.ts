@@ -35,7 +35,7 @@ const main = async () => {
     }
     const deploymentFile = await getExistingDeploymentFilename()
     const options: LiquidParams = args as LiquidParams
-    const {allSignedTxs, deployments} = await scripts.liquid(
+    const {allSignedTxs, deployment} = await scripts.liquid(
         options,
         PROVIDER,
         adminWallet,
@@ -43,9 +43,9 @@ const main = async () => {
         deploymentFile
     )
     
-    if (allSignedTxs.length > 0 && deployments) {
+    if (allSignedTxs.length > 0 && deployment) {
         const filename = args.shouldDeploy ? await getNewDeploymentFilename() : await getNewLiquidityFilename()
-        await MevFlood.saveDeployment(filename, deployments, allSignedTxs)
+        await MevFlood.saveDeployment(filename, deployment, allSignedTxs)
     }
 }
 

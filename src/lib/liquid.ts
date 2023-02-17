@@ -9,19 +9,32 @@ export type ContractDeployment = {
     signedDeployTx: string,
 }
 
-export type Deployment = {
-    dai: ContractDeployment,              // erc20
+export type LiquidDeployment = {
+    dai: ContractDeployment[],            // erc20
     weth: ContractDeployment,             // erc20
-    uniV2Factory_A: ContractDeployment,   // univ2 factory (creates univ2 pairs)
-    uniV2Factory_B: ContractDeployment,   // univ2 factory (creates univ2 pairs)
+    uniV2FactoryA: ContractDeployment,   // univ2 factory (creates univ2 pairs)
+    uniV2FactoryB: ContractDeployment,   // univ2 factory (creates univ2 pairs)
     atomicSwap: ContractDeployment,       // custom univ2 interface
-    dai_weth_A?: ContractDeployment,      // univ2 pair on Uni_A
-    dai_weth_B?: ContractDeployment,      // univ2 pair on Uni_B
+    daiWethA?: ContractDeployment[],      // univ2 pair on Uni_A
+    daiWethB?: ContractDeployment[],      // univ2 pair on Uni_B
 }
 
 export type DeploymentsFile = {
-    deployments: Deployment,
+    deployment: LiquidDeployment,
     allSignedTxs: string[],
+}
+
+export const getLiquidDeploymentTransactions = (deployment: LiquidDeployment): string[] => {
+    let daiWethDeployA = deployment.daiWethA ? deployment.daiWethA.map(d => d.signedDeployTx) : []
+    let daiWethDeployB = deployment.daiWethB ? deployment.daiWethB.map(d => d.signedDeployTx) : []
+    let txs = [
+    ...deployment.dai.map(d => d.signedDeployTx),
+    deployment.weth.signedDeployTx,
+    deployment.uniV2FactoryA.signedDeployTx,
+    deployment.uniV2FactoryB.signedDeployTx,
+    deployment.atomicSwap.signedDeployTx,
+    ].concat(...daiWethDeployA).concat(...daiWethDeployB)
+    return txs
 }
 
 const dir = async () => {
