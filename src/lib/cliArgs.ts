@@ -285,6 +285,8 @@ export const getSwapdArgs = () => {
     const daiIndexShort = "-d"
     const swapWethForDaiFlag = "--buy-dai"
     const swapWethForDaiShort = "-b"
+    const swapDaiForWethFlag = "--buy-weth"
+    const swapDaiForWethShort = "-s"
 
     const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)"
     const usage = `\
@@ -298,6 +300,7 @@ export const getSwapdArgs = () => {
     ${exchangeShort}\t${exchangeFlag}\t\tExchange to swap on ("A" or "B").
     ${daiIndexShort}\t${daiIndexFlag}\t\tIndex of deployed DAI token to trade with.
     ${swapWethForDaiShort}\t${swapWethForDaiFlag}\t\tSwaps WETH for DAI if set.
+    ${swapDaiForWethShort}\t${swapDaiForWethFlag}\t\tSwaps DAI for WETH if set.
 `
     const examples = `\
     # run with a single wallet
@@ -325,10 +328,10 @@ export const getSwapdArgs = () => {
     let numSwaps = 1
     let numPairs = 1
     let minUsd = 100
-    let maxUsd = 0 // 0 is interpreted as unlimited
-    let exchange = "A"
+    let maxUsd = 5000
+    let exchange = undefined
     let daiIndex = 0
-    let swapWethForDai = true
+    let swapWethForDai = undefined
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -362,6 +365,10 @@ export const getSwapdArgs = () => {
             if (args.includes(swapWethForDaiFlag) || args.includes(swapWethForDaiShort)) {
                 const flagIndex = getFlagIndex(args, swapWethForDaiFlag, swapWethForDaiShort)
                 swapWethForDai = getOption(args, flagIndex, "boolean") as boolean
+            }
+            if (args.includes(swapDaiForWethFlag) || args.includes(swapDaiForWethShort)) {
+                const flagIndex = getFlagIndex(args, swapDaiForWethFlag, swapDaiForWethShort)
+                swapWethForDai = !(getOption(args, flagIndex, "boolean") as boolean)
             }
 
         }

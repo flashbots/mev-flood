@@ -121,10 +121,10 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
             // TODO: calculate gas cost dynamically (accurately)
             const gasCost = math.bignumber(100000).mul(1e9).mul(20)
             // normalize profit to ETH
-            const avgReserves0 = backrunParams.otherReserves.reserves0.add(backrunParams.userReserves.reserves0).div(2)
-            const avgReserves1 = backrunParams.otherReserves.reserves1.add(backrunParams.userReserves.reserves1).div(2)
-            const avgPrice = wethIndex === 0 ? avgReserves1.div(avgReserves0) : avgReserves0.div(avgReserves1)
-            const profit = settlesInWeth ? backrunParams.profit : backrunParams.profit.div(avgPrice)
+            const reserves0 = backrunParams.otherReserves.reserves0
+            const reserves1 = backrunParams.otherReserves.reserves1
+            const price = settlesInWeth ? 1 : wethIndex === 0 ? reserves1.div(reserves0) : reserves0.div(reserves1)
+            const profit = settlesInWeth ? backrunParams.profit : backrunParams.profit.div(price)
             if (profit.gt(gasCost)) {
                 console.log("BACKRUN")
                 const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
