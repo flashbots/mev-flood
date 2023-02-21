@@ -12,7 +12,7 @@ import { formatEther } from 'ethers/lib/utils'
 // lib
 import contracts, { ContractSpec } from "../contracts"
 import { ETH, populateTxFully, randInRange } from '../helpers'
-import { ContractDeployment, LiquidDeployment, loadDeployment, ILiquidDeployment } from '../liquid'
+import { ContractDeployment, LiquidDeployment, loadDeployment } from '../liquid'
 import { signSwap } from '../swap'
 
 export interface LiquidParams {
@@ -218,11 +218,8 @@ const liquid = async (params: LiquidParams, provider: providers.JsonRpcProvider,
         }
         const reservesDaiWeth_A = await Promise.all(daiWethPairContractsA.map(contract => contract.getReserves()))
         const reservesDaiWeth_B = await Promise.all(daiWethPairContractsB.map(contract => contract.getReserves()))
-        console.log("reservesA", reservesDaiWeth_A)
         const emptyA = (idx: number) => (reservesDaiWeth_A[idx][0] as BigNumber).lte(0) || (reservesDaiWeth_A[idx][1] as BigNumber).lte(0)
         const emptyB = (idx: number) => (reservesDaiWeth_B[idx][0] as BigNumber).lte(0) || (reservesDaiWeth_B[idx][1] as BigNumber).lte(0)
-        console.log("emptyA", emptyA(0))
-        console.log("emptyB", emptyB(0))
 
         return {
             admin: {
