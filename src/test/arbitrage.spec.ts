@@ -189,23 +189,25 @@ describe("arbitrage", () => {
                 const kB = reserves0B.mul(reserves1B)
                 const userSwapAmount = math.bignumber(5)
 
-                const userSwap = calculatePostTradeReserves(reserves0A, reserves1A, kA, userSwapAmount, wethIndex === 0)
+                // user will swap 5 WETH -> DAI on exchange A
+                const userSwap = calculatePostTradeReserves(reserves0A, reserves1A, kA, userSwapAmount.mul(ETH), wethIndex === 0)
                 console.log("sim swap", {
                     reservesA: {0: userSwap.reserves0, 1: userSwap.reserves1}
                 })
 
-                // user will swap 1 WETH -> DAI on exchange A
-                const swap = await flood.sendSwaps({minUSD: userSwapAmount.mul(price).toNumber(), maxUSD: userSwapAmount.mul(price).toNumber(), swapWethForDai: true}, [user])
-                await Promise.all(swap.swapResults.map(r => r.wait()))
-                // await swap.swapResults[0].wait(1)
-                // [reserves0A, reserves1A]
+                const swap = await flood.sendSwaps({
+                    minUSD: userSwapAmount.mul(price).toNumber(),
+                    maxUSD: userSwapAmount.mul(price).toNumber(),
+                    swapWethForDai: true,
+                    daiIndex: 0,
+                    swapOnA: true,
+                },
+                [user])
+                await Promise.all(swap.swapResults.map(r => r.wait(1)))
                 const rA_new = (await contracts.daiWethA[0].getReserves()).slice(0, 2).map(ethersToMath)
                 console.log("real swap", {
                     reservesA: {0: rA_new[0], 1: rA_new[1]}
                 })
-
-                // const brSim = calculateBackrunParams(userSwap.reserves0, userSwap.reserves1, kA, reserves0B, reserves1B, kB, userSwap.amountOut, wethIndex === 0, "A")
-                // console.log("brSim", brSim)
             } else {
                 console.error("deployment borked")
             }
