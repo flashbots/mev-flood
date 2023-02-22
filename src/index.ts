@@ -7,7 +7,7 @@ import { handleBackrun } from './lib/backrun'
 import { textColors } from './lib/helpers'
 import { ILiquidDeployment, LiquidDeployment, loadDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
-import { SwapOptions } from './lib/swap'
+import { approveIfNeeded, SwapOptions } from './lib/swap'
 
 class MevFlood {
     private adminWallet: Wallet
@@ -39,7 +39,7 @@ class MevFlood {
      * @param deployment 
      * @returns 
      */
-    public withDeployment(deployment: LiquidDeployment) {
+    public withLiquid(deployment: LiquidDeployment) {
         return new MevFlood(this.adminWallet, this.provider, deployment)
     }
 
@@ -50,13 +50,12 @@ class MevFlood {
      * @returns Array of pending transactions.
      */
     async fundWallets(recipients: string[], ethAmount: number) {
-        await Promise.all((await scripts.fundWallets(
+        return await scripts.fundWallets(
             this.provider,
             recipients,
             this.adminWallet,
             ethAmount,
-        )))
-        return this
+        )
     }
 
     /**
@@ -75,7 +74,7 @@ class MevFlood {
             this.deployment || "deployment.json"
         )
         this.deployment = deployment
-        return this
+        return deployment
     }
 
     /**
@@ -101,6 +100,19 @@ class MevFlood {
             return await handleBackrun(this.provider, this.deployment, this.adminWallet, pendingTx)
         else {
             throw new Error("backrun failed")
+        }
+    }
+
+    /**
+     * Approves the max spend amount for every token from each wallet in `wallets`.
+     * @param wallets Wallets to sign approvals.
+     */
+    async approveRouter(wallets: Wallet[]) {
+        const contracts = this.deployment?.getDeployedContracts(this.provider)
+        if (contracts){
+            return await approveIfNeeded(this.provider, wallets, contracts)
+        } else {
+            throw new Error("deployment required for approvals")
         }
     }
 

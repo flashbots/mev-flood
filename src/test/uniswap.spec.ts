@@ -14,7 +14,8 @@ describe("uniswap", () => {
             const flood = await new MevFlood(
                 admin,
                 PROVIDER
-            ).liquid({wethMintAmountAdmin: 3, shouldTestSwap: false}, user)
+            )
+            await flood.liquid({wethMintAmountAdmin: 3, shouldTestSwap: false}, user)
             const contracts = await flood.deployment?.getDeployedContracts(PROVIDER)
             const ethersToMath = (bn: ethers.BigNumber) => math.bignumber(bn.toString())
             if (flood.deployment?.daiWethA && flood.deployment?.daiWethB && contracts && contracts.daiWethA && contracts.daiWethB) {

@@ -61,6 +61,15 @@ export type Reserves = {
     B: {reserves0: BigNumber, reserves1: BigNumber},
 }
 
+/**
+ * 
+ * @param provider Provider to pull blockchain state from.
+ * @param deployment Liquid deployment instance.
+ * @param wallet Wallet from which to send backrun.
+ * @param pendingTx Pending tx to try to backrun.
+ * @param userPairReserves Optional; specifies pre-trade reserves (before the user makes their swap). Default: reads from chain.
+ * @returns 
+ */
 export const handleBackrun = async (provider: providers.JsonRpcProvider, deployment: LiquidDeployment, wallet: Wallet, pendingTx: Transaction, userPairReserves?: Reserves) => {
     if (pendingTx.to === deployment.atomicSwap.contractAddress) {
         // const nonce = await PROVIDER.getTransactionCount(wallet.address)

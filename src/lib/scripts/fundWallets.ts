@@ -41,8 +41,8 @@ const fundWallets = async (provider: providers.JsonRpcProvider, recipients: stri
     })
     const signedTxs = await Promise.all(signedTxPromises)
     console.log(signedTxs)
-    const sentTxPromises = signedTxs.map(tx => (
-        provider.sendTransaction(tx)
+    const sentTxPromises = signedTxs.map(async tx => (
+        await provider.sendTransaction(tx)
     ))
 
     return await Promise.all(sentTxPromises)

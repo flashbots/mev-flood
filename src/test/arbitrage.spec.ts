@@ -161,7 +161,8 @@ describe("arbitrage integration tests", () => {
             const flood = await new MevFlood(
                 admin,
                 PROVIDER
-            ).liquid({wethMintAmountAdmin: 13, shouldTestSwap: false}, user)
+            )
+            await flood.liquid({wethMintAmountAdmin: 13, shouldTestSwap: false}, user)
             const contracts = await flood.deployment?.getDeployedContracts(PROVIDER)
             if (flood.deployment?.daiWethA && flood.deployment?.daiWethB && contracts && contracts.daiWethA && contracts.daiWethB) {
                 const balanceStart = await contracts.dai[0].balanceOf(admin.address)
