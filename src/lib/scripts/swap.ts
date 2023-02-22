@@ -6,6 +6,7 @@ import { createRandomSwap, signSwap, SwapOptions } from '../swap'
 
 export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployment: LiquidDeployment) => {
     let signedSwaps = []
+    let swapParams = []
     for (const wallet of userWallets) {
         const nonce = await wallet.connect(provider).getTransactionCount()
         const atomicSwapContract = new Contract(deployment.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
@@ -16,6 +17,7 @@ export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRp
             deployment.weth.contractAddress,
             options
         )
+        swapParams.push(swap)
         const wethForDai = swap.path[0].toLowerCase() === deployment.weth.contractAddress.toLowerCase()
         console.log(`swapping ${formatEther(swap.amountIn)} ${wethForDai ? "WETH" : "DAI"} for ${wethForDai ? "DAI" : "WETH"}`)
         const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, nonce, provider.network.chainId)
@@ -24,5 +26,5 @@ export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRp
     const swapPromises = signedSwaps.map(tx => provider.sendTransaction(tx))
     const swapResults = await Promise.all(swapPromises)
     console.log(`swapped with ${swapResults.length} wallets`)
-    return {swapResults, signedSwaps}
+    return {swapResults, signedSwaps, swapParams}
 }

@@ -167,7 +167,7 @@ export const calculateBackrunParams = (
      * Gets reserves of exchange that we sell our backrun-purchased tokens on.
      */
     const getOtherExchangeReserves = () => {
-        return otherExchange === "A" ? {reserves0: reservesA_0, reserves1: reservesA_1, k: kA} : {reserves0: reservesB_0, reserves1: reservesB_1, k: kB}
+        return userExchange === "A" ? {reserves0: reservesB_0, reserves1: reservesB_1, k: kB} : {reserves0: reservesA_0, reserves1: reservesA_1, k: kA}
     }
 
     // settlementToken is the FINAL node in the arb path

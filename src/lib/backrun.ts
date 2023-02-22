@@ -56,13 +56,19 @@ const findTokenName = (addr: string, deployment: LiquidDeployment) => {
     return "-?-"
 }
 
-export const handleBackrun = async (provider: providers.JsonRpcProvider, deployment: LiquidDeployment, wallet: Wallet, pendingTx: Transaction) => {
+export type Reserves = {
+    A: {reserves0: BigNumber, reserves1: BigNumber},
+    B: {reserves0: BigNumber, reserves1: BigNumber},
+}
+
+export const handleBackrun = async (provider: providers.JsonRpcProvider, deployment: LiquidDeployment, wallet: Wallet, pendingTx: Transaction, userPairReserves?: Reserves) => {
     if (pendingTx.to === deployment.atomicSwap.contractAddress) {
         // const nonce = await PROVIDER.getTransactionCount(wallet.address)
         // swap detected
         // TODO: side daemon that caches the reserves on new blocks
         // for now we can just pull the reserves for every tx but it's not ideal
         const deployedContracts = deployment.getDeployedContracts(provider)
+
         const getReserves = async (token0: string, token1: string) => {
             // get reserves
             const pairAddressA = await deployedContracts.uniV2FactoryA.getPair(token0, token1)
@@ -70,9 +76,18 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
             // TODO: cache these contracts
             const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, provider)
             const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, provider)
-            const reservesA = pairA.getReserves()
-            const reservesB = pairB.getReserves()
-            return {reservesA: await reservesA, reservesB: await reservesB, pairA, pairB}
+            const reserves = userPairReserves ? {
+                reservesA: [userPairReserves.A.reserves0, userPairReserves.A.reserves1],
+                reservesB: [userPairReserves.B.reserves0, userPairReserves.B.reserves1],
+                pairA,
+                pairB,
+            } : {
+                reservesA: await pairA.getReserves(),
+                reservesB: await pairB.getReserves(),
+                pairA,
+                pairB,
+            }
+            return reserves
         }
 
         // decode tx to get pair
@@ -98,9 +113,11 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
 
             // we can assume that the pair ordering is the same on both pairs
             // bc they are the same contract, so they order the same way
-            const token0: string = await pairA.callStatic.token0()
-            const token1: string = await pairA.callStatic.token1()
+            const token0: string = await pairA?.callStatic.token0()
+            const token1: string = await pairA?.callStatic.token1()
             const wethIndex = token0.toLowerCase() === deployment.weth.contractAddress.toLowerCase() ? 0 : 1
+            const userSwapXForY = userSwap.path[0].toLowerCase() === token0.toLowerCase()
+            const userExchange = userSwap.factory.toLowerCase() === deployment.uniV2FactoryA.contractAddress.toLowerCase() ? "A" : "B"
             const backrunParams = calculateBackrunParams(
                 numify(reservesA[0]),
                 numify(reservesA[1]),
@@ -109,8 +126,8 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
                 numify(reservesB[1]),
                 numify(kB),
                 numify(decodedTxData[1]),
-                userSwap.path[0].toLowerCase() === token0.toLowerCase(),
-                userSwap.factory.toLowerCase() === deployment.uniV2FactoryA.contractAddress.toLowerCase() ? "A" : "B"
+                userSwapXForY,
+                userExchange
             )
             if (!backrunParams) {
                 return
@@ -129,17 +146,20 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
                 console.debug(`BACKRUN. estimated proceeds: ${utils.formatEther(backrunParams.profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
                 const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
                 const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
-                const startFactory = userSwap.factory
-                const endFactory = startFactory === deployment.uniV2FactoryA.contractAddress ? deployment.uniV2FactoryB.contractAddress : deployment.uniV2FactoryA.contractAddress
-                const pairStart: string = startFactory === deployment.uniV2FactoryA.contractAddress ? pairA.address : pairB.address
-                const pairEnd: string = startFactory === deployment.uniV2FactoryA.contractAddress ? pairB.address : pairA.address
+                const factoryStart = userSwap.factory
+                const factoryEnd = factoryStart === deployment.uniV2FactoryA.contractAddress ? deployment.uniV2FactoryB.contractAddress : deployment.uniV2FactoryA.contractAddress
+                const pairStart: string | undefined = factoryStart === deployment.uniV2FactoryA.contractAddress ? pairA?.address : pairB?.address
+                const pairEnd: string | undefined = factoryStart === deployment.uniV2FactoryA.contractAddress ? pairB?.address : pairA?.address
                 const amountIn = BigNumber.from(backrunParams.backrunAmount.toFixed(0))
+                if (!pairStart || !pairEnd) {
+                    return
+                }
 
                 const arbRequest = await deployedContracts.atomicSwap.populateTransaction.arb(
                     tokenArb,
                     tokenSettle,
-                    startFactory,
-                    endFactory,
+                    factoryStart,
+                    factoryEnd,
                     pairStart,
                     pairEnd,
                     amountIn
