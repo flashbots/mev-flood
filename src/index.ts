@@ -55,7 +55,7 @@ class MevFlood {
             recipients,
             this.adminWallet,
             ethAmount,
-        )).map(tx => tx.wait(1)))
+        )))
         return this
     }
 
