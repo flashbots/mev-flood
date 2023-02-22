@@ -8,7 +8,7 @@ const config = {
     number: "BigNumber" as any,
 
     // Number of significant digits for BigNumbers
-    precision: 18
+    precision: 36
 }
 const math = create(all, config)
 
