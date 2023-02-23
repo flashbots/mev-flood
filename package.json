@@ -17,6 +17,11 @@
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "^0.5.0",
+    "@uniswap/sdk-core": "^3.0.0-alpha.3",
+    "@uniswap/v2-core": "^1.0.1",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "@uniswap/v2-sdk": "^3.0.1",
+    "async-mutex": "^0.4.0",
     "axios": "^0.27.2",
     "dotenv": "^16.0.1",
     "ethers": "^5.0.0",
@@ -27,6 +32,7 @@
   "scripts": {
     "test": "ts-mocha -p ./tsconfig.json src/test/*.spec.ts --debug",
     "test.arbitrage": "ts-mocha -p ./tsconfig.json src/test/arbitrage.spec.ts --debug",
+    "test.uniswap": "ts-mocha -p ./tsconfig.json src/test/uniswap.spec.ts --debug",
     "build": "npx tsc",
     "cancel-dev": "npx ts-node src/cancellations.ts",
     "cancel": "node build/cancellations.js",

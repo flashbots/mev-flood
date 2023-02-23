@@ -1,27 +1,29 @@
 import assert from "assert"
-import { ethers, utils, Wallet } from 'ethers'
+import { ethers, Wallet } from 'ethers'
 import { formatEther } from 'ethers/lib/utils'
 import MevFlood from '..'
-import { calculateBackrunParams, calculatePostTradeReserves } from "../lib/arbitrage"
+import { calculateBackrunParams } from "../lib/arbitrage"
 import { handleBackrun } from '../lib/backrun'
 import math, { numify } from "../lib/math"
 import { PROVIDER } from '../lib/providers'
+import { SwapOptions } from '../lib/swap'
 type BigNumber = math.BigNumber
 
+type PairReserves = {reserves0: BigNumber, reserves1: BigNumber}
+type BackrunParams = {
+    A: PairReserves,
+    B: PairReserves,
+    swap0For1: boolean,
+    amountIn: BigNumber,
+}
+
 describe("arbitrage unit tests", () => {
-    type PairReserves = {reserves0: BigNumber, reserves1: BigNumber}
-    type Params = {
-        A: PairReserves,
-        B: PairReserves,
-        swap0For1: boolean,
-        amountIn: BigNumber,
-    }
 
     const labels = {x: "USD", y: "ETH"}
     const ETH = math.bignumber(1).mul(1e9).mul(1e9)
     const getK = (pairReserves: PairReserves): BigNumber => pairReserves.reserves0.mul(pairReserves.reserves1)
 
-    const testBackrunProfit = (params: Params) => {
+    const testBackrunProfit = (params: BackrunParams) => {
         const kA = getK(params.A)
         const kB = getK(params.B)
         const backrunParams = calculateBackrunParams(
@@ -154,15 +156,10 @@ describe("arbitrage unit tests", () => {
 })
 
 describe("arbitrage integration tests", () => {
-    it("should accurately estimate arbitrage profit", async () => {
-        try {
-            const admin = new Wallet("0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6") // hh[9]
-            const user = new Wallet("0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97", PROVIDER) // hh[8]
-            const flood = await new MevFlood(
-                admin,
-                PROVIDER
-            )
-            await flood.liquid({wethMintAmountAdmin: 13, shouldTestSwap: false}, user)
+    const testBackrunArb = async (admin: Wallet, user: Wallet, flood: MevFlood, swapParams: SwapOptions) => {
+        const deploymentRes = await (await flood.liquid({wethMintAmountAdmin: 13}, user)).deployToMempool()
+            await Promise.all(deploymentRes.map(d => d.wait(1)))
+
             const contracts = await flood.deployment?.getDeployedContracts(PROVIDER)
             if (flood.deployment?.daiWethA && flood.deployment?.daiWethB && contracts && contracts.daiWethA && contracts.daiWethB) {
                 const balanceStart = await contracts.dai[0].balanceOf(admin.address)
@@ -177,33 +174,18 @@ describe("arbitrage integration tests", () => {
                 reserves1A = rA[1]
                 reserves0B = rB[0]
                 reserves1B = rB[1]
-                console.log("start", {
-                    A: {
-                        0: reserves0A.toString(), 1: reserves1A.toString()
-                    },
-                    B: {
-                        0: reserves0B.toString(), 1: reserves1B.toString()
-                    }
-                })
 
                 const token0 = await contracts.daiWethA[0].token0()
                 wethIndex = contracts.weth.address.toLowerCase() === token0.toLowerCase() ? 0 : 1
 
-                const price = 1300
                 const kA = reserves0A.mul(reserves1A)
                 const kB = reserves0B.mul(reserves1B)
 
-                // user will swap 5 WETH -> DAI on exchange A
-                const userSwapAmount = math.bignumber(5)
-                const swap = await flood.sendSwaps({
-                    minUSD: userSwapAmount.mul(price).toNumber(),
-                    maxUSD: userSwapAmount.mul(price).toNumber(),
-                    swapWethForDai: true,
-                    daiIndex: 0,
-                    swapOnA: true,
-                }, [user])
+                // user swap
+                const swap = await flood.sendSwaps(swapParams, [user])
                 await Promise.all(swap.swapResults.map(r => r.wait(1)))
 
+                // backrun
                 const backrunParams = calculateBackrunParams(numify(reserves0A), numify(reserves1A), numify(kA), numify(reserves0B), numify(reserves1B), numify(kB), numify(swap.swapParams[0].amountIn), wethIndex === 0, "A")
                 const backrun = await handleBackrun(PROVIDER, flood.deployment, admin, swap.swapResults[0], {
                     A: {
@@ -223,19 +205,47 @@ describe("arbitrage integration tests", () => {
                 console.log("balanceNew", balanceNew.toString())
                 console.log("balanceDiff", balanceDiff.toFixed(0))
                 console.log("profit estimated", backrunParams?.profit.toFixed(0))
+
                 if (backrunParams) {
-                    const profitDiff = math.abs(balanceDiff.sub(backrunParams.profit))
-                    console.log("profitDiff", profitDiff)
-                    assert(profitDiff.lt(balanceDiff.div(20))) // 5% margin of error
+                    return {
+                        backrunParams,
+                        balanceDiff,
+                        balanceNew,
+                        balanceStart,
+                    }
                 }
+                return undefined
             } else {
                 console.error("deployment borked, could not run test. check your ETH provider for clues.")
+                return undefined
+            }
+    }
+    it("should accurately estimate backrun-arbitrage profit", async () => {
+        try {
+            const admin = new Wallet("0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6") // hh[9]
+            const user = new Wallet("0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97", PROVIDER) // hh[8]
+            const flood = await new MevFlood(
+                admin,
+                PROVIDER
+            )
+            const arbResult = await testBackrunArb(admin, user, flood, {
+                minUSD: 5000,
+                maxUSD: 5000,
+                swapOnA: true,
+                daiIndex: 0,
+                swapWethForDai: true,
+            })
+            if (arbResult) {
+                const profitDiff = math.abs(arbResult.balanceDiff.sub(arbResult.backrunParams.profit))
+                console.log("profitDiff", profitDiff)
+                assert(profitDiff.lt(arbResult.balanceDiff.div(20))) // 5% margin of error
+            } else {
+                assert.fail("arbitrage setup failed")
             }
         } catch (e) {
             type E = {
                 code?: string,
             }
-
             if ((e as E).code == "ERR_ASSERTION") {
                 let err = e as assert.AssertionError
                 assert.fail(err.message)

@@ -1,8 +1,9 @@
 import { Contract, providers } from 'ethers';
 import { constants as fsConstants } from 'fs';
 import fs from "fs/promises"
-import contracts from './contracts';
 
+// lib
+import contracts from './contracts';
 import { TransactionRequest } from './helpers'
 
 export type ContractDeployment = {
@@ -14,8 +15,8 @@ export type ContractDeployment = {
 export interface ILiquidDeployment {
     dai: ContractDeployment[],            // erc20
     weth: ContractDeployment,             // erc20
-    uniV2FactoryA: ContractDeployment,   // univ2 factory (creates univ2 pairs)
-    uniV2FactoryB: ContractDeployment,   // univ2 factory (creates univ2 pairs)
+    uniV2FactoryA: ContractDeployment,    // univ2 factory (creates univ2 pairs)
+    uniV2FactoryB: ContractDeployment,    // univ2 factory (creates univ2 pairs)
     atomicSwap: ContractDeployment,       // custom univ2 interface
     daiWethA?: ContractDeployment[],      // univ2 pair on Uni_A
     daiWethB?: ContractDeployment[],      // univ2 pair on Uni_B
@@ -79,7 +80,7 @@ export class LiquidDeployment implements ILiquidDeployment {
         this.atomicSwap = deployment.atomicSwap || this.atomicSwap
         this.daiWethA = deployment.daiWethA || this.daiWethA
         this.daiWethB = deployment.daiWethB || this.daiWethB
-        this.signedTxs = allSignedTxs
+        this.signedTxs = allSignedTxs || this.signedTxs
     }
 
     public getDeployedContracts(provider?: providers.JsonRpcProvider) {
@@ -98,12 +99,14 @@ export class LiquidDeployment implements ILiquidDeployment {
         let daiWethDeployA = this.daiWethA ? this.daiWethA.map(d => d.signedDeployTx) : []
         let daiWethDeployB = this.daiWethB ? this.daiWethB.map(d => d.signedDeployTx) : []
         let txs = [
-        ...this.dai.map(d => d.signedDeployTx),
-        this.weth.signedDeployTx,
-        this.uniV2FactoryA.signedDeployTx,
-        this.uniV2FactoryB.signedDeployTx,
-        this.atomicSwap.signedDeployTx,
-        ].concat(...daiWethDeployA).concat(...daiWethDeployB)
+            ...this.dai.map(d => d.signedDeployTx),
+            this.weth.signedDeployTx,
+            this.uniV2FactoryA.signedDeployTx,
+            this.uniV2FactoryB.signedDeployTx,
+            this.atomicSwap.signedDeployTx,
+            ...daiWethDeployA,
+            ...daiWethDeployB,
+        ]
         return txs
     }
 }

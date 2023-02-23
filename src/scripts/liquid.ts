@@ -1,11 +1,12 @@
 import readline from "readline-sync"
-import { getDeployUniswapV2Args } from '../lib/cliArgs';
 
+// lib
+import { getDeployUniswapV2Args } from '../lib/cliArgs';
 import env from '../lib/env';
 import { PROVIDER } from '../lib/providers';
 import { getExistingDeploymentFilename, getNewDeploymentFilename, getNewLiquidityFilename } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
-import scripts, {LiquidParams} from '../lib/scripts';
+import {LiquidParams} from '../lib/scripts';
 import MevFlood from '..';
 
 /** Prints txs:
@@ -34,18 +35,23 @@ const main = async () => {
         readline.question("press Enter to continue...")
     }
     const deploymentFile = await getExistingDeploymentFilename()
-    const options: LiquidParams = args as LiquidParams
-    const deployment = await scripts.liquid(
-        options,
-        PROVIDER,
-        adminWallet,
-        userWallet,
-        deploymentFile
-    )
-    
+    const flood = await new MevFlood(adminWallet, PROVIDER).init(deploymentFile)
+    const {deployment, deployToMempool, deployToFlashbots} = await flood.liquid(args as LiquidParams, userWallet)
+
     if (deployment.signedTxs && deployment.signedTxs.length > 0) {
         const filename = args.shouldDeploy ? await getNewDeploymentFilename() : await getNewLiquidityFilename()
         await MevFlood.saveDeployment(filename, deployment, deployment.signedTxs)
+    }
+
+    if (args.sendToMempool) {
+        console.log("Txs prepared. Sending to mempool...")
+        const deploymentRes = await deployToMempool()
+        await Promise.all(deploymentRes.map(tx => tx.wait(1)))
+        console.log(`Finished deployment. Sent ${deploymentRes.length} txs.`)
+    } else {
+        console.log("Txs prepared. Sending to Flashbots.")
+        const deploymentRes = await deployToFlashbots()
+        console.log(`Finished deployment.`)
     }
 }
 

@@ -164,9 +164,9 @@ export const getDeployUniswapV2Args = () => {
     let shouldMintTokens = true
     let shouldBootstrapLiquidity = true
     let shouldApproveTokens = true
-    let shouldTestSwap = true
     let autoAccept = false
     let numPairs = 1
+    let sendToMempool = false
 
     const helpMessage = `
     ${textColors.Bright}script.liquid${textColors.Reset}: deploy a uniswap v2 environment w/ bootstrapped liquidity.
@@ -181,11 +181,11 @@ Options:
     --mint-only *       Only mint tokens.
     --bootstrap-only *  Only bootstrap liquidity, don't deploy contracts.
     --approve-only *    Only approve uni router to spend your tokens.
-    --swap-only *       Only test swap.
     -p, --num-pairs     Number of DAI pairs to deploy (if deploying). 
                         Half that number of DAI tokens (rounding up) will be created, 
                         and a unique WETH_DAI pair will be deployed on each UniswapV2 
                         clone for each DAI token.
+    -m, --mempool       Send transactions to mempool instead of Flashbots.
     -y                  Auto-accept prompts (non-interactive mode).
 
     (*) passing multiple --X-only params will cause none of them to execute.
@@ -212,25 +212,21 @@ Example:
             shouldBootstrapLiquidity = false
             shouldMintTokens = false
             shouldApproveTokens = false
-            shouldTestSwap = false
         }
         if (args.includes("--bootstrap-only")) {
             shouldDeploy = false
             shouldMintTokens = false
             shouldApproveTokens = false
-            shouldTestSwap = false
         }
         if (args.includes("--mint-only")) {
             shouldDeploy = false
             shouldBootstrapLiquidity = false
             shouldApproveTokens = false
-            shouldTestSwap = false
         }
         if (args.includes("--approve-only")) {
             shouldDeploy = false
             shouldBootstrapLiquidity = false
             shouldMintTokens = false
-            shouldTestSwap = false
         }
         if (args.includes("--swap-only")) {
             shouldDeploy = false
@@ -241,6 +237,9 @@ Example:
         if (args.includes("--num-pairs") || args.includes("-p")) {
             numPairs = getOption(args, getFlagIndex(args, "--num-pairs", "-p"), "number") as number
         }
+        if (args.includes("--mempool") || args.includes("-m")) {
+            sendToMempool = true
+        }
         if (args.includes("-y")) {
             autoAccept = true
         }
@@ -250,9 +249,9 @@ Example:
         shouldDeploy,
         shouldBootstrapLiquidity,
         shouldMintTokens,
-        shouldTestSwap,
         autoAccept,
         numPairs,
+        sendToMempool,
     }
 }
 //TODO: use a legit cli parser

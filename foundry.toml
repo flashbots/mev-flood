@@ -1,6 +1,6 @@
 [profile.default]
 libs = ['univ2-core/contracts', 'univ2-periphery/contracts', '../node_modules/@uniswap/lib']
-out = 'out'
+out = 'src/contractsBuild'
 remappings = [
   '@uniswap/v2-core=contracts/univ2-core',
 ]

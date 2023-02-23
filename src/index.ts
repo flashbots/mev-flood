@@ -74,7 +74,37 @@ class MevFlood {
             this.deployment || "deployment.json"
         )
         this.deployment = deployment
-        return deployment
+
+        const deployToMempool = async () => {
+            if (deployment.signedTxs){
+                return this.deployToMempool(deployment.signedTxs)
+            } else {
+                throw new Error("failed to deploy to mempool. No signedTxs in deployment.")
+            }
+        }
+
+        const deployToFlashbots = async () => {
+            // TODO
+            console.warn("unimplemented!")
+        }
+
+        return {
+            deployment,
+            deployToMempool,
+            deployToFlashbots,
+        }
+    }
+
+    private async deployToMempool(allSignedTxs: string[]) {
+        let pendingTxs = []
+        for (const tx of allSignedTxs) {
+            pendingTxs.push(await this.provider.sendTransaction(tx))
+        }
+        return pendingTxs
+    }
+
+    private async deployToFlashbots(allSignedTxs: string[]) {
+        // TODO
     }
 
     /**
