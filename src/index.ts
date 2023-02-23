@@ -6,7 +6,7 @@ import { handleBackrun } from './lib/backrun'
 
 // lib
 import { textColors } from './lib/helpers'
-import { ILiquidDeployment, LiquidDeployment, loadDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
+import { ILiquidDeployment, LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
 import { approveIfNeeded, SwapOptions } from './lib/swap'
 
@@ -43,11 +43,11 @@ class MevFlood {
      * @param deploymentFilename 
      * @returns 
      */
-    public async init(deploymentFilename?: string) {
+    public async withDeploymentFile(deploymentFilename: string) {
         try {
-            this.deployment = await loadDeployment({filename: deploymentFilename})
+            this.deployment = await MevFlood.loadDeployment(deploymentFilename)
         } catch (e) {
-            throw new Error(`deployment "${deploymentFilename}" does not exist, or is not formatted correctly`)
+            console.warn(`deployment "${deploymentFilename}" does not exist, or is not formatted correctly`)
         }
         return this
     }
@@ -67,7 +67,7 @@ class MevFlood {
      * @param deployment 
      * @returns 
      */
-    public withLiquid(deployment: LiquidDeployment) {
+    public withDeployment(deployment: LiquidDeployment) {
         return new MevFlood(this.adminWallet, this.provider, deployment)
     }
 

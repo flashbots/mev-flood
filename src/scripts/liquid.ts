@@ -9,7 +9,7 @@ import { getExistingDeploymentFilename, getNewDeploymentFilename, getNewLiquidit
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 import {LiquidParams} from '../lib/scripts';
 import MevFlood from '..';
-import { RelayResponseError } from '@flashbots/ethers-provider-bundle';
+import { FlashbotsBundleResolution, RelayResponseError } from '@flashbots/ethers-provider-bundle';
 
 /** Prints txs:
  * build a set of contracts to deploy,
@@ -20,26 +20,32 @@ import { RelayResponseError } from '@flashbots/ethers-provider-bundle';
 */
 const main = async () => {
     const args = getDeployLiquidArgs()
-
     try {
         await PROVIDER.getBlockNumber()
     } catch (e) {
         console.error(`failed to connect to ${env.RPC_URL}.`)
         process.exit(1)
     }
-    
+
     const adminWallet = getAdminWallet().connect(PROVIDER)
     const userWallet = getTestWallet().connect(PROVIDER)
-    
+    const flashbotsSigner = new Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") // hh[0]
+
     let adminNonce = await adminWallet.getTransactionCount()
     if (adminNonce != 0 && !args.autoAccept) {
         console.warn(`Your admin account nonce is currently ${adminNonce}.`)
         readline.question("press Enter to continue...")
     }
 
+    let flood = new MevFlood(adminWallet, PROVIDER)
     const deploymentFile = await getExistingDeploymentFilename()
-    const flashbotsSigner = new Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-    const flood = await (await new MevFlood(adminWallet, PROVIDER).init(deploymentFile)).initFlashbots(flashbotsSigner)
+    try {
+        flood = await (await flood.withDeploymentFile(deploymentFile)).initFlashbots(flashbotsSigner)
+    } catch (e) {
+        console.error("Failed to load deployment file. Creating new deployment.")
+        await flood.liquid(args as LiquidParams, userWallet)
+        flood.saveDeployment(deploymentFile)
+    }
     const {deployment, deployToMempool, deployToFlashbots} = await flood.liquid(args as LiquidParams, userWallet)
 
     if (deployment.signedTxs && deployment.signedTxs.length > 0) {
@@ -54,12 +60,25 @@ const main = async () => {
         console.log(`Finished deployment. Sent ${deploymentRes.length} txs.`)
     } else {
         console.log("Txs prepared. Sending to Flashbots.")
-        const deploymentRes = await deployToFlashbots()
-        if ("error" in deploymentRes) {
-            throw (deploymentRes as RelayResponseError).error
-        } else {
-            const res = await deploymentRes.wait()
-            console.log("res", res)
+        let bundleStatus: FlashbotsBundleResolution = FlashbotsBundleResolution.BlockPassedWithoutInclusion
+        while (bundleStatus == FlashbotsBundleResolution.BlockPassedWithoutInclusion) {
+            const deploymentRes = await deployToFlashbots()
+            if ("error" in deploymentRes) {
+                throw (deploymentRes as RelayResponseError).error
+            } else {
+                const res = await deploymentRes.wait()
+                if (res == FlashbotsBundleResolution.BundleIncluded) {
+                    console.log("bundle included")
+                    break
+                } else {
+                    const msg = res == FlashbotsBundleResolution.BlockPassedWithoutInclusion ?
+                        "block passed without inclusion" :
+                        res == FlashbotsBundleResolution.AccountNonceTooHigh ?
+                        "account nonce too high" :
+                        "bundle not included (unknown reason)"
+                    console.log(msg)
+                }
+            }
         }
         console.log(`Finished deployment.`)
     }
