@@ -2,8 +2,15 @@ import { textColors, } from './helpers'
 
 export const getOption = (args: string[], flagIndex: number, argType?: "string" | "number" | "boolean") => {
     if (args.length > flagIndex + 1 || argType === "boolean") {
-        if (!argType || argType === "number") // number is default
-            return parseInt(args[flagIndex + 1])
+        // number is default type
+        if (!argType || argType === "number") {
+            const f = parseFloat(args[flagIndex + 1])
+            if (f % 1 !== 0) {
+                return f
+            } else {
+                return parseInt(args[flagIndex + 1])
+            }
+        }
         else if (argType === "boolean")
             return true
         else if (argType === "string")
@@ -159,7 +166,7 @@ Example:
 
 export const useMempool = process.argv.length > 4 && process.argv[4] == "mempool"
 
-export const getDeployUniswapV2Args = () => {
+export const getDeployLiquidArgs = () => {
     let shouldDeploy = true
     let shouldMintTokens = true
     let shouldBootstrapLiquidity = true
@@ -167,6 +174,8 @@ export const getDeployUniswapV2Args = () => {
     let autoAccept = false
     let numPairs = 1
     let sendToMempool = false
+    let wethMintAmountAdmin: number = 100
+    let wethMintAmountUser: number = 5.1
 
     const helpMessage = `
     ${textColors.Bright}script.liquid${textColors.Reset}: deploy a uniswap v2 environment w/ bootstrapped liquidity.
@@ -177,16 +186,18 @@ Usage:
     yarn script.liquid [options]
 
 Options:
-    --deploy-only *     Only deploy contracts, don't bootstrap liquidity.
-    --mint-only *       Only mint tokens.
-    --bootstrap-only *  Only bootstrap liquidity, don't deploy contracts.
-    --approve-only *    Only approve uni router to spend your tokens.
-    -p, --num-pairs     Number of DAI pairs to deploy (if deploying). 
-                        Half that number of DAI tokens (rounding up) will be created, 
-                        and a unique WETH_DAI pair will be deployed on each UniswapV2 
-                        clone for each DAI token.
-    -m, --mempool       Send transactions to mempool instead of Flashbots.
-    -y                  Auto-accept prompts (non-interactive mode).
+    --deploy-only *         Only deploy contracts, don't bootstrap liquidity.
+    --mint-only *           Only mint tokens.
+    --bootstrap-only *      Only bootstrap liquidity, don't deploy contracts.
+    --approve-only *        Only approve uni router to spend your tokens.
+    -p, --num-pairs         Number of DAI pairs to deploy (if deploying). 
+                            That number of DAI tokens will be created, and a unique 
+                            WETH_DAI pair will be deployed on each UniswapV2 
+                            clone for each DAI token.
+    -w, --weth-mint-admin   Amount of WETH to mint for admin (default: 100).
+    -W, --weth-mint-user    Amount of WETH to mint for user (default: 5.1).
+    -m, --mempool           Send transactions to mempool instead of Flashbots.
+    -y                      Auto-accept prompts (non-interactive mode).
 
     (*) passing multiple --X-only params will cause none of them to execute.
 
@@ -213,14 +224,14 @@ Example:
             shouldMintTokens = false
             shouldApproveTokens = false
         }
-        if (args.includes("--bootstrap-only")) {
-            shouldDeploy = false
-            shouldMintTokens = false
-            shouldApproveTokens = false
-        }
         if (args.includes("--mint-only")) {
             shouldDeploy = false
             shouldBootstrapLiquidity = false
+            shouldApproveTokens = false
+        }
+        if (args.includes("--bootstrap-only")) {
+            shouldDeploy = false
+            shouldMintTokens = false
             shouldApproveTokens = false
         }
         if (args.includes("--approve-only")) {
@@ -228,14 +239,14 @@ Example:
             shouldBootstrapLiquidity = false
             shouldMintTokens = false
         }
-        if (args.includes("--swap-only")) {
-            shouldDeploy = false
-            shouldBootstrapLiquidity = false
-            shouldMintTokens = false
-            shouldApproveTokens = false
-        }
         if (args.includes("--num-pairs") || args.includes("-p")) {
             numPairs = getOption(args, getFlagIndex(args, "--num-pairs", "-p"), "number") as number
+        }
+        if (args.includes("--weth-admin") || args.includes("-w")) {
+            wethMintAmountAdmin = getOption(args, getFlagIndex(args, "--weth-admin", "-w"), "number") as number
+        }
+        if (args.includes("--weth-user") || args.includes("-u")) {
+            wethMintAmountUser = getOption(args, getFlagIndex(args, "--weth-user", "-u"), "number") as number
         }
         if (args.includes("--mempool") || args.includes("-m")) {
             sendToMempool = true
@@ -252,6 +263,8 @@ Example:
         autoAccept,
         numPairs,
         sendToMempool,
+        wethMintAmountAdmin,
+        wethMintAmountUser,
     }
 }
 //TODO: use a legit cli parser

@@ -3,12 +3,11 @@ import {
     ContractFactory,
     Contract,
     utils,
-    BigNumber,
     constants,
     providers,
     Wallet
 } from "ethers"
-import { formatEther } from 'ethers/lib/utils'
+import { formatEther, parseEther } from 'ethers/lib/utils'
 
 // lib
 import contracts, { ContractSpec } from "../contracts"
@@ -34,17 +33,20 @@ const generateLiquidDeployment = async (params: LiquidParams, provider: provider
             return value
         }
     }
+    // parse args, set defaults
     const shouldApproveTokens = defaultTrue(params.shouldApproveTokens)
     const shouldDeploy = defaultTrue(params.shouldDeploy)
     const shouldBootstrapLiquidity = defaultTrue(params.shouldBootstrapLiquidity)
     const shouldMintTokens = defaultTrue(params.shouldMintTokens)
+    const numPairs = params.numPairs || 1
+    // have to explicitly check for undefined because 0 is falsy
+    const adminMintAmount = params.wethMintAmountAdmin !== undefined ? parseEther(params.wethMintAmountAdmin.toString()) : undefined
+    const userMintAmount = params.wethMintAmountUser !== undefined ? parseEther(params.wethMintAmountUser.toString()) : undefined
 
     const overrides = { // TODO: rename
         from: adminWallet.address,
         chainId: provider.network.chainId,
     }
-
-    const numPairs = params.numPairs || 1
 
     /** Get signed tx to deploy a generic contract clone, as well as the address it will be deployed at.*/
     const getCloneDeployment = async (contract: ContractSpec, nonce: number, args?: any[]): Promise<ContractDeployment> => {
@@ -178,12 +180,13 @@ const generateLiquidDeployment = async (params: LiquidParams, provider: provider
     const daiWethPairContractsB = daiWethAddrsB.map(addr => new Contract(addr, contracts.UniV2Pair.abi))
 
     if (shouldMintTokens) {
-        const adminMintAmount = params.wethMintAmountAdmin !== undefined ? BigNumber.from(params.wethMintAmountAdmin) : undefined
-        const userMintAmount = params.wethMintAmountUser !== undefined ? BigNumber.from(params.wethMintAmountUser) : undefined
-        const WETH_ADMIN_MINT_AMOUNT = ETH.mul(adminMintAmount || 2500)
-        const WETH_USER_MINT_AMOUNT = ETH.mul(userMintAmount || 500)
-        const DAI_ADMIN_MINT_AMOUNT = WETH_ADMIN_MINT_AMOUNT.div(100).mul(90).mul(1300) // 90% 0f WETH will be paired w/ DAI @ 1300 DAI/WETH
-        const DAI_USER_MINT_AMOUNT = ETH.mul(50000) // always mint 50k DAI for user
+        // assign defaults if amounts were not specified
+        const WETH_ADMIN_MINT_AMOUNT = adminMintAmount || ETH.mul(2500)
+        const WETH_USER_MINT_AMOUNT = userMintAmount || ETH.mul(500)
+        // 90% of admin's WETH will be paired w/ DAI @ 1300 DAI/WETH
+        const DAI_ADMIN_MINT_AMOUNT = WETH_ADMIN_MINT_AMOUNT.div(100).mul(90).mul(1300)
+        // always mint 50k DAI for user
+        const DAI_USER_MINT_AMOUNT = ETH.mul(50000)
 
         for (const dai of daiContracts) {
             // mint DAI for admin
@@ -272,9 +275,7 @@ const generateLiquidDeployment = async (params: LiquidParams, provider: provider
     if (shouldBootstrapLiquidity) {
         // if `params.wethMintAmountAdmin` was specified, mint 40% of admin's weth (per pair, per exchange)
         // otherwise mint 1000 WETH
-        const WETH_DEPOSIT_AMOUNT = params.wethMintAmountAdmin ?
-            ETH.mul(params.wethMintAmountAdmin).div(100).mul(40/numPairs) :
-            ETH.mul(1000)
+        const WETH_DEPOSIT_AMOUNT = adminMintAmount?.div(100).mul(40/numPairs) || ETH.mul(1000/numPairs)
         const DAI_DEPOSIT_AMOUNT = WETH_DEPOSIT_AMOUNT.mul(1300) // price 1300 DAI/WETH
 
         // deposit liquidity into WETH/DAI pairs

@@ -1,13 +1,15 @@
 import readline from "readline-sync"
+import { Wallet } from 'ethers';
 
 // lib
-import { getDeployUniswapV2Args } from '../lib/cliArgs';
+import { getDeployLiquidArgs } from '../lib/cliArgs';
 import env from '../lib/env';
 import { PROVIDER } from '../lib/providers';
 import { getExistingDeploymentFilename, getNewDeploymentFilename, getNewLiquidityFilename } from '../lib/liquid';
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 import {LiquidParams} from '../lib/scripts';
 import MevFlood from '..';
+import { RelayResponseError } from '@flashbots/ethers-provider-bundle';
 
 /** Prints txs:
  * build a set of contracts to deploy,
@@ -17,7 +19,7 @@ import MevFlood from '..';
  * all txs are signed with the account specified by ADMIN_PRIVATE_KEY in .env
 */
 const main = async () => {
-    const args = getDeployUniswapV2Args()
+    const args = getDeployLiquidArgs()
 
     try {
         await PROVIDER.getBlockNumber()
@@ -34,8 +36,10 @@ const main = async () => {
         console.warn(`Your admin account nonce is currently ${adminNonce}.`)
         readline.question("press Enter to continue...")
     }
+
     const deploymentFile = await getExistingDeploymentFilename()
-    const flood = await new MevFlood(adminWallet, PROVIDER).init(deploymentFile)
+    const flashbotsSigner = new Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+    const flood = await (await new MevFlood(adminWallet, PROVIDER).init(deploymentFile)).initFlashbots(flashbotsSigner)
     const {deployment, deployToMempool, deployToFlashbots} = await flood.liquid(args as LiquidParams, userWallet)
 
     if (deployment.signedTxs && deployment.signedTxs.length > 0) {
@@ -51,6 +55,12 @@ const main = async () => {
     } else {
         console.log("Txs prepared. Sending to Flashbots.")
         const deploymentRes = await deployToFlashbots()
+        if ("error" in deploymentRes) {
+            throw (deploymentRes as RelayResponseError).error
+        } else {
+            const res = await deploymentRes.wait()
+            console.log("res", res)
+        }
         console.log(`Finished deployment.`)
     }
 }

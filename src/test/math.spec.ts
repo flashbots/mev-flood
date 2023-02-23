@@ -1,6 +1,6 @@
 import assert from "assert"
 import { ethers } from 'ethers'
-import math, { numify } from "../lib/math"
+import { numify } from "../lib/math"
 
 describe("math", () => {
     it("should decode a BigNumber correctly", () => {

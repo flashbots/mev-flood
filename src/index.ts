@@ -1,4 +1,5 @@
 /** module exports for using mev-flood as a library */
+import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
 import { handleBackrun } from './lib/backrun'
@@ -9,9 +10,26 @@ import { ILiquidDeployment, LiquidDeployment, loadDeployment, loadDeployment as 
 import scripts, { LiquidParams } from './lib/scripts'
 import { approveIfNeeded, SwapOptions } from './lib/swap'
 
+const flashbotsUrls = {
+    1: "https://relay.flashbots.net",
+    5: "https://relay-goerli.flashbots.net",
+    11155111: "https://relay-sepolia.flashbots.net"
+} // TODO: make a PR to flashbots/ethers-provider-bundle to integrate network detection; users shouldn't need to do this
+
+const getFlashbotsUrl = (chainId: number): string => {
+    const url = Object.keys(flashbotsUrls).includes(chainId.toString()) ?
+        Object.entries(flashbotsUrls).find(([k,]) => k === chainId.toString())?.[1] :
+        undefined
+    if (!url) {
+        throw new Error(`Flashbots is not supported on network ${chainId}`)
+    }
+    return url
+}
+
 class MevFlood {
     private adminWallet: Wallet
     private provider: providers.JsonRpcProvider
+    private flashbotsProvider?: FlashbotsBundleProvider
     public deployment?: LiquidDeployment
 
     constructor(adminWallet: Wallet, provider: providers.JsonRpcProvider, deployment?: LiquidDeployment) {
@@ -31,6 +49,16 @@ class MevFlood {
         } catch (e) {
             throw new Error(`deployment "${deploymentFilename}" does not exist, or is not formatted correctly`)
         }
+        return this
+    }
+
+    public async initFlashbots(flashbotsSigner: Wallet) {
+        this.flashbotsProvider = await FlashbotsBundleProvider.create(
+            this.provider,
+            flashbotsSigner,
+            getFlashbotsUrl(this.provider.network.chainId),
+            this.provider.network
+        )
         return this
     }
 
@@ -84,8 +112,11 @@ class MevFlood {
         }
 
         const deployToFlashbots = async () => {
-            // TODO
-            console.warn("unimplemented!")
+            if (deployment.signedTxs){
+                return this.deployToFlashbots(deployment.signedTxs)
+            } else {
+                throw new Error("failed to deploy to flashbots. No signedTxs in deployment.")
+            }
         }
 
         return {
@@ -104,7 +135,12 @@ class MevFlood {
     }
 
     private async deployToFlashbots(allSignedTxs: string[]) {
-        // TODO
+        if (this.flashbotsProvider) {
+            const targetBlock = await this.provider.getBlockNumber() + 1
+            return await this.flashbotsProvider.sendRawBundle(allSignedTxs, targetBlock)
+        } else {
+            throw new Error("must call initFlashbots on MevFlood instance to deploy to flashbots")
+        }
     }
 
     /**
