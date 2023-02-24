@@ -7,7 +7,7 @@ import { getAdminWallet, getWalletSet } from './lib/wallets'
 
 async function main() {
     // get cli args
-    const {startIdx, endIdx, numSwaps, numPairs, minUsd, maxUsd, daiIndex, swapWethForDai, exchange} = getSwapdArgs()
+    const {startIdx, endIdx, numSwaps, numPairs, minUsd, maxUsd, daiIndex, swapWethForDai, exchange, mintWethAmount} = getSwapdArgs()
     // TODO: impl numPairs!
     // TODO: impl numSwaps!
 
@@ -21,7 +21,7 @@ async function main() {
     console.log("using wallets", walletSet.map(w => w.address))
 
     // check wallet balance for each token, mint if needed
-    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts)
+    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount)
 
     // check atomicSwap allowance for each wallet, approve max_uint if needed
     await approveIfNeeded(PROVIDER, walletSet, contracts)

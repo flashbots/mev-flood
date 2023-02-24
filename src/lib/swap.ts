@@ -119,16 +119,23 @@ export const approveIfNeeded = async (
     }
 }
 
-export const mintIfNeeded = async (provider: providers.JsonRpcProvider, adminWallet: Wallet, adminNonce: number, walletSet: Wallet[], contracts: {weth: Contract, dai: Contract[]}) => {
+export const mintIfNeeded = async (
+    provider: providers.JsonRpcProvider,
+    adminWallet: Wallet,
+    adminNonce: number,
+    walletSet: Wallet[],
+    contracts: {weth: Contract, dai: Contract[]},
+    wethAmount: BigNumber,
+) => {
     let signedDeposits = []
     let signedMints = []
 
     for (const wallet of walletSet) {
         let wethBalance: BigNumber = await contracts.weth.callStatic.balanceOf(wallet.address)
-        if (wethBalance.lte(ETH.mul(20))) {
+        if (wethBalance.lte(wethAmount)) {
             let nonce = await wallet.connect(provider).getTransactionCount()
             // mint 20 WETH
-            const tx = populateTxFully(await contracts.weth.populateTransaction.deposit({value: ETH.mul(20)}), nonce, {
+            const tx = populateTxFully(await contracts.weth.populateTransaction.deposit({value: wethAmount}), nonce, {
                 gasLimit: 50000,
                 from: wallet.address,
                 chainId: provider.network.chainId,

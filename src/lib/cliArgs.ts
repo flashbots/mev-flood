@@ -1,3 +1,4 @@
+import { parseEther } from 'ethers/lib/utils'
 import { textColors, } from './helpers'
 
 export const getOption = (args: string[], flagIndex: number, argType?: "string" | "number" | "boolean") => {
@@ -299,6 +300,8 @@ export const getSwapdArgs = () => {
     const swapWethForDaiShort = "-b"
     const swapDaiForWethFlag = "--buy-eth"
     const swapDaiForWethShort = "-s"
+    const mintWethAmountFlag = "--mint-weth"
+    const mintWethAmountShort = "-w"
 
     const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)"
     const usage = `\
@@ -313,6 +316,7 @@ export const getSwapdArgs = () => {
     ${daiIndexShort}\t${daiIndexFlag}\t\tIndex of deployed DAI token to trade with.
     ${swapWethForDaiShort}\t${swapWethForDaiFlag}\t\tSwaps WETH for DAI if set.
     ${swapDaiForWethShort}\t${swapDaiForWethFlag}\t\tSwaps DAI for WETH if set.
+    ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
 `
     const examples = `\
     # run with a single wallet
@@ -344,6 +348,7 @@ export const getSwapdArgs = () => {
     let exchange = undefined
     let daiIndex = 0
     let swapWethForDai = undefined
+    let mintWethAmount = 20
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -382,6 +387,10 @@ export const getSwapdArgs = () => {
                 const flagIndex = getFlagIndex(args, swapDaiForWethFlag, swapDaiForWethShort)
                 swapWethForDai = !(getOption(args, flagIndex, "boolean") as boolean)
             }
+            if (args.includes(mintWethAmountFlag) || args.includes(mintWethAmountShort)) {
+                const flagIndex = getFlagIndex(args, mintWethAmountFlag, mintWethAmountShort)
+                mintWethAmount = getOption(args, flagIndex, "number") as number
+            }
 
         }
     } else {
@@ -401,6 +410,7 @@ export const getSwapdArgs = () => {
         exchange,
         daiIndex,
         swapWethForDai,
+        mintWethAmount: parseEther(mintWethAmount.toString()),
     }
 }
 
@@ -408,10 +418,15 @@ export const getSwapdArgs = () => {
 export const getArbdArgs = () => {
     const description = "Monitor mempool for arbitrage opportunities, backrun user when profit detected."
     const minProfitFlag = "--min-profit"
+    const minProfitShort = "-m"
     const maxProfitFlag = "--max-profit"
+    const maxProfitShort = "-M"
+    const mintWethAmountFlag = "--mint-weth"
+    const mintWethAmountShort = "-w"
     const options = `\
-    -m, ${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in gwei. (default=100)
-    -M, ${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in gwei. (default=inf)
+    ${minProfitShort}, ${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in gwei. (default=100)
+    ${maxProfitShort}, ${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in gwei. (default=inf)
+    ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
 `
     const usage = `\
     yarn swapd <first_wallet_index> [last_wallet_index] [OPTIONS...]
@@ -431,6 +446,7 @@ export const getArbdArgs = () => {
     const args = process.argv.slice(2)
     let minProfit = 100
     let maxProfit = -1 // -1 is interpreted as unlimited
+    let mintWethAmount = 20
 
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -457,5 +473,42 @@ export const getArbdArgs = () => {
         walletIdx,
         minProfit,
         maxProfit,
+    }
+}
+
+export const getFundWalletsArgs = () => {
+    const description = "Fund wallets with ETH."
+    const usage = `\
+    yarn script.fundWallets [OPTIONS]
+`
+    const ethFlag = "--eth"
+    const ethShort = "-e"
+    const options = `\
+    ${ethShort}, ${ethFlag}\t\t\tAmount of ETH to send to each wallet. (default=50)
+`
+    const examples = `\
+    # fund wallets with 50 ETH each (default)
+    yarn script.fundWallets
+
+    # fund wallets with 1 ETH
+    yarn script.fundWallets -e 1
+`
+    const helpMessage = genHelpMessage(description, usage, options, examples)
+    let eth: number | undefined = 50
+
+    const args = process.argv.slice(2)
+    if (args.length > 0) {
+        if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
+            console.log(helpMessage)
+            process.exit(0)
+        }
+    }
+    
+    if (args.includes(ethFlag) || args.includes(ethShort)) {
+        const ethFlagIndex = getFlagIndex(args, ethFlag, ethShort)
+        eth = getOption(args, ethFlagIndex, "number") as number
+    }
+    return {
+        eth,
     }
 }

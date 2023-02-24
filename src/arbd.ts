@@ -1,5 +1,6 @@
 import { handleBackrun } from './lib/backrun'
 import { getArbdArgs } from './lib/cliArgs'
+import { ETH } from './lib/helpers'
 import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
 import { approveIfNeeded, mintIfNeeded } from './lib/swap'
@@ -21,7 +22,7 @@ async function main() {
     console.log("using wallets", walletSet.map(w => w.address))
 
     // check wallet balance for each token, mint if needed
-    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts)
+    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, ETH.mul(20))
 
     // check atomicSwap allowance for each wallet, approve max_uint if needed
     await approveIfNeeded(PROVIDER, walletSet, contracts)
