@@ -55,9 +55,10 @@ async function main() {
                         }
                     }
                 } else {
+                    console.log("sending backrun to mempool")
                     const res = await backrun.sendToMempool()
                     if (res) {
-                        console.log("backrun sent to mempool")
+                        console.log("backrun sent")
                     }
                 }
             }

@@ -1,5 +1,5 @@
 import { BigNumber, Contract, ethers, providers, Transaction, utils, Wallet } from 'ethers'
-import { formatEther } from 'ethers/lib/utils'
+import { formatEther, UnsignedTransaction } from 'ethers/lib/utils'
 import { calculateBackrunParams } from './arbitrage'
 import contracts from './contracts'
 import { extract4Byte, populateTxFully } from './helpers'
@@ -182,12 +182,14 @@ export const generateBackrun = async (provider: providers.JsonRpcProvider, deplo
                     amountIn
                 )
                 const signedArb = await wallet.signTransaction(populateTxFully(arbRequest, await provider.getTransactionCount(wallet.address), {from: wallet.address, chainId: provider.network.chainId}))
-
+                if (pendingTx.type === 2) {
+                    delete pendingTx.gasPrice
+                }
                 return {
                     arbRequest,
                     signedArb,
                     bundle: [
-                        utils.serializeTransaction(pendingTx),
+                        utils.serializeTransaction(pendingTx as UnsignedTransaction, {r: pendingTx.r || "0x", s: pendingTx.s, v: pendingTx.v}),
                         signedArb,
                     ],
                 }

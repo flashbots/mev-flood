@@ -1,6 +1,6 @@
 /** module exports for using mev-flood as a library */
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
-import { Wallet, providers, Transaction } from 'ethers'
+import { Wallet, providers, Transaction, ethers } from 'ethers'
 import fs from "fs/promises"
 import { generateBackrun, Reserves } from './lib/backrun'
 
@@ -192,7 +192,7 @@ class MevFlood {
             }
             const sendToMempool = async () => {
                 if (backrun?.bundle) {
-                    return this.sendToMempool(backrun.bundle)
+                    return this.sendToMempool([backrun.signedArb])
                 }
             }
             return {
