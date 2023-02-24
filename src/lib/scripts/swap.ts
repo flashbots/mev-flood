@@ -4,7 +4,7 @@ import contracts from '../contracts'
 import { LiquidDeployment } from '../liquid'
 import { createRandomSwap, signSwap, SwapOptions } from '../swap'
 
-export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployment: LiquidDeployment) => {
+export const createSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployment: LiquidDeployment) => {
     let signedSwaps = []
     let swapParams = []
     for (const wallet of userWallets) {
@@ -23,8 +23,6 @@ export const sendSwaps = async (options: SwapOptions, provider: providers.JsonRp
         const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, nonce, provider.network.chainId)
         signedSwaps.push(signedSwap)
     }
-    const swapPromises = signedSwaps.map(tx => provider.sendTransaction(tx))
-    const swapResults = await Promise.all(swapPromises)
-    console.log(`swapped with ${swapResults.length} wallets`)
-    return {swapResults, signedSwaps, swapParams}
+    console.log(`created swaps from ${signedSwaps.length} wallets`)
+    return {signedSwaps, swapParams}
 }

@@ -2,7 +2,7 @@
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
-import { handleBackrun } from './lib/backrun'
+import { generateBackrun, Reserves } from './lib/backrun'
 
 // lib
 import { textColors } from './lib/helpers'
@@ -36,6 +36,33 @@ class MevFlood {
         this.adminWallet = adminWallet
         this.provider = provider
         this.deployment = deployment
+    }
+
+    /**
+     * Sends array of transactions to the mempool.
+     * @param allSignedTxs Array of raw signed transactions.
+     * @returns Pending transactions.
+     */
+    private async sendToMempool(allSignedTxs: string[]) {
+        let pendingTxs = []
+        for (const tx of allSignedTxs) {
+            pendingTxs.push(await this.provider.sendTransaction(tx))
+        }
+        return pendingTxs
+    }
+
+    /**
+     * Sends a bundle of transactions to Flashbots.
+     * @param allSignedTxs Array of raw signed transactions.
+     * @returns Pending bundle response.
+     */
+    private async sendToFlashbots(allSignedTxs: string[]) {
+        if (this.flashbotsProvider) {
+            const targetBlock = await this.provider.getBlockNumber() + 1
+            return await this.flashbotsProvider.sendRawBundle(allSignedTxs, targetBlock)
+        } else {
+            throw new Error("must call initFlashbots on MevFlood instance to deploy to flashbots")
+        }
     }
 
     /**
@@ -105,7 +132,7 @@ class MevFlood {
 
         const deployToMempool = async () => {
             if (deployment.signedTxs){
-                return this.deployToMempool(deployment.signedTxs)
+                return this.sendToMempool(deployment.signedTxs)
             } else {
                 throw new Error("failed to deploy to mempool. No signedTxs in deployment.")
             }
@@ -113,7 +140,7 @@ class MevFlood {
 
         const deployToFlashbots = async () => {
             if (deployment.signedTxs){
-                return this.deployToFlashbots(deployment.signedTxs)
+                return this.sendToFlashbots(deployment.signedTxs)
             } else {
                 throw new Error("failed to deploy to flashbots. No signedTxs in deployment.")
             }
@@ -126,34 +153,28 @@ class MevFlood {
         }
     }
 
-    private async deployToMempool(allSignedTxs: string[]) {
-        let pendingTxs = []
-        for (const tx of allSignedTxs) {
-            pendingTxs.push(await this.provider.sendTransaction(tx))
-        }
-        return pendingTxs
-    }
-
-    private async deployToFlashbots(allSignedTxs: string[]) {
-        if (this.flashbotsProvider) {
-            const targetBlock = await this.provider.getBlockNumber() + 1
-            return await this.flashbotsProvider.sendRawBundle(allSignedTxs, targetBlock)
-        } else {
-            throw new Error("must call initFlashbots on MevFlood instance to deploy to flashbots")
-        }
-    }
-
     /**
      * Sends a random swap from many wallets.
-     * @param swapParams Parameters to adjust the size of the swap. // TODO: add direction
+     * @param swapParams Parameters to adjust the size of the swap.
      * @param fromWallets Array of wallets that will send the swaps.
      * @param deployment LiquidDeployment object containing contract information. See `MevFlood.loadDeployment` and `MevFlood.saveDeployment`.
      */
-    async sendSwaps(swapParams: SwapOptions, fromWallets: Wallet[]) {
-        if (this.deployment)
-            return await scripts.sendSwaps(swapParams, this.provider, fromWallets, this.deployment)
-        else {
-            throw new Error("must initialize MevFlood with a deployment to send swaps")
+    async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[]) {
+        if (this.deployment) {
+            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment)
+            const sendToFlashbots = async () => {
+                return this.sendToFlashbots(swaps.signedSwaps)
+            }
+            const sendToMempool = async () => {
+                return this.sendToMempool(swaps.signedSwaps)
+            }
+            return {
+                swaps,
+                sendToFlashbots,
+                sendToMempool
+            }
+        } else {
+            throw new Error("must initialize MevFlood with a liquid deployment to send swaps")
         }
     }
 
@@ -161,9 +182,25 @@ class MevFlood {
      * Attempt to execute a backrun given a pending transaction.
      * @param pendingTx 
      */
-    async backrun(pendingTx: Transaction) {
-        if (this.deployment)
-            return await handleBackrun(this.provider, this.deployment, this.adminWallet, pendingTx)
+    async backrun(pendingTx: Transaction, userPairReserves?: Reserves) {
+        if (this.deployment) {
+            const backrun = await generateBackrun(this.provider, this.deployment, this.adminWallet, pendingTx, userPairReserves)
+            const sendToFlashbots = async () => {
+                if (backrun?.bundle) {
+                    return this.sendToFlashbots(backrun.bundle)
+                }
+            }
+            const sendToMempool = async () => {
+                if (backrun?.bundle) {
+                    return this.sendToMempool(backrun.bundle)
+                }
+            }
+            return {
+                backrun,
+                sendToFlashbots,
+                sendToMempool,
+            }
+        }
         else {
             throw new Error("backrun failed")
         }

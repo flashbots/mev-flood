@@ -3,7 +3,6 @@ import { ethers, Wallet } from 'ethers'
 import { formatEther } from 'ethers/lib/utils'
 import MevFlood from '..'
 import { calculateBackrunParams } from "../lib/arbitrage"
-import { handleBackrun } from '../lib/backrun'
 import math, { numify } from "../lib/math"
 import { PROVIDER } from '../lib/providers'
 import { SwapOptions } from '../lib/swap'
@@ -182,12 +181,23 @@ describe("arbitrage integration tests", () => {
                 const kB = reserves0B.mul(reserves1B)
 
                 // user swap
-                const swap = await flood.sendSwaps(swapParams, [user])
-                await Promise.all(swap.swapResults.map(r => r.wait(1)))
+                const swaps = await flood.generateSwaps(swapParams, [user])
+                const swapRes = await swaps.sendToMempool()
+                await Promise.all(swapRes.map(r => r.wait(1)))
 
                 // backrun
-                const backrunParams = calculateBackrunParams(numify(reserves0A), numify(reserves1A), numify(kA), numify(reserves0B), numify(reserves1B), numify(kB), numify(swap.swapParams[0].amountIn), wethIndex === 0, "A")
-                const backrun = await handleBackrun(PROVIDER, flood.deployment, admin, swap.swapResults[0], {
+                const backrunParams = calculateBackrunParams(
+                    numify(reserves0A),
+                    numify(reserves1A),
+                    numify(kA),
+                    numify(reserves0B),
+                    numify(reserves1B),
+                    numify(kB),
+                    numify(swaps.swaps.swapParams[0].amountIn),
+                    wethIndex === 0, "A"
+                )
+                // TODO: group multiple txs together to backrun all swaps
+                const backrun = await flood.backrun(swapRes[0], {
                     A: {
                         reserves0: reserves0A,
                         reserves1: reserves1A,
@@ -197,7 +207,16 @@ describe("arbitrage integration tests", () => {
                         reserves1: reserves1B,
                     },
                 })
-                await backrun?.arbSendResult?.wait(1)
+                if (backrun) {
+                    const backrunRes = await backrun.sendToMempool()
+                    if (backrunRes) {
+                        await Promise.all(backrunRes.map(async r => await r.wait(1)))
+                    } else {
+                        console.error("backrun failed to send to mempool")
+                    }
+                } else {
+                    console.error("failed to generate backrun")
+                }
 
                 const balanceNew = await contracts.dai[0].balanceOf(admin.address)
                 const balanceDiff = numify(balanceNew.sub(balanceStart))

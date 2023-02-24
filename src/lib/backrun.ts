@@ -3,7 +3,7 @@ import { formatEther } from 'ethers/lib/utils'
 import { calculateBackrunParams } from './arbitrage'
 import contracts from './contracts'
 import { extract4Byte, populateTxFully } from './helpers'
-import { ContractDeployment, LiquidDeployment } from './liquid'
+import { ContractDeployment, LiquidContracts, LiquidDeployment } from './liquid'
 import math, { numify } from './math'
 
 interface ISwapParams {
@@ -61,43 +61,51 @@ export type Reserves = {
     B: {reserves0: BigNumber, reserves1: BigNumber},
 }
 
+/** Gets reserves for a given pair on each exchange.
+ * @param token0 Address of token0
+ * @param token1 Address of token1
+ * @param deployedContracts LiquidContracts object
+ * @param provider ethers provider
+ * @param userPairReserves Optional user-provided reserves
+ * @returns reserves: {reservesA: [BigNumber, BigNumber], reservesB: [BigNumber, BigNumber]}
+ */
+const getReserves = async (token0: string, token1: string, deployedContracts: LiquidContracts, provider: providers.JsonRpcProvider, userPairReserves?: Reserves) => {
+    // get reserves
+    const pairAddressA = await deployedContracts.uniV2FactoryA.getPair(token0, token1)
+    const pairAddressB = await deployedContracts.uniV2FactoryB.getPair(token0, token1)
+    // TODO: cache these contracts
+    const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, provider)
+    const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, provider)
+    const reserves = userPairReserves ? {
+        reservesA: [userPairReserves.A.reserves0, userPairReserves.A.reserves1],
+        reservesB: [userPairReserves.B.reserves0, userPairReserves.B.reserves1],
+        pairA,
+        pairB,
+    } : {
+        reservesA: await pairA.getReserves(),
+        reservesB: await pairB.getReserves(),
+        pairA,
+        pairB,
+    }
+    return reserves
+}
+
 /**
- * 
+ * Interprets a pending tx and attempts to create a transaction to backrun it.
  * @param provider Provider to pull blockchain state from.
  * @param deployment Liquid deployment instance.
  * @param wallet Wallet from which to send backrun.
  * @param pendingTx Pending tx to try to backrun.
  * @param userPairReserves Optional; specifies pre-trade reserves (before the user makes their swap). Default: reads from chain.
- * @returns 
+ * @returns Bundle of transactions to backrun the user's swap, along with arb details.
  */
-export const handleBackrun = async (provider: providers.JsonRpcProvider, deployment: LiquidDeployment, wallet: Wallet, pendingTx: Transaction, userPairReserves?: Reserves) => {
+export const generateBackrun = async (provider: providers.JsonRpcProvider, deployment: LiquidDeployment, wallet: Wallet, pendingTx: Transaction, userPairReserves?: Reserves) => {
     if (pendingTx.to === deployment.atomicSwap.contractAddress) {
         // const nonce = await PROVIDER.getTransactionCount(wallet.address)
         // swap detected
         // TODO: side daemon that caches the reserves on new blocks
         // for now we can just pull the reserves for every tx but it's not ideal
         const deployedContracts = deployment.getDeployedContracts(provider)
-
-        const getReserves = async (token0: string, token1: string) => {
-            // get reserves
-            const pairAddressA = await deployedContracts.uniV2FactoryA.getPair(token0, token1)
-            const pairAddressB = await deployedContracts.uniV2FactoryB.getPair(token0, token1)
-            // TODO: cache these contracts
-            const pairA = new Contract(pairAddressA, contracts.UniV2Pair.abi, provider)
-            const pairB = new Contract(pairAddressB, contracts.UniV2Pair.abi, provider)
-            const reserves = userPairReserves ? {
-                reservesA: [userPairReserves.A.reserves0, userPairReserves.A.reserves1],
-                reservesB: [userPairReserves.B.reserves0, userPairReserves.B.reserves1],
-                pairA,
-                pairB,
-            } : {
-                reservesA: await pairA.getReserves(),
-                reservesB: await pairB.getReserves(),
-                pairA,
-                pairB,
-            }
-            return reserves
-        }
 
         // decode tx to get pair
         // we're expecting a call to `swap` on atomicSwap
@@ -114,7 +122,7 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
             const userSwap = new SwapParams(decodedTxData)
 
             // get reserves
-            const {reservesA, reservesB, pairA, pairB} = await getReserves(userSwap.path[0], userSwap.path[1])
+            const {reservesA, reservesB, pairA, pairB} = await getReserves(userSwap.path[0], userSwap.path[1], deployedContracts, provider, userPairReserves)
 
             // TODO: only calculate each `k` once
             const kA = reservesA[0].mul(reservesA[1])
@@ -173,42 +181,15 @@ export const handleBackrun = async (provider: providers.JsonRpcProvider, deploym
                     pairEnd,
                     amountIn
                 )
-                const signedArb = wallet.signTransaction(populateTxFully(arbRequest, await provider.getTransactionCount(wallet.address), {from: wallet.address, chainId: provider.network.chainId}))
-                let arbSendResult
-                try {
-                    arbSendResult = await provider.sendTransaction(await signedArb)
-                    const daiAddress = wethIndex === 0 ? token1 : token0
-                    const daiIdx = deployedContracts.dai.map(c => c.address.toLowerCase()).indexOf(daiAddress.toLowerCase())
-                    const daiContract = deployedContracts.dai[daiIdx]
-                    if ((await arbSendResult.wait()).confirmations > 0){
-                        console.log("ARB LANDED")
-                    }
-                    const userBalances = {
-                        WETH: formatEther(await deployedContracts.weth.balanceOf(wallet.address)),
-                        DAI: formatEther(await daiContract.balanceOf(wallet.address)),
-                    }
-                    const swapContractBalances = {
-                        WETH: formatEther(await deployedContracts.weth.balanceOf(deployment.atomicSwap.contractAddress)),
-                        DAI: formatEther(await daiContract.balanceOf(deployment.atomicSwap.contractAddress)),
-                    }
-                    console.log(`[${wallet.address}] DAI${daiIdx+1}`, userBalances)
-                    console.log(`[atomicSwapContract]`, swapContractBalances)
-                } catch (e) {
-                    type E = {
-                        code: string
-                    }
-                    if ((e as E).code === ethers.errors.NONCE_EXPIRED) {
-                        console.warn("nonce expired")
-                    } else if ((e as E).code === ethers.errors.REPLACEMENT_UNDERPRICED) {
-                        console.warn("replacement underpriced")
-                    } else {
-                        console.error(e)
-                    }
-                }
+                const signedArb = await wallet.signTransaction(populateTxFully(arbRequest, await provider.getTransactionCount(wallet.address), {from: wallet.address, chainId: provider.network.chainId}))
+
                 return {
                     arbRequest,
                     signedArb,
-                    arbSendResult,
+                    bundle: [
+                        utils.serializeTransaction(pendingTx),
+                        signedArb,
+                    ],
                 }
             }
         }

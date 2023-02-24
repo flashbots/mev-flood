@@ -63,7 +63,7 @@ describe("uniswap", () => {
                     0: userSwap.reserves0, 1: userSwap.reserves1
                 })
     
-                const swap = await flood.sendSwaps({
+                const swap = await flood.generateSwaps({
                     minUSD: userSwapAmount.mul(price).toNumber(),
                     maxUSD: userSwapAmount.mul(price).toNumber(),
                     swapWethForDai: true,
@@ -71,7 +71,8 @@ describe("uniswap", () => {
                     swapOnA: true,
                 },
                 [user])
-                await Promise.all(swap.swapResults.map(r => r.wait(1)))
+                const swapResults = await swap.sendToMempool()
+                await Promise.all(swapResults.map(r => r.wait(1)))
                 const rA_new = (await contracts.daiWethA[0].getReserves()).slice(0, 2).map(ethersToMath)
                 const reservesNew = {
                     0: rA_new[0], 1: rA_new[1]

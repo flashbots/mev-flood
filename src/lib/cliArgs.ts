@@ -302,6 +302,8 @@ export const getSwapdArgs = () => {
     const swapDaiForWethShort = "-s"
     const mintWethAmountFlag = "--mint-weth"
     const mintWethAmountShort = "-w"
+    const flashbotsFlag = "--flashbots"
+    const flashbotsShort = "-f"
 
     const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)"
     const usage = `\
@@ -317,6 +319,7 @@ export const getSwapdArgs = () => {
     ${swapWethForDaiShort}\t${swapWethForDaiFlag}\t\tSwaps WETH for DAI if set.
     ${swapDaiForWethShort}\t${swapDaiForWethFlag}\t\tSwaps DAI for WETH if set.
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
+    ${flashbotsShort}\t${flashbotsFlag}\t\tSend swaps as Flashbots bundles instead of sending to mempool.
 `
     const examples = `\
     # run with a single wallet
@@ -349,6 +352,7 @@ export const getSwapdArgs = () => {
     let daiIndex = 0
     let swapWethForDai = undefined
     let mintWethAmount = 20
+    let sendToFlashbots = false
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -391,6 +395,9 @@ export const getSwapdArgs = () => {
                 const flagIndex = getFlagIndex(args, mintWethAmountFlag, mintWethAmountShort)
                 mintWethAmount = getOption(args, flagIndex, "number") as number
             }
+            if (args.includes(flashbotsFlag)) {
+                sendToFlashbots = true
+            }
 
         }
     } else {
@@ -411,6 +418,7 @@ export const getSwapdArgs = () => {
         daiIndex,
         swapWethForDai,
         mintWethAmount: parseEther(mintWethAmount.toString()),
+        sendToFlashbots,
     }
 }
 
@@ -423,10 +431,12 @@ export const getArbdArgs = () => {
     const maxProfitShort = "-M"
     const mintWethAmountFlag = "--mint-weth"
     const mintWethAmountShort = "-w"
+    const mempoolFlag = "--mempool"
     const options = `\
-    ${minProfitShort}, ${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in gwei. (default=100)
-    ${maxProfitShort}, ${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in gwei. (default=inf)
+    ${minProfitShort}\t${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in gwei. (default=100)
+    ${maxProfitShort}\t${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in gwei. (default=inf)
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
+    ${mempoolFlag}\t\t\tSend backruns to mempool instead of sending a bundle to Flashbots (NOT recommended).
 `
     const usage = `\
     yarn swapd <first_wallet_index> [last_wallet_index] [OPTIONS...]
@@ -447,19 +457,27 @@ export const getArbdArgs = () => {
     let minProfit = 100
     let maxProfit = -1 // -1 is interpreted as unlimited
     let mintWethAmount = 20
+    let sendToFlashbots = true
 
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
             console.log(helpMessage)
             process.exit(0)
         } else {
-            if (args.includes(minProfitFlag) || args.includes("-m")) {
-                const flagIndex = getFlagIndex(args, minProfitFlag, "-m")
+            if (args.includes(minProfitFlag) || args.includes(minProfitShort)) {
+                const flagIndex = getFlagIndex(args, minProfitFlag, minProfitShort)
                 minProfit = getOption(args, flagIndex) as number
             }
-            if (args.includes(maxProfitFlag) || args.includes("-M")) {
-                const flagIndex = getFlagIndex(args, maxProfitFlag, "-M")
+            if (args.includes(maxProfitFlag) || args.includes(maxProfitShort)) {
+                const flagIndex = getFlagIndex(args, maxProfitFlag, maxProfitShort)
                 maxProfit = getOption(args, flagIndex) as number
+            }
+            if (args.includes(mintWethAmountFlag) || args.includes(mintWethAmountShort)) {
+                const flagIndex = getFlagIndex(args, mintWethAmountFlag, mintWethAmountShort)
+                mintWethAmount = getOption(args, flagIndex) as number
+            }
+            if (args.includes(mempoolFlag)) {
+                sendToFlashbots = false
             }
         }
     } else {
@@ -473,6 +491,8 @@ export const getArbdArgs = () => {
         walletIdx,
         minProfit,
         maxProfit,
+        mintWethAmount: parseEther(mintWethAmount.toString()),
+        sendToFlashbots,
     }
 }
 
@@ -503,7 +523,7 @@ export const getFundWalletsArgs = () => {
             process.exit(0)
         }
     }
-    
+
     if (args.includes(ethFlag) || args.includes(ethShort)) {
         const ethFlagIndex = getFlagIndex(args, ethFlag, ethShort)
         eth = getOption(args, ethFlagIndex, "number") as number

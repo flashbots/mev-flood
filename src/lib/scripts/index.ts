@@ -1,11 +1,11 @@
 import fundWallets from './fundWallets'
 import liquid from './liquid'
-import { sendSwaps } from './swap'
+import { createSwaps } from './swap'
 
 export {LiquidParams} from "./liquid"
 
 export default {
     fundWallets,
     liquid,
-    sendSwaps,
+    createSwaps,
 }
