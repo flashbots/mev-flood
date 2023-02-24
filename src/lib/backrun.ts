@@ -1,4 +1,4 @@
-import { BigNumber, Contract, ethers, providers, Transaction, utils, Wallet } from 'ethers'
+import { BigNumber, Contract, ethers, PopulatedTransaction, providers, Transaction, utils, Wallet } from 'ethers'
 import { formatEther, UnsignedTransaction } from 'ethers/lib/utils'
 import { calculateBackrunParams } from './arbitrage'
 import contracts from './contracts'
@@ -99,7 +99,17 @@ const getReserves = async (token0: string, token1: string, deployedContracts: Li
  * @param userPairReserves Optional; specifies pre-trade reserves (before the user makes their swap). Default: reads from chain.
  * @returns Bundle of transactions to backrun the user's swap, along with arb details.
  */
-export const generateBackrun = async (provider: providers.JsonRpcProvider, deployment: LiquidDeployment, wallet: Wallet, pendingTx: Transaction, userPairReserves?: Reserves) => {
+export const generateBackrun = async (
+    provider: providers.JsonRpcProvider,
+    deployment: LiquidDeployment,
+    wallet: Wallet,
+    pendingTx: Transaction,
+    opts?: {minProfit?: BigNumber, maxProfit?: BigNumber, userPairReserves?: Reserves},
+): Promise<{
+    arbRequest: PopulatedTransaction,
+    signedArb: string,
+    bundle: string[],
+} | undefined> => {
     if (pendingTx.to === deployment.atomicSwap.contractAddress) {
         // const nonce = await PROVIDER.getTransactionCount(wallet.address)
         // swap detected
@@ -122,7 +132,7 @@ export const generateBackrun = async (provider: providers.JsonRpcProvider, deplo
             const userSwap = new SwapParams(decodedTxData)
 
             // get reserves
-            const {reservesA, reservesB, pairA, pairB} = await getReserves(userSwap.path[0], userSwap.path[1], deployedContracts, provider, userPairReserves)
+            const {reservesA, reservesB, pairA, pairB} = await getReserves(userSwap.path[0], userSwap.path[1], deployedContracts, provider, opts?.userPairReserves)
 
             // TODO: only calculate each `k` once
             const kA = reservesA[0].mul(reservesA[1])
@@ -160,6 +170,14 @@ export const generateBackrun = async (provider: providers.JsonRpcProvider, deplo
             const price = wethIndex === 0 ? reserves1.div(reserves0) : reserves0.div(reserves1)
             const profit = settlesInWeth ? backrunParams.profit : backrunParams.profit.div(price)
             if (profit.gt(gasCost)) {
+                if (opts?.maxProfit && profit.gt(numify(opts.maxProfit))) {
+                    console.warn("profit exceeds maxProfit setting")
+                    return
+                }
+                if (opts?.minProfit && profit.lt(numify(opts.minProfit))) {
+                    console.warn("profit is less than minProfit setting")
+                    return
+                }
                 console.debug(`BACKRUN. estimated proceeds: ${utils.formatEther(backrunParams.profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
                 const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
                 const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1

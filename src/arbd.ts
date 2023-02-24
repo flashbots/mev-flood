@@ -1,9 +1,8 @@
 import { FlashbotsBundleResolution } from '@flashbots/ethers-provider-bundle'
 import { Wallet } from 'ethers'
+import { parseEther } from 'ethers/lib/utils'
 import MevFlood from '.'
-import { generateBackrun } from './lib/backrun'
 import { getArbdArgs } from './lib/cliArgs'
-import { ETH } from './lib/helpers'
 import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
 import { approveIfNeeded, mintIfNeeded } from './lib/swap'
@@ -12,9 +11,6 @@ import { getAdminWallet, getWalletSet } from './lib/wallets'
 async function main() {
     // get cli args
     const {walletIdx, minProfit, maxProfit, sendToFlashbots, mintWethAmount} = getArbdArgs()
-    // TODO: impl minProfit!
-    // TODO: impl maxProfit!
-
     const walletSet = getWalletSet(walletIdx, walletIdx + 1)
     const deployment = await loadDeployment({})
     const contracts = deployment.getDeployedContracts(PROVIDER)
@@ -35,8 +31,10 @@ async function main() {
 
     PROVIDER.on('pending', async (pendingTx: any) => {
         for (const wallet of walletSet) {
-            // const backrun = await generateBackrun(PROVIDER, deployment, wallet, pendingTx)
-            const backrun = await (await flood(wallet)).backrun(pendingTx)
+            const backrun = await (await flood(wallet)).backrun(pendingTx, {
+                minProfit: parseEther(minProfit.toString()),
+                maxProfit: parseEther(maxProfit.toString()),
+            })
             if (backrun) {
                 if (sendToFlashbots) {
                     const res = await backrun.sendToFlashbots()

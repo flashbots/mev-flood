@@ -1,6 +1,6 @@
 /** module exports for using mev-flood as a library */
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
-import { Wallet, providers, Transaction, ethers } from 'ethers'
+import { Wallet, providers, Transaction, ethers, BigNumber } from 'ethers'
 import fs from "fs/promises"
 import { generateBackrun, Reserves } from './lib/backrun'
 
@@ -115,7 +115,7 @@ class MevFlood {
 
     /**
      * Deploys & bootstraps a functional Uniswap V2 environment.
-     * @param liquidParams flags to modify the behavior of the function. // TODO: split these out into atomic functions
+     * @param liquidParams flags to modify the behavior of the function. // TODO: split liquid's features out into atomic functions
      * @param userWallet Optional wallet to receive tokens.
      * @param deployment LiquidDeployment object containing contract information. See `MevFlood.loadDeployment` and `MevFlood.saveDeployment`.
      */
@@ -182,9 +182,9 @@ class MevFlood {
      * Attempt to execute a backrun given a pending transaction.
      * @param pendingTx 
      */
-    async backrun(pendingTx: Transaction, userPairReserves?: Reserves) {
+    async backrun(pendingTx: Transaction, opts?: {minProfit?: BigNumber, maxProfit?: BigNumber, userPairReserves?: Reserves}) {
         if (this.deployment) {
-            const backrun = await generateBackrun(this.provider, this.deployment, this.adminWallet, pendingTx, userPairReserves)
+            const backrun = await generateBackrun(this.provider, this.deployment, this.adminWallet, pendingTx, opts)
             const sendToFlashbots = async () => {
                 if (backrun?.bundle) {
                     return this.sendToFlashbots(backrun.bundle)
