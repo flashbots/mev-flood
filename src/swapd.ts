@@ -12,12 +12,14 @@ import { getAdminWallet, getWalletSet } from './lib/wallets'
 async function main() {
     // get cli args
     const {startIdx, endIdx, numSwaps, numPairs, minUsd, maxUsd, daiIndex, swapWethForDai, exchange, mintWethAmount, sendToFlashbots} = getSwapdArgs()
-    // TODO: impl numPairs!
-    // TODO: impl numSwaps!
 
     const walletSet = getWalletSet(startIdx, endIdx)
     const deployment = await loadDeployment({})
     const contracts = deployment.getDeployedContracts(PROVIDER)
+
+    if (numPairs > contracts.dai.length) {
+        throw new Error(`numPairs ${numPairs} is higher than the number of dai contracts ${contracts.dai.length}`)
+    }
 
     // check token balances for each wallet, mint more if needed
     const flashbotsSigner = new Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") // hh[0]

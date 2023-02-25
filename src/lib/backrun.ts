@@ -1,9 +1,9 @@
-import { BigNumber, Contract, ethers, PopulatedTransaction, providers, Transaction, utils, Wallet } from 'ethers'
+import { BigNumber, Contract, PopulatedTransaction, providers, Transaction, utils, Wallet } from 'ethers'
 import { formatEther, UnsignedTransaction } from 'ethers/lib/utils'
 import { calculateBackrunParams } from './arbitrage'
 import contracts from './contracts'
 import { extract4Byte, populateTxFully } from './helpers'
-import { ContractDeployment, LiquidContracts, LiquidDeployment } from './liquid'
+import { LiquidContracts, LiquidDeployment } from './liquid'
 import math, { numify } from './math'
 
 interface ISwapParams {
@@ -145,8 +145,7 @@ export const generateBackrun = async (
                 return
             }
             const settlesInWeth = backrunParams.settlementToken === wethIndex
-            
-            // TODO: check profit against min/max profit flags b4 executing
+
             // TODO: calculate gas cost dynamically (accurately)
             const gasCost = math.bignumber(100000).mul(1e9).mul(40)
             // normalize profit to ETH

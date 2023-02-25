@@ -5,7 +5,6 @@ import { ETH, GWEI, populateTxFully } from '../lib/helpers'
 import { PROVIDER } from '../lib/providers'
 import { getTestWallet } from '../lib/wallets'
 
-// TODO: write all args helpers like this
 const getArgs = () => {
     const helpMessage = `Simulate a bundle that wraps ETH and transfers your WETH to yourself. Useless but effective for testing.
 

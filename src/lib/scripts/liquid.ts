@@ -43,7 +43,7 @@ const generateLiquidDeployment = async (params: LiquidParams, provider: provider
     const adminMintAmount = params.wethMintAmountAdmin !== undefined ? parseEther(params.wethMintAmountAdmin.toString()) : undefined
     const userMintAmount = params.wethMintAmountUser !== undefined ? parseEther(params.wethMintAmountUser.toString()) : undefined
 
-    const overrides = { // TODO: rename
+    const overrides = {
         from: adminWallet.address,
         chainId: provider.network.chainId,
     }
