@@ -37,8 +37,8 @@ This will deploy all contracts of a full Uniswap V2 system:
 const liquid = await flood.liquid()
 
 // send deployment via one of the callbacks
-await liquid.deployToFlashbots()
-// await liquid.deployToMempool()
+// await liquid.deployToFlashbots()
+await liquid.deployToMempool()
 ```
 
 You can also specify options to modify what the liquid script does or doesn't do.
@@ -55,7 +55,7 @@ type LiquidParams = {
 }
 ```
 
-For example, we can use liquid to mint more DAI tokens into a user's account:
+For example, we can use liquid to mint more WETH into a user's account:
 
 ```typescript
 await (await flood.liquid({
@@ -73,6 +73,7 @@ We can also send deployments to Flashbots instead of the mempool. We just have t
 // account used to sign payloads to Flashbots, should not contain any ETH
 const flashbotsSigner = new Wallet("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
 await liquid.initFlashbots(flashbotsSigner)
+await (await flood.liquid({}, userWallet)).deployToFlashbots()
 ```
 
 #### Load & Save Deployment
@@ -100,10 +101,10 @@ const liquid = await flood.liquid()
 const flood = new MevFlood(adminWallet, provider, liquid.deployment)
 ```
 
-Alternatively...
+Alternatively, you can hot-swap deployments:
 
 ```typescript
-const flood = new MevFlood(adminWallet, provider).withDeployment(liquid.deployment)
+await flood.withDeployment(liquid.deployment).deployToMempool()
 ```
 
 ### swaps
