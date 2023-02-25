@@ -1,3 +1,4 @@
+import { FlashbotsBundleResolution, FlashbotsTransaction, FlashbotsTransactionResponse } from '@flashbots/ethers-provider-bundle'
 import axios from "axios"
 import { formatEther, id as ethersId, parseTransaction } from "ethers/lib/utils"
 
@@ -133,4 +134,20 @@ export const getBundleStats = async (bundleHash: string, blockNumber: string) =>
     }
 
     return res.data
+}
+
+export const logSendBundleResponse = async (res?: FlashbotsTransaction) => {
+    if (res) {
+        if ("error" in res) {
+            throw (res as RelayResponseError).error
+        } else {
+            const bundleRes = await res.wait()
+            const msg = bundleRes == FlashbotsBundleResolution.BlockPassedWithoutInclusion ?
+                "block passed without inclusion" :
+                bundleRes == FlashbotsBundleResolution.AccountNonceTooHigh ?
+                "account nonce too high" :
+                "bundle not included (unknown reason)"
+            console.warn(msg)
+        }
+    }
 }

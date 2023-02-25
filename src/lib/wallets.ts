@@ -11,13 +11,13 @@ import { getSearchArgs } from './cliArgs'
  */
 export const getSearchWalletSet = (programName: string) => {
     const {startIdx, endIdx} = getSearchArgs(programName)
-    const wallets = getWalletSet(startIdx, endIdx)
+    const wallets = getWalletSet(parseInt(startIdx), parseInt(endIdx))
     return wallets
 }
 
-export const getWalletSet = (startIdx: string, endIdx: string) => {
+export const getWalletSet = (startIdx: number, endIdx: number) => {
     const wallets = minionWallets
-        .slice(parseInt(startIdx), parseInt(endIdx))
+        .slice(startIdx, endIdx)
         .map(wallet => new Wallet(wallet.privateKey))
     console.log("using the following wallet(s)", wallets.map(w => w.address))
     return wallets

@@ -1,30 +1,26 @@
 import { Contract, providers, Wallet } from 'ethers'
+import { formatEther } from 'ethers/lib/utils'
 import contracts from '../contracts'
-import { Deployment } from '../liquid'
-import { createRandomSwap, signSwap } from '../swap'
+import { LiquidDeployment } from '../liquid'
+import { createRandomSwap, signSwap, SwapOptions, SwapParams } from '../swap'
 
-export type SwapParams = {
-    maxUSD: number,
-    minUSD: number,
-}
-
-export const sendSwaps = async (options: SwapParams, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployments: Deployment) => {
-    let signedSwaps = []
+export const createSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployment: LiquidDeployment, nonceOffset?: number) => {
+    let signedSwaps: string[] = []
+    let swapParams: SwapParams[] = []
     for (const wallet of userWallets) {
-        const nonce = wallet.connect(provider).getTransactionCount()
-        const atomicSwapContract = new Contract(deployments.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
+        const atomicSwapContract = new Contract(deployment.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
         const swap = createRandomSwap(
-            deployments.uniV2Factory_A.contractAddress, 
-            deployments.uniV2Factory_B.contractAddress, 
-            [deployments.dai.contractAddress], 
-            deployments.weth.contractAddress, 
-            options.minUSD, 
-            options.maxUSD
+            deployment.uniV2FactoryA.contractAddress,
+            deployment.uniV2FactoryB.contractAddress,
+            deployment.dai.map(c => c.contractAddress),
+            deployment.weth.contractAddress,
+            options
         )
-        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, await nonce, provider.network.chainId)
+        swapParams.push(swap)
+        const wethForDai = swap.path[0].toLowerCase() === deployment.weth.contractAddress.toLowerCase()
+        console.log(`[${wallet.address}] swapping ${formatEther(swap.amountIn)} ${wethForDai ? "WETH" : "DAI"} for ${wethForDai ? "DAI" : "WETH"}`)
+        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, (await wallet.connect(provider).getTransactionCount()) + (nonceOffset || 0), provider.network.chainId)
         signedSwaps.push(signedSwap)
     }
-    const swapPromises = signedSwaps.map(tx => provider.sendTransaction(tx))
-    const swapResults = await Promise.all(swapPromises)
-    console.log(`swapped with ${swapResults.length} wallets`)
+    return {signedSwaps, swapParams}
 }

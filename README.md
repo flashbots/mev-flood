@@ -1,6 +1,189 @@
 # mev-flood
 
+A collection of tools to simulate MEV activity on EVM-based networks.
+
+## the library
+
+This project's primary export is `MevFlood`, a library that manages deployment of, and interaction with a UniswapV2 environment.
+
+```typescript
+import MevFlood from "mev-flood"
+
+const adminWallet = new Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+const provider = new providers.JsonRpcProvider("http://localhost:8545")
+
+const flood = new MevFlood(adminWallet, provider)
+```
+
+### Fund Wallets
+
+This script sends the specified amount to each wallet from the admin account.
+
+```typescript
+const userWallet = new Wallet("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
+await flood.fundWallets([userWallet], 5) // send 5 ETH to userWallet
+```
+
+### Deployments
+
+`MevFlood` interacts with a class `LiquidDeployment` which is a wrapper for interacting with contracts. A LiquidDeployment must be initialized in the `MevFlood` instance for most features to work.
+
+#### Create a New Liquid deployment
+
+This will deploy all contracts of a full Uniswap V2 system:
+
+```typescript
+// LiquidDeployment is stored internally in `flood` upon completion
+const liquid = await flood.liquid()
+
+// send deployment via one of the callbacks
+await liquid.deployToFlashbots()
+// await liquid.deployToMempool()
+```
+
+You can also specify options to modify what the liquid script does or doesn't do.
+
+```typescript
+type LiquidParams = {
+  shouldApproveTokens?: boolean,
+  shouldDeploy?: boolean,
+  shouldBootstrapLiquidity?: boolean,
+  shouldMintTokens?: boolean,
+  wethMintAmountAdmin?: number,
+  wethMintAmountUser?: number,
+  numPairs?: number,
+}
+```
+
+For example, we can use liquid to mint more DAI tokens into a user's account:
+
+```typescript
+await (await flood.liquid({
+  shouldDeploy: false,
+  shouldBootstrapLiquidity: false,
+  wethMintAmountAdmin: 0,
+  wethMintAmountUser: 13.37, // mint 13.37 WETH using user's ETH balance
+}, userWallet))
+.deployToMempool()
+```
+
+We can also send deployments to Flashbots instead of the mempool. We just have to initialize the Flashbots provider first:
+
+```typescript
+// account used to sign payloads to Flashbots, should not contain any ETH
+const flashbotsSigner = new Wallet("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
+await liquid.initFlashbots(flashbotsSigner)
+```
+
+#### Load & Save Deployment
+
+Deployments can be saved to disk so that you can use the same environment continually.
+
+Save:
+
+```typescript
+await liquid.saveDeployment("deployment.json")
+```
+
+Load:
+
+```typescript
+const flood = new MevFlood(adminWallet, provider).withDeploymentFile("deployment.json")
+```
+
+You can also use the raw LiquidDeployment object to instantiate an MevFlood instance:
+
+```typescript
+const liquid = await flood.liquid()
+...
+// assume `flood` is now out of scope
+const flood = new MevFlood(adminWallet, provider, liquid.deployment)
+```
+
+Alternatively...
+
+```typescript
+const flood = new MevFlood(adminWallet, provider).withDeployment(liquid.deployment)
+```
+
+### swaps
+
+MevFlood can facilitate the sending of UniV2 swaps from an array of specified accounts.
+
+```typescript
+const swaps = await flood.generateSwaps({}, [userWallet])
+await swaps.sendToMempool()
+```
+
+Swaps have many options that enable you to test your strategy with certainty, or conversely, increase entropy (your choice!):
+
+```typescript
+type SwapOptions = {
+    minUSD?: number,
+    maxUSD?: number,
+    swapOnA?: boolean,
+    daiIndex?: number, // useful if you deployed >1 DAI tokens in the deploy step (using the `numPairs` option)
+    swapWethForDai?: boolean,
+}
+```
+
+Example:
+
+```typescript
+const swaps = await flood.generateSwaps({
+  minUSD: 5000,
+  maxUSD: 5000,
+  swapOnA: true,
+  swapWethForDai: true,
+}, [userWallet])
+await swaps.sendToMempool()
+```
+
+### backruns
+
+MevFlood contains an arbitrage engine that will attempt to create a transaction that arbitrages tokens from a user's trade by backrunning.
+
+```typescript
+// most likely you want to send backruns to Flashbots
+await flood.initFlashbots(flashbotsSigner)
+
+provider.on('pending', async pendingTx => {
+  const pendingTx = provider.getPendingTransactions
+  const backrun = await flood.backrun(pendingTx)
+
+  // `sendToFlashbots` throws an error if `initFlashbots` hasn't been called on the MevFlood instance
+  await backrun.sendToFlashbots()
+})
+```
+
+> The backrun tx is sent from the `adminWallet` account used to instantiate `MevFlood`.
+
+Backruns have some optionality to give you more control when you need it:
+
+```typescript
+type BackrunOptions = {
+    minProfit?: BigNumber,
+    maxProfit?: BigNumber,
+    userPairReserves?: Reserves, // pre-trade reserves of pair that user swaps on; used to calculate optimal arb
+    nonce?: number, // override nonce used for backrun tx
+}
+```
+
+```typescript
+provider.on('pending', async pendingTx => {
+  const pendingTx = provider.getPendingTransactions
+  const backrun = await flood.backrun(pendingTx, {
+    minProfit: 0.05, // minimum 0.05 ETH estimated profit to execute
+  })
+  await backrun.sendToFlashbots()
+})
+```
+
 ## the game
+
+This repository originally started here. This is a game that simulates MEV-like activity, but it's not very applicable to the real world.
+
+> Note: `MevFlood` does not export any of this functionality.
 
 Call `bid`, placing a bet by setting `value`, and send the highest bid (which may be in _addition_ to others' bids in the block) before calling `claim`. The winner (the person who called bid with the highest `value` this round), upon calling `claim` gets the entire balance of the contract, at which point `highest_bid` (also the minimum to land a new bid) resets (to 1 gwei). `claim` will also only pay out if you placed the _most recent_ bid.
 

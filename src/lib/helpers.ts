@@ -1,5 +1,9 @@
+import { Token } from '@uniswap/sdk-core'
+import { computePairAddress } from '@uniswap/v2-sdk'
 import { BigNumber, Wallet, providers, utils } from "ethers"
-import { id as ethersId } from "ethers/lib/utils"
+import { getAddress, id as ethersId, keccak256, solidityPack } from "ethers/lib/utils"
+
+import UniswapV2PairLocal from '../contractsBuild/UniswapV2Pair.sol/UniswapV2Pair.json'
 
 export type TransactionRequest = providers.TransactionRequest
 export const GWEI = BigNumber.from(1e9)
@@ -57,6 +61,19 @@ export const getRpcRequest = async (params: any, method: string, authSigner: Wal
     }
 }
 
+/**
+ * Locally calculates the ordering of tokens in a pair, as it would be done by the Uniswap V2 Factory.
+ */
+export const sortTokens = (tokenA: string, tokenB: string) => {
+    let tokenANum = BigNumber.from(tokenA)
+    let tokenBNum = BigNumber.from(tokenB)
+    let [token0, token1] = tokenANum.lt(tokenBNum) ? [tokenA, tokenB] : [tokenB, tokenA]
+    return {
+        token0,
+        token1,
+    }
+}
+
 export const textColors = {
     Reset: "\x1b[0m",
     Bright: "\x1b[1m",
@@ -102,4 +119,46 @@ export const textColors = {
         type: 2,
         chainId: overrides?.chainId
     }
+}
+
+/**
+ * Extracts 4-byte function signature from calldata.
+ * @param calldata raw calldata (`tx.data`) from tx.
+ */
+export const extract4Byte = (calldata: string) => {
+    return calldata.substring(2, 10)
+}
+
+/**
+ * Copied from @uniswap/v2-core.
+ * @param factoryAddress Contract address of UniswapV2Factory.
+ * @param tokens Pair of tokens to compute address for.
+ * @param bytecode Bytecode of compiled UniswapV2Pair contract.
+ * @returns Pair address.
+ */
+function getCreate2PairAddress(
+    factoryAddress: string,
+    [tokenA, tokenB]: [string, string],
+    bytecode: string
+  ): string {
+    const [token0, token1] = tokenA < tokenB ? [tokenA, tokenB] : [tokenB, tokenA]
+    const create2Inputs = [
+      '0xff',
+      factoryAddress,
+      keccak256(solidityPack(['address', 'address'], [token0, token1])),
+      keccak256(bytecode)
+    ]
+    const sanitizedInputs = `0x${create2Inputs.map(i => i.slice(2)).join('')}`
+    return getAddress(`0x${keccak256(sanitizedInputs).slice(-40)}`)
+}
+
+/**
+ * Computes the address of a UniswapV2Pair contract.
+ * @param factoryAddress Contract address of UniswapV2Factory.
+ * @param tokenA Address of token A.
+ * @param tokenB Address of token B.
+ * @returns Pair address.
+ */
+export const computeUniV2PairAddress = async (factoryAddress: string, tokenA: string, tokenB: string) => {
+    return getCreate2PairAddress(factoryAddress, [tokenA, tokenB], UniswapV2PairLocal.bytecode.object)
 }

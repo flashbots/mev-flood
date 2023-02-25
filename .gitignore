@@ -6,9 +6,11 @@ node_modules
 build
 *.log
 
-# unique JSON files
+# default deployment files
 src/output
 
-# foundry
+# forge
 cache
-out
+
+# anvil
+chaindata
