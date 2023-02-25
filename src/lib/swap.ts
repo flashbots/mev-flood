@@ -142,7 +142,6 @@ export const mintIfNeeded = async (
         let wethBalance: BigNumber = await contracts.weth.callStatic.balanceOf(wallet.address)
         if (wethBalance.lte(wethAmount)) {
             let nonce = await wallet.connect(provider).getTransactionCount()
-            // mint 20 WETH
             const tx = populateTxFully(await contracts.weth.populateTransaction.deposit({value: wethAmount}), nonce, {
                 gasLimit: 50000,
                 from: wallet.address,

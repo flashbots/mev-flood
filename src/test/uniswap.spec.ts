@@ -16,7 +16,7 @@ describe("uniswap", () => {
             const adminWallet = admin()
             const factory = await new ContractFactory(contracts.UniV2Factory.abi, contracts.UniV2Factory.bytecode, adminWallet).deploy(adminWallet.address)
             const tokenA = await new ContractFactory(contracts.WETH.abi, contracts.WETH.bytecode, adminWallet).deploy()
-            const tokenB = await new ContractFactory(contracts.DAI.abi, contracts.DAI.bytecode, adminWallet).deploy(5)
+            const tokenB = await new ContractFactory(contracts.DAI.abi, contracts.DAI.bytecode, adminWallet).deploy(PROVIDER.network.chainId)
             const pairAddress = await factory.callStatic.createPair(tokenA.address, tokenB.address)
             const calculatedPairAddress = await computeUniV2PairAddress(factory.address, tokenA.address, tokenB.address)
             assert.equal(pairAddress.toLowerCase(), calculatedPairAddress.toLowerCase())
