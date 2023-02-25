@@ -2002,6 +2002,15 @@
                 {
                   "externalReferences": [
                     {
+                      "pair": {
+                        "declaration": 439,
+                        "isOffset": false,
+                        "isSlot": false,
+                        "src": "1192:4:1",
+                        "valueSize": 1
+                      }
+                    },
+                    {
                       "bytecode": {
                         "declaration": 486,
                         "isOffset": false,
@@ -2016,15 +2025,6 @@
                         "isOffset": false,
                         "isSlot": false,
                         "src": "1215:8:1",
-                        "valueSize": 1
-                      }
-                    },
-                    {
-                      "pair": {
-                        "declaration": 439,
-                        "isOffset": false,
-                        "isSlot": false,
-                        "src": "1192:4:1",
                         "valueSize": 1
                       }
                     },

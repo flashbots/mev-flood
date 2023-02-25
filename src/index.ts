@@ -1,8 +1,8 @@
 /** module exports for using mev-flood as a library */
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
-import { Wallet, providers, Transaction, ethers, BigNumber } from 'ethers'
+import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
-import { BackrunOptions, generateBackrun, Reserves } from './lib/backrun'
+import { BackrunOptions, generateBackrun } from './lib/backrun'
 
 // lib
 import { textColors } from './lib/helpers'
@@ -234,7 +234,7 @@ class MevFlood {
      */
     public async saveDeployment(filename: string) {
         if (this.deployment)
-            MevFlood.saveDeployment(filename, this.deployment.inner(), this.deployment.signedTxs)
+            await MevFlood.saveDeployment(filename, this.deployment.inner(), this.deployment.signedTxs)
         else {
             throw new Error("save deployment failed")
         }

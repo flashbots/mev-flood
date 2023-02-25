@@ -157,87 +157,87 @@ describe("arbitrage unit tests", () => {
 describe("arbitrage integration tests", () => {
     const testBackrunArb = async (admin: Wallet, user: Wallet, flood: MevFlood, swapParams: SwapOptions) => {
         const deploymentRes = await (await flood.liquid({wethMintAmountAdmin: 13}, user)).deployToMempool()
-            await Promise.all(deploymentRes.map(d => d.wait(1)))
+        await Promise.all(deploymentRes.map(d => d.wait(1)))
 
-            const contracts = await flood.deployment?.getDeployedContracts(PROVIDER)
-            if (flood.deployment?.daiWethA && flood.deployment?.daiWethB && contracts && contracts.daiWethA && contracts.daiWethB) {
-                const balanceStart = await contracts.dai[0].balanceOf(admin.address)
-                let reserves0A = ethers.BigNumber.from(0)
-                let reserves1A = ethers.BigNumber.from(0)
-                let reserves0B = ethers.BigNumber.from(0)
-                let reserves1B = ethers.BigNumber.from(0)
-                let wethIndex = 0
-                const rA = (await contracts.daiWethA[0].getReserves()).slice(0, 2)
-                const rB = (await contracts.daiWethB[0].getReserves()).slice(0, 2)
-                reserves0A = rA[0]
-                reserves1A = rA[1]
-                reserves0B = rB[0]
-                reserves1B = rB[1]
+        const contracts = await flood.deployment?.getDeployedContracts(PROVIDER)
+        if (flood.deployment?.daiWethA && flood.deployment?.daiWethB && contracts && contracts.daiWethA && contracts.daiWethB) {
+            const balanceStart = await contracts.dai[0].balanceOf(admin.address)
+            let reserves0A = ethers.BigNumber.from(0)
+            let reserves1A = ethers.BigNumber.from(0)
+            let reserves0B = ethers.BigNumber.from(0)
+            let reserves1B = ethers.BigNumber.from(0)
+            let wethIndex = 0
+            const rA = (await contracts.daiWethA[0].getReserves()).slice(0, 2)
+            const rB = (await contracts.daiWethB[0].getReserves()).slice(0, 2)
+            reserves0A = rA[0]
+            reserves1A = rA[1]
+            reserves0B = rB[0]
+            reserves1B = rB[1]
 
-                const token0 = await contracts.daiWethA[0].token0()
-                wethIndex = contracts.weth.address.toLowerCase() === token0.toLowerCase() ? 0 : 1
+            const token0 = await contracts.daiWethA[0].token0()
+            wethIndex = contracts.weth.address.toLowerCase() === token0.toLowerCase() ? 0 : 1
 
-                const kA = reserves0A.mul(reserves1A)
-                const kB = reserves0B.mul(reserves1B)
+            const kA = reserves0A.mul(reserves1A)
+            const kB = reserves0B.mul(reserves1B)
 
-                // user swap
-                const swaps = await flood.generateSwaps(swapParams, [user])
-                const swapRes = await swaps.sendToMempool()
-                await Promise.all(swapRes.map(r => r.wait(1)))
+            // user swap
+            const swaps = await flood.generateSwaps(swapParams, [user])
+            const swapRes = await swaps.sendToMempool()
+            await Promise.all(swapRes.map(r => r.wait(1)))
 
-                // backrun
-                const backrunParams = calculateBackrunParams(
-                    numify(reserves0A),
-                    numify(reserves1A),
-                    numify(kA),
-                    numify(reserves0B),
-                    numify(reserves1B),
-                    numify(kB),
-                    numify(swaps.swaps.swapParams[0].amountIn),
-                    wethIndex === 0, "A"
-                )
-                // TODO: group multiple txs together to backrun all swaps
-                const backrun = await flood.backrun(swapRes[0], {userPairReserves: {
-                    A: {
-                        reserves0: reserves0A,
-                        reserves1: reserves1A,
-                    },
-                    B: {
-                        reserves0: reserves0B,
-                        reserves1: reserves1B,
-                    },
-                }})
-                if (backrun) {
-                    const backrunRes = await backrun.sendToMempool()
-                    if (backrunRes) {
-                        await backrunRes.wait(1)
-                    } else {
-                        console.error("backrun failed to send to mempool")
-                    }
+            // backrun
+            const backrunParams = calculateBackrunParams(
+                numify(reserves0A),
+                numify(reserves1A),
+                numify(kA),
+                numify(reserves0B),
+                numify(reserves1B),
+                numify(kB),
+                numify(swaps.swaps.swapParams[0].amountIn),
+                wethIndex === 0, "A"
+            )
+            // TODO: group multiple txs together to backrun all swaps
+            const backrun = await flood.backrun(swapRes[0], {userPairReserves: {
+                A: {
+                    reserves0: reserves0A,
+                    reserves1: reserves1A,
+                },
+                B: {
+                    reserves0: reserves0B,
+                    reserves1: reserves1B,
+                },
+            }})
+            if (backrun) {
+                const backrunRes = await backrun.sendToMempool()
+                if (backrunRes) {
+                    await backrunRes.wait(1)
                 } else {
-                    console.error("failed to generate backrun")
+                    console.error("backrun failed to send to mempool")
                 }
-
-                const balanceNew = await contracts.dai[0].balanceOf(admin.address)
-                const balanceDiff = numify(balanceNew.sub(balanceStart))
-                console.log("balanceStart", balanceStart.toString())
-                console.log("balanceNew", balanceNew.toString())
-                console.log("balanceDiff", balanceDiff.toFixed(0))
-                console.log("profit estimated", backrunParams?.profit.toFixed(0))
-
-                if (backrunParams) {
-                    return {
-                        backrunParams,
-                        balanceDiff,
-                        balanceNew,
-                        balanceStart,
-                    }
-                }
-                return undefined
             } else {
-                console.error("deployment borked, could not run test. check your ETH provider for clues.")
-                return undefined
+                console.error("failed to generate backrun")
             }
+
+            const balanceNew = await contracts.dai[0].balanceOf(admin.address)
+            const balanceDiff = numify(balanceNew.sub(balanceStart))
+            console.log("balanceStart", balanceStart.toString())
+            console.log("balanceNew", balanceNew.toString())
+            console.log("balanceDiff", balanceDiff.toFixed(0))
+            console.log("profit estimated", backrunParams?.profit.toFixed(0))
+
+            if (backrunParams) {
+                return {
+                    backrunParams,
+                    balanceDiff,
+                    balanceNew,
+                    balanceStart,
+                }
+            }
+            return undefined
+        } else {
+            console.error("deployment borked, could not run test. check your ETH provider for clues.")
+            return undefined
+        }
     }
     it("should accurately estimate backrun-arbitrage profit", async () => {
         try {

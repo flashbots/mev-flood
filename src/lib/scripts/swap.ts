@@ -8,7 +8,6 @@ export const createSwaps = async (options: SwapOptions, provider: providers.Json
     let signedSwaps: string[] = []
     let swapParams: SwapParams[] = []
     for (const wallet of userWallets) {
-        const nonce = wallet.connect(provider).getTransactionCount()
         const atomicSwapContract = new Contract(deployment.atomicSwap.contractAddress, contracts.AtomicSwap.abi)
         const swap = createRandomSwap(
             deployment.uniV2FactoryA.contractAddress,
@@ -20,7 +19,7 @@ export const createSwaps = async (options: SwapOptions, provider: providers.Json
         swapParams.push(swap)
         const wethForDai = swap.path[0].toLowerCase() === deployment.weth.contractAddress.toLowerCase()
         console.log(`[${wallet.address}] swapping ${formatEther(swap.amountIn)} ${wethForDai ? "WETH" : "DAI"} for ${wethForDai ? "DAI" : "WETH"}`)
-        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, await nonce + (nonceOffset || 0), provider.network.chainId)
+        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, (await wallet.connect(provider).getTransactionCount()) + (nonceOffset || 0), provider.network.chainId)
         signedSwaps.push(signedSwap)
     }
     return {signedSwaps, swapParams}
