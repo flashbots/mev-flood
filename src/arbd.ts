@@ -1,14 +1,37 @@
-import { FlashbotsBundleResolution } from '@flashbots/ethers-provider-bundle'
+import { Mutex } from 'async-mutex'
 import { Wallet } from 'ethers'
-import { parseEther } from 'ethers/lib/utils'
 import MevFlood from '.'
 import { getArbdArgs } from './lib/cliArgs'
+import { logSendBundleResponse } from './lib/flashbots'
 import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
 import { approveIfNeeded, mintIfNeeded } from './lib/swap'
 import { getAdminWallet, getWalletSet } from './lib/wallets'
 
 async function main() {
+    // very primitive nonce management
+    const walletNonces = new Map<string, number>()
+    const nonceMutex = new Mutex()
+    const getNonce = async (walletAddress: string) => {
+        const release = await nonceMutex.acquire()
+        try {
+            const nonce = walletNonces.get(walletAddress) || await PROVIDER.getTransactionCount(walletAddress)
+            walletNonces.set(walletAddress, nonce + 1)
+            return nonce
+        } finally {
+            release()
+        }
+    }
+    const resetNonce = async (walletAddress: string) => {
+        const release = await nonceMutex.acquire()
+        try {
+            const nonce = await PROVIDER.getTransactionCount(walletAddress)
+            walletNonces.set(walletAddress, nonce)
+        } finally {
+            release()
+        }
+    }
+
     // get cli args
     const {walletIdx, minProfit, maxProfit, sendToFlashbots, mintWethAmount} = getArbdArgs()
     const walletSet = getWalletSet(walletIdx, walletIdx + 1)
@@ -30,35 +53,50 @@ async function main() {
     await approveIfNeeded(PROVIDER, walletSet, contracts)
 
     PROVIDER.on('pending', async (pendingTx: any) => {
+        // TODO: batch multiple txs to backrun instead of backrunning each one individually
         for (const wallet of walletSet) {
             const backrun = await (await flood(wallet)).backrun(pendingTx, {
-                minProfit: parseEther(minProfit.toString()),
-                maxProfit: parseEther(maxProfit.toString()),
+                minProfit,
+                maxProfit,
+                nonce: await getNonce(wallet.address),
             })
-            if (backrun) {
+            if (backrun.backrun) {
                 if (sendToFlashbots) {
-                    const res = await backrun.sendToFlashbots()
-                    if (res) {
-                        if ("error" in res) {
-                            console.error("error sending to flashbots", res.error)
-                        } else {
-                            const bundleRes = await res.wait()
-                            if (bundleRes == FlashbotsBundleResolution.BundleIncluded) {
-                                console.log("backrun included!")
-                            } else if (bundleRes == FlashbotsBundleResolution.AccountNonceTooHigh) {
-                                console.log("nonce too high")
-                            } else if (bundleRes == FlashbotsBundleResolution.BlockPassedWithoutInclusion) {
-                                console.log("bundle didn't land")
-                            }
+                    try {
+                        console.log("sending backrun to flashbots")
+                        const res = await backrun.sendToFlashbots()
+                        await logSendBundleResponse(res)
+                        if (!res) {
+                            resetNonce(wallet.address)
+                        }
+                    } catch (e) {
+                        if ((e as Error).message.includes("nonce too low")) {
+                            console.warn("nonce too low, resetting nonce")
+                            resetNonce(wallet.address)
                         }
                     }
                 } else {
                     console.log("sending backrun to mempool")
-                    const res = await backrun.sendToMempool()
-                    if (res) {
-                        console.log("backrun sent")
+                    try {
+                        const res = await backrun.sendToMempool()
+                        if (res) {
+                            console.log("backrun sent")
+                            const result = await res.wait(1)
+                            console.log(`backrun ${result.status === 1 ? "landed" : "failed"}`)
+                        } else {
+                            resetNonce(wallet.address)
+                        }
+                    } catch (e) {
+                        if ((e as Error).message.includes("nonce too low")) {
+                            console.warn("nonce too low, resetting nonce")
+                            resetNonce(wallet.address)
+                        }
                     }
                 }
+            }
+            else {
+                // TODO: reduce load on provider by only doing this once per block
+                resetNonce(wallet.address)
             }
         }
     })

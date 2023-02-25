@@ -1,3 +1,4 @@
+import { BigNumber } from 'ethers'
 import { parseEther } from 'ethers/lib/utils'
 import { textColors, } from './helpers'
 
@@ -294,7 +295,7 @@ export const getSwapdArgs = () => {
     const numPairsShort = "-p"
     const exchangeFlag = "--exchange"
     const exchangeShort = "-e"
-    const daiIndexFlag = "--dai-number"
+    const daiIndexFlag = "--dai-index"
     const daiIndexShort = "-d"
     const swapWethForDaiFlag = "--buy-dai"
     const swapWethForDaiShort = "-b"
@@ -315,7 +316,7 @@ export const getSwapdArgs = () => {
     ${numSwapsShort}\t${numSwapsFlag}\t\tNumber of swaps to execute per wallet.
     ${numPairsShort}\t${numPairsFlag}\t\tNumber of pairs to choose from; one is selected randomly.
     ${exchangeShort}\t${exchangeFlag}\t\tExchange to swap on ("A" or "B").
-    ${daiIndexShort}\t${daiIndexFlag}\t\tIndex of deployed DAI token to trade with.
+    ${daiIndexShort}\t${daiIndexFlag}\t\tIndex of deployed DAI token to trade with. (Ignored if --num-pairs is set.)
     ${swapWethForDaiShort}\t${swapWethForDaiFlag}\t\tSwaps WETH for DAI if set.
     ${swapDaiForWethShort}\t${swapDaiForWethFlag}\t\tSwaps DAI for WETH if set.
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
@@ -433,13 +434,13 @@ export const getArbdArgs = () => {
     const mintWethAmountShort = "-w"
     const mempoolFlag = "--mempool"
     const options = `\
-    ${minProfitShort}\t${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in gwei. (default=100)
-    ${maxProfitShort}\t${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in gwei. (default=inf)
+    ${minProfitShort}\t${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in wei. (default=0 + gas cost)
+    ${maxProfitShort}\t${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in wei. (default=inf)
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
     ${mempoolFlag}\t\t\tSend backruns to mempool instead of sending a bundle to Flashbots (NOT recommended).
 `
     const usage = `\
-    yarn swapd <first_wallet_index> [last_wallet_index] [OPTIONS...]
+    yarn arbd <first_wallet_index> [OPTIONS...]
 `
     const examples = `\
     # run arb bot with wallet 13
@@ -454,8 +455,8 @@ export const getArbdArgs = () => {
     const helpMessage = genHelpMessage(description, usage, options, examples)
 
     const args = process.argv.slice(2)
-    let minProfit = 100
-    let maxProfit = -1 // -1 is interpreted as unlimited
+    let minProfit = 0
+    let maxProfit = undefined // unlimited if undefined
     let mintWethAmount = 20
     let sendToFlashbots = true
 
@@ -489,8 +490,10 @@ export const getArbdArgs = () => {
     let walletIdx = parseInt(args[0])
     return {
         walletIdx,
-        minProfit,
-        maxProfit,
+        minProfit: parseEther(minProfit.toString()),
+        maxProfit: maxProfit !== undefined ?
+            parseEther(maxProfit.toString()) :
+            undefined,
         mintWethAmount: parseEther(mintWethAmount.toString()),
         sendToFlashbots,
     }

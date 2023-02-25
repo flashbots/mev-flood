@@ -1,5 +1,6 @@
-import readline from "readline-sync"
+import { FlashbotsBundleResolution } from '@flashbots/ethers-provider-bundle';
 import { Wallet } from 'ethers';
+import readline from "readline-sync"
 
 // lib
 import { getDeployLiquidArgs } from '../lib/cliArgs';
@@ -9,15 +10,8 @@ import { getExistingDeploymentFilename, getNewDeploymentFilename, getNewLiquidit
 import { getAdminWallet, getTestWallet } from '../lib/wallets';
 import {LiquidParams} from '../lib/scripts';
 import MevFlood from '..';
-import { FlashbotsBundleResolution, RelayResponseError } from '@flashbots/ethers-provider-bundle';
+import { logSendBundleResponse } from '../lib/flashbots';
 
-/** Prints txs:
- * build a set of contracts to deploy,
- * create univ2 pools,
- * bootstrap w/ liquidity
- * 
- * all txs are signed with the account specified by ADMIN_PRIVATE_KEY in .env
-*/
 const main = async () => {
     const args = getDeployLiquidArgs()
     try {
@@ -63,22 +57,7 @@ const main = async () => {
         let bundleStatus: FlashbotsBundleResolution = FlashbotsBundleResolution.BlockPassedWithoutInclusion
         while (bundleStatus == FlashbotsBundleResolution.BlockPassedWithoutInclusion) {
             const deploymentRes = await deployToFlashbots()
-            if ("error" in deploymentRes) {
-                throw (deploymentRes as RelayResponseError).error
-            } else {
-                const res = await deploymentRes.wait()
-                if (res == FlashbotsBundleResolution.BundleIncluded) {
-                    console.log("bundle included")
-                    break
-                } else {
-                    const msg = res == FlashbotsBundleResolution.BlockPassedWithoutInclusion ?
-                        "block passed without inclusion" :
-                        res == FlashbotsBundleResolution.AccountNonceTooHigh ?
-                        "account nonce too high" :
-                        "bundle not included (unknown reason)"
-                    console.log(msg)
-                }
-            }
+            await logSendBundleResponse(deploymentRes)
         }
         console.log(`Finished deployment.`)
     }

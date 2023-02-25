@@ -1,9 +1,11 @@
 import { Wallet } from 'ethers'
+
+// lib
 import MevFlood from '.'
 import { getSwapdArgs } from './lib/cliArgs'
+import { logSendBundleResponse } from './lib/flashbots'
 import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
-// import { createSwaps } from './lib/scripts/swap'
 import { approveIfNeeded, mintIfNeeded } from './lib/swap'
 import { getAdminWallet, getWalletSet } from './lib/wallets'
 
@@ -33,18 +35,28 @@ async function main() {
 
     PROVIDER.on('block', async blockNum => {
         console.log(`[BLOCK ${blockNum}]`)
+        let allSwaps = []
         try {
-            const swaps = await flood.generateSwaps({
-                minUSD: minUsd,
-                maxUSD: maxUsd,
-                swapOnA: exchange !== undefined ? exchange === "A" : undefined,
-                swapWethForDai,
-                daiIndex,
-            }, walletSet)
+            for (let i = 0; i < numSwaps; i++) {
+                for (let j = 0; j < numPairs; j++) {
+                    const swaps = await flood.generateSwaps({
+                        minUSD: minUsd,
+                        maxUSD: maxUsd,
+                        swapOnA: exchange !== undefined ? exchange === "A" : undefined,
+                        swapWethForDai,
+                        daiIndex: numPairs > 1 ? j : daiIndex,
+                    }, walletSet, i)
+                    allSwaps.push(swaps)
+                }
+            }
             if (sendToFlashbots) {
-                const res = await swaps.sendToFlashbots()
+                const res = await allSwaps.map(swaps => swaps.sendToFlashbots())
+                const flashbotsResponses = await Promise.all(res)
+                flashbotsResponses.forEach(async res => {
+                    await logSendBundleResponse(res)
+                })
             } else {
-                const swapPromises = swaps.swaps.signedSwaps.map(tx => PROVIDER.sendTransaction(tx))
+                const swapPromises = allSwaps.map(swaps => swaps.swaps.signedSwaps.map(tx => PROVIDER.sendTransaction(tx)))
                 await Promise.all(swapPromises)
             }
         } catch (_) {/* ignore errors, just spam it */}

@@ -8,7 +8,6 @@ import minionWallets from "../output/wallets.json"
 
 async function main() {
     const args = getFundWalletsArgs()
-    // read wallets from file, send them each some ether
     const adminWallet = new Wallet(env.ADMIN_PRIVATE_KEY, PROVIDER)
     console.log("admin wallet", adminWallet.address)
 

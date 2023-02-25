@@ -34,31 +34,16 @@ class SwapParams implements ISwapParams {
     }
 }
 
-const findTokenName = (addr: string, deployment: LiquidDeployment) => {
-    // if it's either WETH or one of the DAI tokens
-    if (addr.toLowerCase() === deployment.weth.contractAddress.toLowerCase()) {
-        return "WETH"
-    } else {
-        for (let i = 0; i < deployment.dai.length; i++) {
-            if (deployment.dai[i].contractAddress.toLowerCase() === addr.toLowerCase()) {
-                return `DAI${i+1}`
-            }
-        }
-    }
-    // if it's any other top-level contract
-    for (const cd of Object.entries(deployment.inner())) {
-        const key: string = cd[0]
-        const val: ContractDeployment = cd[1]
-        if (val.contractAddress === addr) {
-            return key
-        }
-    }
-    return "-?-"
-}
-
 export type Reserves = {
     A: {reserves0: BigNumber, reserves1: BigNumber},
     B: {reserves0: BigNumber, reserves1: BigNumber},
+}
+
+export type BackrunOptions = {
+    minProfit?: BigNumber,
+    maxProfit?: BigNumber,
+    userPairReserves?: Reserves,
+    nonce?: number,
 }
 
 /** Gets reserves for a given pair on each exchange.
@@ -104,7 +89,7 @@ export const generateBackrun = async (
     deployment: LiquidDeployment,
     wallet: Wallet,
     pendingTx: Transaction,
-    opts?: {minProfit?: BigNumber, maxProfit?: BigNumber, userPairReserves?: Reserves},
+    opts?: BackrunOptions,
 ): Promise<{
     arbRequest: PopulatedTransaction,
     signedArb: string,
@@ -175,14 +160,16 @@ export const generateBackrun = async (
                     return
                 }
                 if (opts?.minProfit && profit.lt(numify(opts.minProfit))) {
-                    console.warn("profit is less than minProfit setting")
+                    console.warn(`profit ${formatEther(BigNumber.from(profit.toFixed(0)))} is less than minProfit setting ${formatEther(opts.minProfit)}`)
                     return
                 }
                 console.debug(`BACKRUN. estimated proceeds: ${utils.formatEther(backrunParams.profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
                 const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
                 const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
                 const factoryStart = userSwap.factory
-                const factoryEnd = factoryStart === deployment.uniV2FactoryA.contractAddress ? deployment.uniV2FactoryB.contractAddress : deployment.uniV2FactoryA.contractAddress
+                const factoryEnd = factoryStart === deployment.uniV2FactoryA.contractAddress ?
+                    deployment.uniV2FactoryB.contractAddress :
+                    deployment.uniV2FactoryA.contractAddress
                 const pairStart: string | undefined = factoryStart === deployment.uniV2FactoryA.contractAddress ? pairA?.address : pairB?.address
                 const pairEnd: string | undefined = factoryStart === deployment.uniV2FactoryA.contractAddress ? pairB?.address : pairA?.address
                 const amountIn = BigNumber.from(backrunParams.backrunAmount.toFixed(0))
@@ -199,7 +186,11 @@ export const generateBackrun = async (
                     pairEnd,
                     amountIn
                 )
-                const signedArb = await wallet.signTransaction(populateTxFully(arbRequest, await provider.getTransactionCount(wallet.address), {from: wallet.address, chainId: provider.network.chainId}))
+                const signedArb = await wallet.signTransaction(populateTxFully(
+                    arbRequest,
+                    opts?.nonce || await provider.getTransactionCount(wallet.address),
+                    {from: wallet.address, chainId: provider.network.chainId}
+                ))
                 if (pendingTx.type === 2) {
                     delete pendingTx.gasPrice
                 }

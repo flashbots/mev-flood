@@ -210,7 +210,7 @@ describe("arbitrage integration tests", () => {
                 if (backrun) {
                     const backrunRes = await backrun.sendToMempool()
                     if (backrunRes) {
-                        await Promise.all(backrunRes.map(async r => await r.wait(1)))
+                        await backrunRes.wait(1)
                     } else {
                         console.error("backrun failed to send to mempool")
                     }

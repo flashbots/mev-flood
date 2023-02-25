@@ -2,7 +2,7 @@
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { Wallet, providers, Transaction, ethers, BigNumber } from 'ethers'
 import fs from "fs/promises"
-import { generateBackrun, Reserves } from './lib/backrun'
+import { BackrunOptions, generateBackrun, Reserves } from './lib/backrun'
 
 // lib
 import { textColors } from './lib/helpers'
@@ -115,12 +115,12 @@ class MevFlood {
 
     /**
      * Deploys & bootstraps a functional Uniswap V2 environment.
-     * @param liquidParams flags to modify the behavior of the function. // TODO: split liquid's features out into atomic functions
+     * @param liquidParams flags to modify the behavior of the function.
      * @param userWallet Optional wallet to receive tokens.
      * @param deployment LiquidDeployment object containing contract information. See `MevFlood.loadDeployment` and `MevFlood.saveDeployment`.
      */
     async liquid(liquidParams: LiquidParams, userWallet?: Wallet) {
-        // TODO: break liquid into atomic functions; params are confusing
+        // TODO: break liquid's atomic functions out; params are kinda confusing
         const deployment = await scripts.liquid(
             liquidParams,
             this.provider,
@@ -159,9 +159,9 @@ class MevFlood {
      * @param fromWallets Array of wallets that will send the swaps.
      * @param deployment LiquidDeployment object containing contract information. See `MevFlood.loadDeployment` and `MevFlood.saveDeployment`.
      */
-    async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[]) {
+    async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[], nonceOffset?: number) {
         if (this.deployment) {
-            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment)
+            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, nonceOffset)
             const sendToFlashbots = async () => {
                 return this.sendToFlashbots(swaps.signedSwaps)
             }
@@ -179,20 +179,29 @@ class MevFlood {
     }
 
     /**
-     * Attempt to execute a backrun given a pending transaction.
+     * Builds a backrun given a pending transaction.
      * @param pendingTx 
+     * @returns Backrun with callbacks to send it.
      */
-    async backrun(pendingTx: Transaction, opts?: {minProfit?: BigNumber, maxProfit?: BigNumber, userPairReserves?: Reserves}) {
+    async backrun(pendingTx: Transaction, opts?: BackrunOptions) {
         if (this.deployment) {
             const backrun = await generateBackrun(this.provider, this.deployment, this.adminWallet, pendingTx, opts)
+            /**
+             * Sends bundle containing original tx we're backrunning and the arb tx.
+             * @returns Pending bundle response.
+             */
             const sendToFlashbots = async () => {
                 if (backrun?.bundle) {
                     return this.sendToFlashbots(backrun.bundle)
                 }
             }
+            /**
+             * Only sends the arb tx to the mempool, not the tx we're backrunning.
+             * @returns Pending transactions response.
+             */
             const sendToMempool = async () => {
-                if (backrun?.bundle) {
-                    return this.sendToMempool([backrun.signedArb])
+                if (backrun) {
+                    return (await this.sendToMempool([backrun.signedArb]))[0]
                 }
             }
             return {

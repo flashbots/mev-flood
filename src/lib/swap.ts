@@ -9,12 +9,20 @@ export type SwapOptions = {
     swapWethForDai?: boolean,
 }
 
+export type SwapParams = {
+    amountIn: BigNumber,
+    path: string[],
+    tokenInName: string,
+    tokenOutName: string,
+    uniFactory: string,
+}
+
 export const createRandomSwap = (
     uniFactoryAddress_A: string,
     uniFactoryAddress_B: string,
     daiAddresses: string[],
     wethAddress: string,
-    overrides: SwapOptions) => {
+    overrides: SwapOptions): SwapParams => {
     
     // pick random uni factory
     const uniFactory = overrides.swapOnA !== undefined ? overrides.swapOnA ? uniFactoryAddress_A : uniFactoryAddress_B : coinToss() ? uniFactoryAddress_A : uniFactoryAddress_B
