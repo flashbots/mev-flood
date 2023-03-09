@@ -11,7 +11,7 @@ async function main() {
     const txs = [0, 1, 2].map(i => ({
         chainId: env.CHAIN_ID,
         type: 2,
-        to: contracts.WETH.address,
+        to: contracts.WETH.address(env.CHAIN_ID),
         from: testWallet.address,
         value: utils.parseEther("0.01"),
         nonce: nonce + i,
