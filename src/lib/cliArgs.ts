@@ -125,7 +125,6 @@ Example:
  */
  export const getSendProtectTxArgs = () => {
     let dummy = false
-    let fast = false
     const helpMessage = `send a sample Protect tx.
 
 Usage:
@@ -156,13 +155,9 @@ Example:
         if (args.includes("dummy")) {
             dummy = true
         }
-        if (args.includes("fast")) {
-            fast = true
-        }
     }
     return {
         dummy,
-        fast,
     }
 }
 
