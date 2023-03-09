@@ -11,7 +11,7 @@ async function main() {
         return
     }
     args.fast && console.log("Using 'fast mode'")
-    const provider = args?.fast ? new providers.JsonRpcProvider(`${env.RPC_URL}/fast`) : PROVIDER
+    const provider = args?.fast ? new providers.JsonRpcProvider(`${env.PROTECT_URL}/fast`) : PROVIDER
     const adminWallet = getAdminWallet().connect(provider)
 
     const tx = args.dummy ? await createRevertingUniTx() : await getSampleLotteryTx(adminWallet)
