@@ -15,7 +15,7 @@ Useless but effective for testing.
         yarn script.testSimple [minusBlocks] [OPTIONS]
 
     Options:
-        --send: send the bundle to flashbots
+        --send: send the bundle to flashbots, targeting the next 10 blocks
     
     Example:
         # run a sim against the current block
@@ -64,21 +64,26 @@ async function main() {
         from: wallet.address,
         gasLimit: 55000,
         maxFeePerGas: GWEI.mul(42),
-        maxPriorityFeePerGas: GWEI.mul(3),
+        maxPriorityFeePerGas: GWEI.mul(13),
         chainId: env.CHAIN_ID,
     }
-    const depositTx = populateTxFully(await weth?.populateTransaction.deposit({value: ETH.div(100)}), nonce, options)
-    const transferTx = populateTxFully(await weth?.populateTransaction.deposit({value: ETH.div(100)}), nonce + 1, options)
+    const depositTx = populateTxFully(await weth?.populateTransaction.deposit({value: ETH.div(1000000)}), nonce, options)
+    const transferTx = populateTxFully(await weth?.populateTransaction.deposit({value: ETH.div(1000000)}), nonce + 1, options)
     const bundle = [
         await wallet.signTransaction(depositTx),
         await wallet.signTransaction(transferTx),
     ]
-    console.log(JSON.stringify(bundle))
+    console.log(`'${JSON.stringify(bundle)}'`)
     const simResult = await simulateBundle(bundle, currentBlock + 1, simBlock)
     console.log("sim result", simResult)
+    const bundleId = uuid()
     if (args.send) {
-        const sendResult = await sendBundle(bundle, currentBlock + 1, uuid())
-        console.log("sendBundle result", sendResult)
+        let sendResults = []
+        for (let i = 1; i < 11; i++) {
+            sendResults.push(sendBundle(bundle, currentBlock + i, bundleId))
+        }
+        const results = await Promise.all(sendResults)
+        console.log("send results", results)
     }
 }
 
