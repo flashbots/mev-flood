@@ -9,7 +9,7 @@ import LotteryMEV from '../contractsBuild/lottery_mev.sol/LotteryMEV.json'
 import WETH from '../contractsBuild/weth.sol/WETH9.json'
 
 export const getContract = (contract: {address: (chainId: number) => string, abi: any}, chainId: number) => {
-  if (!contract.address || !contract.abi) {
+  if (!contract.address(chainId) || !contract.abi) {
       return undefined
   }
   return new Contract(contract.address(chainId), contract.abi)

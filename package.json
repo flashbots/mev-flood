@@ -55,9 +55,9 @@
     "script.getBundleStats": "npx ts-node src/scripts/getBundleStats.ts",
     "script.getConflictingBundle": "npx ts-node src/scripts/getConflictingBundle.ts",
     "script.getUserStats": "npx ts-node src/scripts/getUserStats.ts",
+    "script.liquid": "npx ts-node src/scripts/liquid.ts",
     "script.sendPrivateTx": "npx ts-node src/scripts/sendPrivateTx.ts",
     "script.sendProtectTx": "npx ts-node src/scripts/sendProtectTx.ts",
-    "script.liquid": "npx ts-node src/scripts/liquid.ts",
     "script.testSimpleBundle": "npx ts-node src/scripts/testSimpleBundle.ts"
   }
 }

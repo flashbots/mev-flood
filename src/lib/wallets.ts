@@ -10,9 +10,9 @@ import { getSearchArgs } from './cliArgs'
  * @returns array of wallets from `src/output/wallets.json`
  */
 export const getSearchWalletSet = (programName: string) => {
-    const {startIdx, endIdx} = getSearchArgs(programName)
-    const wallets = getWalletSet(parseInt(startIdx), parseInt(endIdx))
-    return wallets
+    const {startIdx, endIdx, useMempool} = getSearchArgs(programName)
+    const wallets = getWalletSet(startIdx, endIdx)
+    return {wallets, useMempool}
 }
 
 export const getWalletSet = (startIdx: number, endIdx: number) => {

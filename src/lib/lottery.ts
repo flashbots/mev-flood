@@ -16,7 +16,7 @@ const adminWallet = getAdminWallet().connect(PROVIDER)
 const deployLotteryContract = async (): Promise<Contract> => {
     const factory = new ContractFactory(JSON.stringify(contracts.LotteryMEV.abi), contracts.LotteryMEV.bytecode)
     let adminNonce = await adminWallet.getTransactionCount()
-    const txReq = populateTxFully(factory.getDeployTransaction(), adminNonce)
+    const txReq = populateTxFully(factory.getDeployTransaction(), adminNonce, {chainId: env.CHAIN_ID})
     const signedDeployTx = await adminWallet.signTransaction(txReq)
     await PROVIDER.sendTransaction(signedDeployTx)
     const lotteryAddress = utils.getContractAddress({from: txReq.from || adminWallet.address, nonce: adminNonce})
@@ -49,7 +49,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice:
             from: wallet.address,
             value: BID_VALUE.add(GWEI.mul(idx)),
             gasLimit: 100000,
-            gasPrice: bidGasPrice.sub(GWEI.mul(idx)),
+            gasPrice: bidGasPrice.sub(GWEI.mul(idx)), // variate gas price to make txs unique across wallets
             chainId: env.CHAIN_ID,
             nonce: nonces[idx],
         }
@@ -57,7 +57,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice:
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
-            gasPrice: bidGasPrice.sub(GWEI.mul(10)),
+            gasPrice: bidGasPrice.sub(GWEI.mul(idx).sub(GWEI.mul(10))), // subtract 10 to encourage builder to place txs in order
             chainId: env.CHAIN_ID,
             nonce: nonces[idx] + 1,
         }
