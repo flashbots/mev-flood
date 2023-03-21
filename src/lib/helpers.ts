@@ -117,7 +117,7 @@ export const textColors = {
         from: overrides?.from,
         nonce,
         type: 2,
-        chainId: overrides?.chainId
+        chainId: overrides?.chainId || 31337,
     }
 }
 

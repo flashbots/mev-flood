@@ -4,7 +4,7 @@ A collection of tools to simulate MEV activity on EVM-based networks.
 
 ## the library
 
-This project's primary export is `MevFlood`, a library that manages deployment of, and interaction with a UniswapV2 environment.
+This project's primary export is `MevFlood`, a library that can delpoy a UniswapV2 environment and automate swap traffic & backruns.
 
 ```typescript
 import MevFlood from "mev-flood"
@@ -172,7 +172,6 @@ type BackrunOptions = {
 
 ```typescript
 provider.on('pending', async pendingTx => {
-  const pendingTx = provider.getPendingTransactions
   const backrun = await flood.backrun(pendingTx, {
     minProfit: 0.05, // minimum 0.05 ETH estimated profit to execute
   })
@@ -184,7 +183,7 @@ provider.on('pending', async pendingTx => {
 
 This repository originally started here. This is a game that simulates MEV-like activity, but it's not very applicable to the real world.
 
-> Note: `MevFlood` does not export any of this functionality.
+> Note: `MevFlood` does not currently export any of this functionality.
 
 Call `bid`, placing a bet by setting `value`, and send the highest bid (which may be in _addition_ to others' bids in the block) before calling `claim`. The winner (the person who called bid with the highest `value` this round), upon calling `claim` gets the entire balance of the contract, at which point `highest_bid` (also the minimum to land a new bid) resets (to 1 gwei). `claim` will also only pay out if you placed the _most recent_ bid.
 
@@ -206,27 +205,29 @@ mev-flood is a multi-daemon project, and is designed to be run in parallel with 
   * mostly fails and wastes money on bids (for others to take)
   * sends to FB builder, may also send to mempool (pending how/what we want to test)
 * **smart-search:** finds winning bid amount and uses a smart contract that atomically executes bid+claim to win the pool
-  * helpful for stress-testing on testnet (don't run on mainnet!)
   * if only one instance is run, it's practically guaranteed to win every round
-  * if more than one instance is run, they will generate "conflicting" bundles
-    * technically all the bundles will land but their profits will be affected by who gets included first
+  * if more than one instance is run, they will generate competing bids, and all txs that don't make a profit will revert
 * **fake-search** sends a uniswap v2 swap that will always revert
   * helpful for early testing (not stress-testing)
-  * mainnet-friendly (use an empty account for `ADMIN_PRIVATE_KEY`)
+  * mainnet-friendly (use an account with no funds for `ADMIN_PRIVATE_KEY`)
   * this sends a single-transaction bundle to Flashbots from the admin wallet (env: `ADMIN_PRIVATE_KEY`)
 * **swapd** generates a random swap for each wallet in the specified array, for every new block
+* **arbd** watches the mempool for transactions and tries to backrun them
 
 #### Scripts
 
+* **cancelPrivateTx**: cancel a private transaction sent to the bundle API given `txHash`
+* **createTestBundle**: prints a test bundle without sending or signing it (txs are signed)
 * **createWallets**: creates new `wallets.json` file populated w/ 100 wallets
 * **fundWallets**: send 0.1 ETH to each wallet in `wallets.json` from admin wallet (`ADMIN_PRIVATE_KEY`)
-* **sendPrivateTx**: send a private transaction to the bundle API
-* **cancelPrivateTx**: cancel a private transaction sent to the bundle API given `txHash`
 * **getBundleStats**: get bundle stats for a given `bundleHash`
+* **sendPrivateTx**: send a private transaction to the bundle API
+* **getConflictingBundle**: quick-and-dirty interface to call getConflictingBundle from the cli; needs refactoring
 * **getUserStats**: get user stats for admin wallet (`ADMIN_PRIVATE_KEY`)
-* **sendProtectTx**: send a tx to Protect RPC
-* **createTestBundle**: prints a test bundle without sending or signing it (txs are signed)
-* **liquid**: bootstrap a complete uniswap v2 environment
+* **liquid**: bootstrap a new uniswap v2 environment with tokens and pairs
+* **sendPrivateTx**: send a simple private tx to Flashbots
+* **sendProtectTx**: send a simple tx to Flashbots Protect RPC
+* **testSimpleBundle**: simulate & optionally send a bundle with simple transactions to Flashbots
 
 Scripts with optional params are explained with the `help` flag:
 
@@ -264,10 +265,14 @@ mkdir src/output
 yarn script.createWallets
 ```
 
-_Fund test accounts (careful, it sends 0.1 ETH to 100 accounts):_
+_Fund all 100 test accounts with ETH:_
+> :warning: careful, this sends 50 ETH to each account by default.
 
 ```sh
 yarn script.fundWallets
+
+# send 1 ETH to each wallet
+yarn script.fundWallets -e 1
 ```
 
 ## run
@@ -314,9 +319,11 @@ yarn fake-search
 
 You might need to use the mempool to test your transactions' validity before trying to use the bundle API.
 
+Add the mempool flag `-m` or `--mempool` before the wallet index/indices.
+
 ```sh
-yarn dumb-dev 13 14 mempool
-yarn smart-dev 13 14 mempool
+yarn dumb-dev --mempool 13 21
+yarn smart-dev -m 21
 ```
 
 ### stress-test example
@@ -345,9 +352,14 @@ yarn script.fundWallets
 
 # generate orderflow w/ 10 wallets
 yarn swapd 10 20
+
+# (in another terminal) backrun orderflow generated by swapd, using wallet #21 to send them
+yarn arbd 21
 ```
 
-_Note: if you didn't run `yarn build` you can run `yarn swapd-dev` instead of `yarn swapd`._
+_Note: if you didn't run `yarn build` you can run `yarn swapd-dev` instead of `yarn swapd`. Same goes for `arbd`._
+
+In addition to deploying the contracts to the environment specified by NODE_ENV, this script will create a file at `src/output/uniBootstrap.json` containing all the details of the deployment, including pre-calculated contract addresses and a list of all signed transactions.
 
 ### other features
 
@@ -397,11 +409,3 @@ yarn script.sendProtectTx fast dummy
 # or
 yarn script.sendProtectTx dummy fast
 ```
-
-_Bootstrap a uniswap V2 environment:_
-
-```sh
-yarn script.liquid
-```
-
-In addition to deploying the contracts to the environment specified by NODE_ENV, this script will create a file at `src/output/uniBootstrap.json` containing all the details of the deployment, including pre-calculated contract addresses and a list of all signed transactions.

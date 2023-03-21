@@ -3,16 +3,15 @@ import { getSearchWalletSet } from './lib/wallets'
 import { GWEI } from './lib/helpers'
 import { PROVIDER } from './lib/providers'
 import { sendBundle, simulateBundle } from './lib/flashbots'
-import { useMempool } from './lib/cliArgs'
 import { v4 as uuidv4 } from 'uuid';
 
 // load wallets from disk
-const walletSet = getSearchWalletSet("dumb-search")
+const {wallets, useMempool} = getSearchWalletSet("dumb-search")
 
 // run a block monitor to send bundles on every block
 PROVIDER.on('block', async (blockNum: number) => {
     console.log(`[BLOCK ${blockNum}]`)
-    const bundles = await createDumbLotteryBundles(walletSet, GWEI.mul(69))
+    const bundles = await createDumbLotteryBundles(wallets, GWEI.mul(69))
     console.log("bundles", bundles)
 
     if (useMempool) {
@@ -23,7 +22,8 @@ PROVIDER.on('block', async (blockNum: number) => {
                 const claimRes = PROVIDER.sendTransaction(bundle.claimTx)
                 return {bidRes, claimRes}
             })
-            const bundleResults = await Promise.all(bundleResultPromises.map(async bundleResult => {
+            const bundleResults = await Promise.all(bundleResultPromises)
+            await Promise.all(bundleResultPromises.map(async bundleResult => {
                 return await Promise.all([bundleResult.bidRes, bundleResult.claimRes])
             }))
             console.log("[mempool] bundle results", bundleResults)

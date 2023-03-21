@@ -1,4 +1,3 @@
-import { BigNumber } from 'ethers'
 import { parseEther } from 'ethers/lib/utils'
 import { textColors, } from './helpers'
 
@@ -35,34 +34,63 @@ export const getSearchArgs = (programName: string) => {
     const helpMessage = (program: string) => `search on multiple wallets (defined in \`src/output/wallets.json\`)
 
 Usage:
-    yarn ${program} <first_wallet_index> <last_wallet_index> [mempool]
+    yarn ${program} [options] <first_wallet_index> [last_wallet_index]
+
+Options:
+    --mempool, -m    send txs to mempool instead of flashbots
 
 Example:
-    # run with a single wallet
+    # run with a single wallet, send to flashbots
     yarn ${program} 13
+
+    # run with a single wallet, send to mempool
+    yarn ${program} -m 13
 
     # run with 25 wallets on flashbots
     yarn ${program} 0 25
 
     # run with 4 wallets on mempool
-    yarn ${program} 0 25 mempool
+    yarn ${program} --mempool 0 4
 `
-    if (process.argv.length > 2) {
-        if (process.argv[2].includes("help")) {
-            console.log(helpMessage(programName))
-            process.exit(0)
-        }
-    } else {
+    if (process.argv.length < 3) {
         console.error("one or two wallet indices are required")
         console.log(helpMessage(programName))
         process.exit(1)
     }
-    
-    let [startIdx, endIdx] = process.argv.slice(2)
-    if (!endIdx) {
-        endIdx = `${parseInt(startIdx) + 1}`
+
+    const flatArgs = process.argv.map(arg => arg.toLowerCase()).reduce((acc, arg) => acc + " " + arg)
+    if (flatArgs.includes("help")) {
+        console.log(helpMessage(programName))
+        process.exit(0)
     }
-    return {startIdx, endIdx}
+
+    let useMempool = false
+
+    const mempoolFlagIndex = getFlagIndex(process.argv, "--mempool", "-m")
+    let startIdx: number, endIdx: number
+    if (getOption(process.argv, mempoolFlagIndex)) {
+        useMempool = true
+        startIdx = mempoolFlagIndex + 1
+        endIdx = mempoolFlagIndex + 2
+    } else {
+        let [startIdxStr, endIdxStr] = process.argv.slice(2)
+        try {
+            startIdx = parseInt(startIdxStr)
+            if (!endIdxStr) {
+                endIdx = startIdx + 1
+            } else {
+                endIdx = parseInt(endIdxStr)
+            }
+        } catch {
+            console.error("wallet indices must be integers")
+            console.log(helpMessage(programName))
+            process.exit(1)
+        }
+        if (!endIdx) {
+            endIdx = startIdx + 1
+        }
+    }
+    return {startIdx, endIdx, useMempool}
 }
 
 /**
@@ -160,8 +188,6 @@ Example:
         dummy,
     }
 }
-
-export const useMempool = process.argv.length > 4 && process.argv[4] == "mempool"
 
 export const getDeployLiquidArgs = () => {
     let shouldDeploy = true
