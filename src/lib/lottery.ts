@@ -2,6 +2,7 @@ import { BigNumber, Contract, ContractFactory, utils, Wallet } from "ethers"
 import { formatEther, formatUnits } from 'ethers/lib/utils'
 
 import contracts, { getContract } from './contracts'
+// TODO: remove all env invocations from lib; meant to be used outside of lib module
 import env from './env'
 import { GWEI, ETH, now, TransactionRequest, populateTxFully } from './helpers'
 import { PROVIDER } from './providers'
@@ -9,7 +10,7 @@ import { getAdminWallet } from './wallets'
 
 const BID_VALUE = ETH.div(100)
 // TODO: clean up; don't instantiate contract here; getContract should never return undefined
-let lotteryContract = getContract(contracts.LotteryMEV)
+let lotteryContract = getContract(contracts.LotteryMEV, env.CHAIN_ID)
 const adminWallet = getAdminWallet().connect(PROVIDER)
 
 const deployLotteryContract = async (): Promise<Contract> => {
@@ -109,7 +110,7 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]): Promise<string
 /** create a transaction that always reverts */
 export const createRevertingUniTx = async (deadline?: number): Promise<TransactionRequest | undefined> => {
     // make a swap on uniswap v2 where we don't have the tokens
-    const uniContract = getContract(contracts.UniV2Router)
+    const uniContract = getContract(contracts.UniV2Router, env.CHAIN_ID)
     if (!uniContract) {
         console.warn("uniContract is undefined")
         return undefined
@@ -144,7 +145,7 @@ export const createRevertingUniTx = async (deadline?: number): Promise<Transacti
  * @returns transaction that interacts with lottery contract
  */
  export const getSampleLotteryTx = async (sender: Wallet): Promise<TransactionRequest | undefined> => {
-    const contract = getContract(contracts.LotteryMEV)
+    const contract = getContract(contracts.LotteryMEV, env.CHAIN_ID)
     if (!contract) {
         console.warn("lottery contract is undefined for this chain.")
         return undefined

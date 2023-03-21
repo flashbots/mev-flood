@@ -1,7 +1,6 @@
 import { providers } from 'ethers'
 import { getSendProtectTxArgs } from '../lib/cliArgs'
 import env from '../lib/env'
-import { PROVIDER } from '../lib/providers'
 import { createRevertingUniTx, getSampleLotteryTx } from '../lib/lottery'
 import { getAdminWallet } from '../lib/wallets'
 
@@ -10,8 +9,7 @@ async function main() {
     if (!args) {
         return
     }
-    args.fast && console.log("Using 'fast mode'")
-    const provider = args?.fast ? new providers.JsonRpcProvider(`${env.RPC_URL}/fast`) : PROVIDER
+    const provider = new providers.JsonRpcProvider(env.PROTECT_URL)
     const adminWallet = getAdminWallet().connect(provider)
 
     const tx = args.dummy ? await createRevertingUniTx() : await getSampleLotteryTx(adminWallet)

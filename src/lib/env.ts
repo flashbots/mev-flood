@@ -1,5 +1,6 @@
 import dotenv from "dotenv"
-dotenv.config({ path: `.env.${process.env.NODE_ENV}` })
+const envPath = `.env.${process.env.NODE_ENV}`
+dotenv.config({ path: envPath })
 console.log(`ENV: ${process.env.NODE_ENV}`)
 
 const env = {
@@ -7,6 +8,7 @@ const env = {
     TEST_PRIVATE_KEY: process.env.TEST_PRIVATE_KEY || "",
     CHAIN_ID: parseInt(process.env.CHAIN_ID || ""),
     CHAIN_NAME: process.env.CHAIN_NAME || "",
+    PROTECT_URL: process.env.PROTECT_URL || "",
     RPC_URL: process.env.RPC_URL || "",
     MEV_GETH_HTTP_URL: process.env.MEV_GETH_HTTP_URL || "",
 }
@@ -19,7 +21,7 @@ for (const [key, val] of Object.entries(env)) {
     }
 }
 if (fail) {
-    console.error("ERROR: bad .env")
+    console.error(`bad configuration in ${envPath}`)
     process.exit(2)
 }
 
