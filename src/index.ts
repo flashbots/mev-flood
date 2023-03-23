@@ -3,6 +3,7 @@ import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
 import { BackrunOptions, generateBackrun } from './lib/backrun'
+import Matchmaker, { ShareTransactionOptions } from "@flashbots/matchmaker-ts"
 
 // lib
 import { textColors } from './lib/helpers'
@@ -30,6 +31,7 @@ class MevFlood {
     private adminWallet: Wallet
     private provider: providers.JsonRpcProvider
     private flashbotsProvider?: FlashbotsBundleProvider
+    private matchmaker?: Matchmaker
     public deployment?: LiquidDeployment
 
     constructor(adminWallet: Wallet, provider: providers.JsonRpcProvider, deployment?: LiquidDeployment) {
@@ -38,31 +40,18 @@ class MevFlood {
         this.deployment = deployment
     }
 
-    /**
-     * Sends array of transactions to the mempool.
-     * @param allSignedTxs Array of raw signed transactions.
-     * @returns Pending transactions.
-     */
-    private async sendToMempool(allSignedTxs: string[]) {
-        let pendingTxs = []
-        for (const tx of allSignedTxs) {
-            pendingTxs.push(await this.provider.sendTransaction(tx))
-        }
-        return pendingTxs
-    }
+    public async initFlashbots(flashbotsSigner: Wallet) {
+        this.flashbotsProvider = await FlashbotsBundleProvider.create(
+            this.provider,
+            flashbotsSigner,
+            getFlashbotsUrl(this.provider.network.chainId),
+            this.provider.network
+        )
 
-    /**
-     * Sends a bundle of transactions to Flashbots.
-     * @param allSignedTxs Array of raw signed transactions.
-     * @returns Pending bundle response.
-     */
-    private async sendToFlashbots(allSignedTxs: string[], targetBlock?: number) {
-        if (this.flashbotsProvider) {
-            const targetBlockNum = targetBlock || await this.provider.getBlockNumber() + 1
-            return await this.flashbotsProvider.sendRawBundle(allSignedTxs, targetBlockNum)
-        } else {
-            throw new Error("must call initFlashbots on MevFlood instance to deploy to flashbots")
-        }
+        // broken; need ethers v6
+        // this.matchmaker = new Matchmaker(flashbotsSigner, this.provider.network)
+
+        return this
     }
 
     /**
@@ -79,16 +68,6 @@ class MevFlood {
         return this
     }
 
-    public async initFlashbots(flashbotsSigner: Wallet) {
-        this.flashbotsProvider = await FlashbotsBundleProvider.create(
-            this.provider,
-            flashbotsSigner,
-            getFlashbotsUrl(this.provider.network.chainId),
-            this.provider.network
-        )
-        return this
-    }
-
     /**
      * Override deployment to use in instance methods.
      * @param deployment 
@@ -96,6 +75,70 @@ class MevFlood {
      */
     public withDeployment(deployment: LiquidDeployment) {
         return new MevFlood(this.adminWallet, this.provider, deployment)
+    }
+
+    /**
+     * Save liquid deployment to file.
+     * @param filename File path relative to project root, or absolute path.
+     */
+    public async saveDeployment(filename: string) {
+        if (this.deployment)
+            await MevFlood.saveDeployment(filename, this.deployment.inner(), this.deployment.signedTxs)
+        else {
+            throw new Error("save deployment failed")
+        }
+        return this
+    }
+
+    /**
+     * Loads deployment from the given deployment file.
+     * @param filename Filename relative to the project root. JSON file. Ex: "deployment.json"
+     * @returns LiquidDeployment object.
+     */
+    static async loadDeployment(filename: string): Promise<LiquidDeployment> {
+        return await loadDeploymentLib({filename})
+    }
+
+    /**
+     * Saves deployment object to a JSON file.
+     * @param filename Filename relative to the project root. Ex: "deployment.json"
+     * @param deployment LiquidDeployment object.
+     * @param allSignedTxs Array of signed transactions that execute the deployment.
+     */
+    static async saveDeployment(filename: string, deployment: ILiquidDeployment, allSignedTxs?: string[]) {
+        await fs.writeFile(filename, JSON.stringify({deployment: deployment, allSignedTxs}), {encoding: "utf8"})
+        console.log(`Saved deployment: ${textColors.Bright}${filename}${textColors.Reset}`)
+    }
+
+    /**
+     * Sends array of transactions to the mempool.
+     * @param signedTxs Array of raw signed transactions.
+     * @returns Pending transactions.
+     */
+    private async sendToMempool(signedTxs: string[]) {
+        let pendingTxs = []
+        for (const tx of signedTxs) {
+            pendingTxs.push(await this.provider.sendTransaction(tx))
+        }
+        return pendingTxs
+    }
+
+    /**
+     * Sends a bundle of transactions to Flashbots.
+     * @param signedTxs Array of raw signed transactions.
+     * @returns Pending bundle response.
+     */
+    private async sendBundle(signedTxs: string[], targetBlock?: number) {
+        if (this.flashbotsProvider) {
+            const targetBlockNum = targetBlock || await this.provider.getBlockNumber() + 1
+            return await this.flashbotsProvider.sendRawBundle(signedTxs, targetBlockNum)
+        } else {
+            throw new Error("must call initFlashbots on MevFlood instance to deploy to flashbots")
+        }
+    }
+
+    private async sendToMevShare(signedTxs: string[], options: ShareTransactionOptions) {
+        throw new Error("pls implement me ;-;")
     }
 
     /**
@@ -140,7 +183,7 @@ class MevFlood {
 
         const deployToFlashbots = async (targetBlock?: number) => {
             if (deployment.signedTxs){
-                return this.sendToFlashbots(deployment.signedTxs, targetBlock)
+                return this.sendBundle(deployment.signedTxs, targetBlock)
             } else {
                 throw new Error("failed to deploy to flashbots. No signedTxs in deployment.")
             }
@@ -167,9 +210,22 @@ class MevFlood {
             return {
                 swaps,
                 /** Send swaps as a bundle to Flashbots. */
-                sendToFlashbots: async (targetBlock?: number) => this.sendToFlashbots(swaps.signedSwaps, targetBlock),
+                sendToFlashbots: async (targetBlock?: number) => this.sendBundle(swaps.signedSwaps, targetBlock),
                 /** Send all swaps to mempool. */
                 sendToMempool: async () => this.sendToMempool(swaps.signedSwaps),
+            }
+        } else {
+            throw new Error("must initialize MevFlood with a liquid deployment to send swaps")
+        }
+    }
+
+    async generateShareSwaps(swapParams: SwapOptions, fromWallets: Wallet[], shareOptions: ShareTransactionOptions, nonceOffset?: number) {
+        if (this.deployment) {
+            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, nonceOffset)
+            return {
+                swaps,
+                /** Send swaps as mev-share transactions to Flashbots. */
+                sendToMevShare: async (targetBlock?: number) => this.sendBundle(swaps.signedSwaps, targetBlock),
             }
         } else {
             throw new Error("must initialize MevFlood with a liquid deployment to send swaps")
@@ -186,7 +242,7 @@ class MevFlood {
             const backrun = await generateBackrun(this.provider, this.deployment, this.adminWallet, pendingTx, opts)
             const sendToFlashbots = async (targetBlock?: number) => {
                 if (backrun?.bundle) {
-                    return this.sendToFlashbots(backrun.bundle, targetBlock)
+                    return this.sendBundle(backrun.bundle, targetBlock)
                 } else {
                     throw new Error("no backrun bundle was generated")
                 }
@@ -222,39 +278,6 @@ class MevFlood {
         } else {
             throw new Error("deployment required for approvals")
         }
-    }
-
-    /**
-     * Save liquid deployment to file.
-     * @param filename File path relative to project root, or absolute path.
-     */
-    public async saveDeployment(filename: string) {
-        if (this.deployment)
-            await MevFlood.saveDeployment(filename, this.deployment.inner(), this.deployment.signedTxs)
-        else {
-            throw new Error("save deployment failed")
-        }
-        return this
-    }
-
-    /**
-     * Loads deployment from the given deployment file.
-     * @param filename Filename relative to the project root. JSON file. Ex: "deployment.json"
-     * @returns LiquidDeployment object.
-     */
-    static async loadDeployment(filename: string): Promise<LiquidDeployment> {
-        return await loadDeploymentLib({filename})
-    }
-
-    /**
-     * Saves deployment object to a JSON file.
-     * @param filename Filename relative to the project root. Ex: "deployment.json"
-     * @param deployment LiquidDeployment object.
-     * @param allSignedTxs Array of signed transactions that execute the deployment.
-     */
-    static async saveDeployment(filename: string, deployment: ILiquidDeployment, allSignedTxs?: string[]) {
-        await fs.writeFile(filename, JSON.stringify({deployment: deployment, allSignedTxs}), {encoding: "utf8"})
-        console.log(`Saved deployment: ${textColors.Bright}${filename}${textColors.Reset}`)
     }
 }
 
