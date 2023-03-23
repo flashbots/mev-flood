@@ -7,14 +7,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { randomInt } from 'crypto';
 
 // load wallets from disk
-const walletSet = getSearchWalletSet("cancel")
+const {wallets} = getSearchWalletSet("cancel")
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // run a block monitor to send bundles on every block
 PROVIDER.on('block', async blockNum => {
     console.log(`[BLOCK ${blockNum}]`)
-    const bundles = await createDumbLotteryBundles(walletSet, GWEI.mul(31 + randomInt(42)))
+    const bundles = await createDumbLotteryBundles(wallets, GWEI.mul(31 + randomInt(42)))
     console.log("bundles", bundles)
 
         console.warn("SENDING TXS TO FLASHBOTS")
