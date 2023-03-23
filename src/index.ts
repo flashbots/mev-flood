@@ -56,10 +56,10 @@ class MevFlood {
      * @param allSignedTxs Array of raw signed transactions.
      * @returns Pending bundle response.
      */
-    private async sendToFlashbots(allSignedTxs: string[]) {
+    private async sendToFlashbots(allSignedTxs: string[], targetBlock?: number) {
         if (this.flashbotsProvider) {
-            const targetBlock = await this.provider.getBlockNumber() + 1
-            return await this.flashbotsProvider.sendRawBundle(allSignedTxs, targetBlock)
+            const targetBlockNum = targetBlock || await this.provider.getBlockNumber() + 1
+            return await this.flashbotsProvider.sendRawBundle(allSignedTxs, targetBlockNum)
         } else {
             throw new Error("must call initFlashbots on MevFlood instance to deploy to flashbots")
         }
@@ -138,9 +138,9 @@ class MevFlood {
             }
         }
 
-        const deployToFlashbots = async () => {
+        const deployToFlashbots = async (targetBlock?: number) => {
             if (deployment.signedTxs){
-                return this.sendToFlashbots(deployment.signedTxs)
+                return this.sendToFlashbots(deployment.signedTxs, targetBlock)
             } else {
                 throw new Error("failed to deploy to flashbots. No signedTxs in deployment.")
             }
@@ -148,8 +148,10 @@ class MevFlood {
 
         return {
             deployment,
-            deployToMempool,
+            /** Send deployment transactions as a bundle to Flashbots. */
             deployToFlashbots,
+            /** Send deployment transactions to mempool. */
+            deployToMempool,
         }
     }
 
@@ -162,16 +164,12 @@ class MevFlood {
     async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[], nonceOffset?: number) {
         if (this.deployment) {
             const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, nonceOffset)
-            const sendToFlashbots = async () => {
-                return this.sendToFlashbots(swaps.signedSwaps)
-            }
-            const sendToMempool = async () => {
-                return this.sendToMempool(swaps.signedSwaps)
-            }
             return {
                 swaps,
-                sendToFlashbots,
-                sendToMempool
+                /** Send swaps as a bundle to Flashbots. */
+                sendToFlashbots: async (targetBlock?: number) => this.sendToFlashbots(swaps.signedSwaps, targetBlock),
+                /** Send all swaps to mempool. */
+                sendToMempool: async () => this.sendToMempool(swaps.signedSwaps),
             }
         } else {
             throw new Error("must initialize MevFlood with a liquid deployment to send swaps")
@@ -186,27 +184,25 @@ class MevFlood {
     async backrun(pendingTx: Transaction, opts?: BackrunOptions) {
         if (this.deployment) {
             const backrun = await generateBackrun(this.provider, this.deployment, this.adminWallet, pendingTx, opts)
-            /**
-             * Sends bundle containing original tx we're backrunning and the arb tx.
-             * @returns Pending bundle response.
-             */
-            const sendToFlashbots = async () => {
+            const sendToFlashbots = async (targetBlock?: number) => {
                 if (backrun?.bundle) {
-                    return this.sendToFlashbots(backrun.bundle)
+                    return this.sendToFlashbots(backrun.bundle, targetBlock)
+                } else {
+                    throw new Error("no backrun bundle was generated")
                 }
             }
-            /**
-             * Only sends the arb tx to the mempool, not the tx we're backrunning.
-             * @returns Pending transactions response.
-             */
             const sendToMempool = async () => {
                 if (backrun) {
                     return (await this.sendToMempool([backrun.signedArb]))[0]
+                } else {
+                    throw new Error("no backrun bundle was generated")
                 }
             }
             return {
                 backrun,
+                /** Sends bundle containing original tx we're backrunning and the arb tx. */
                 sendToFlashbots,
+                /** Only sends the arb tx to the mempool, not the tx we're backrunning. */
                 sendToMempool,
             }
         }
