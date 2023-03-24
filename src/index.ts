@@ -3,13 +3,16 @@ import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
 import { BackrunOptions, generateBackrun } from './lib/backrun'
-import Matchmaker, { ShareTransactionOptions } from "@flashbots/matchmaker-ts"
+import Matchmaker, { PendingShareTransaction, ShareTransactionOptions } from "@flashbots/matchmaker-ts"
 
 // lib
 import { textColors } from './lib/helpers'
 import { ILiquidDeployment, LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
 import { approveIfNeeded, SwapOptions } from './lib/swap'
+
+// TODO: remove this once flashbots/ethers-provider-bundle & mev-flood are updated to use ethers v6 throughout
+const ethersV6 = require('ethersV6')
 
 const flashbotsUrls = {
     1: "https://relay.flashbots.net",
@@ -47,10 +50,7 @@ class MevFlood {
             getFlashbotsUrl(this.provider.network.chainId),
             this.provider.network
         )
-
-        // broken; need ethers v6
-        // this.matchmaker = new Matchmaker(flashbotsSigner, this.provider.network)
-
+        this.matchmaker = new Matchmaker(new ethersV6.Wallet(flashbotsSigner.privateKey), this.provider.network)
         return this
     }
 
@@ -138,7 +138,13 @@ class MevFlood {
     }
 
     private async sendToMevShare(signedTxs: string[], options: ShareTransactionOptions) {
-        throw new Error("pls implement me ;-;")
+        if (this.matchmaker) {
+            return await Promise.all(signedTxs.map(tx => 
+                this.matchmaker!.sendShareTransaction(tx, options)
+            ))
+        } else {
+            throw new Error("must call initFlashbots on MevFlood instance to send to mev-share")
+        }
     }
 
     /**
@@ -203,6 +209,7 @@ class MevFlood {
      * @param swapParams Parameters to adjust the size of the swap.
      * @param fromWallets Array of wallets that will send the swaps.
      * @param deployment LiquidDeployment object containing contract information. See `MevFlood.loadDeployment` and `MevFlood.saveDeployment`.
+     * @returns Swap params w/ signed transactions, callbacks to send to mempool/flashbots/mev-share.
      */
     async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[], nonceOffset?: number) {
         if (this.deployment) {
@@ -213,23 +220,27 @@ class MevFlood {
                 sendToFlashbots: async (targetBlock?: number) => this.sendBundle(swaps.signedSwaps, targetBlock),
                 /** Send all swaps to mempool. */
                 sendToMempool: async () => this.sendToMempool(swaps.signedSwaps),
+                /** Send all swaps to mev-share. */
+                sendToMevShare: async (shareOptions: ShareTransactionOptions) => this.sendToMevShare(swaps.signedSwaps, shareOptions),
             }
         } else {
             throw new Error("must initialize MevFlood with a liquid deployment to send swaps")
         }
     }
 
-    async generateShareSwaps(swapParams: SwapOptions, fromWallets: Wallet[], shareOptions: ShareTransactionOptions, nonceOffset?: number) {
-        if (this.deployment) {
-            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, nonceOffset)
-            return {
-                swaps,
-                /** Send swaps as mev-share transactions to Flashbots. */
-                sendToMevShare: async (targetBlock?: number) => this.sendBundle(swaps.signedSwaps, targetBlock),
-            }
-        } else {
-            throw new Error("must initialize MevFlood with a liquid deployment to send swaps")
-        }
+    /**
+     * Backrun a pending transaction from mev-share.
+     * @param pendingTxHash Hash of the pending transaction.
+     * @param opts Options to modify the behavior of the backrun.
+     * @returns Backrun with callbacks to send it.
+     * @todo implement me pls 🥺
+     */
+    async backrunShareTransaction(pendingTx: PendingShareTransaction, opts?: BackrunOptions) {
+        // TODO: new method to get the data I need from provided hints
+        // - default method if we have calldata
+        // - logs if the tx's calldata is not given
+        // - quit if neither are given
+        throw new Error(`🥺🥺🥺 tx ${pendingTx.txHash} might be full of juicy MEV but this function hasn't been implemented 🥺🥺🥺`)
     }
 
     /**
