@@ -1,6 +1,10 @@
-import { BigNumber, Contract, providers, Wallet } from 'ethers'
-import { coinToss, ETH, MAX_U256, populateTxFully, randInRange } from './helpers'
+import { PendingShareTransaction } from '@flashbots/matchmaker-ts'
+import { BigNumber, Contract, providers, utils, Wallet } from 'ethers'
+import { coinToss, ETH, extract4Byte, MAX_U256, populateTxFully, randInRange } from './helpers'
 
+/**
+ * Options for generating a new swap.
+ */
 export type SwapOptions = {
     minUSD?: number,
     maxUSD?: number,
@@ -9,6 +13,9 @@ export type SwapOptions = {
     swapWethForDai?: boolean,
 }
 
+/**
+ * Contract-specific parameters of a generated swap.
+ */
 export type SwapParams = {
     amountIn: BigNumber,
     path: string[],
@@ -17,7 +24,65 @@ export type SwapParams = {
     uniFactory: string,
 }
 
-export const createRandomSwap = (
+/**
+ * Pending swap from the mempool or mev-share.
+ */
+export interface IPendingSwap {
+    // address[] memory path,
+    path: string[]
+    // uint256 amountIn,
+    amountIn: BigNumber
+    // address factory,
+    factory: string
+    // address recipient,
+    recipient: string
+    // bool fromThis
+    fromThis: boolean
+}
+
+/**
+ * Class to decode swap params from calldata.
+ */
+export class PendingSwap implements IPendingSwap {
+    public path: string[]
+    public amountIn: BigNumber
+    public factory: string
+    public recipient: string
+    public fromThis: boolean
+    constructor(calldata: string) {
+        const params = decodeSwapCalldata(calldata)
+        this.path = params[0]
+        this.amountIn = params[1]
+        this.factory = params[2]
+        this.recipient = params[3]
+        this.fromThis = params[4]
+    }
+}
+
+const decodeSwapCalldata = (calldata: string) => {
+    const fnSignature = extract4Byte(calldata)
+    // we're expecting a call to `swap` on atomicSwap
+    if (fnSignature === "0cc73263") {
+        // swap detected
+        const decodedTxData = utils.defaultAbiCoder.decode([
+            "address[] path",
+            "uint256 amountIn",
+            "address factory",
+            "address recipient",
+            "bool fromThis",
+        ], `0x${calldata.substring(10)}`)
+        return decodedTxData
+    } else {
+        throw new Error("Unknown function signature: " + fnSignature)
+    }
+}
+
+// TODO
+// export const decodeSwapHints = (shareTx: PendingShareTransaction) => {
+
+// }
+
+export const createRandomSwapParams = (
     uniFactoryAddress_A: string,
     uniFactoryAddress_B: string,
     daiAddresses: string[],

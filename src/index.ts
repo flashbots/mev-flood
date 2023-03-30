@@ -9,7 +9,7 @@ import Matchmaker, { PendingShareTransaction, ShareTransactionOptions } from "@f
 import { populateTxFully, serializePendingTx, textColors } from './lib/helpers'
 import { ILiquidDeployment, LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
-import { approveIfNeeded, SwapOptions } from './lib/swap'
+import { approveIfNeeded, SwapOptions, PendingSwap } from './lib/swap'
 
 // TODO: remove this once flashbots/ethers-provider-bundle & mev-flood are updated to use ethers v6 throughout
 const ethersV6 = require('ethersV6')
@@ -272,30 +272,42 @@ class MevFlood {
      */
     async backrun(pendingTx: Transaction, opts?: BackrunOptions) {
         if (this.deployment) {
-            const backrunTx = await generateBackrunTx(this.provider, this.deployment, pendingTx, opts)
-            if (!backrunTx) {
+            if (pendingTx.to !== this.deployment.atomicSwap.contractAddress) {
+                console.warn(`backrun: tx ${pendingTx.hash} is not a swap. Skipping.`)
                 return undefined
             }
-            const userTx = serializePendingTx(pendingTx)
-            const signedArb = await this.adminWallet.signTransaction(
-                populateTxFully(
-                    backrunTx,
-                    opts?.nonce || await this.provider.getTransactionCount(this.adminWallet.address),
-                    {from: this.adminWallet.address, chainId: this.provider.network.chainId}))
-            const bundle = [userTx, signedArb]
+            // decode tx to get pair and amount
+            try {
+                const userSwap = new PendingSwap(pendingTx.data)
+                const backrunTx = await generateBackrunTx(this.provider, this.deployment, userSwap, opts)
+                if (!backrunTx) {
+                    return undefined
+                }
+                const userTx = serializePendingTx(pendingTx)
+                const signedArb = await this.adminWallet.signTransaction(
+                    populateTxFully(
+                        backrunTx,
+                        opts?.nonce || await this.provider.getTransactionCount(this.adminWallet.address),
+                        {from: this.adminWallet.address, chainId: this.provider.network.chainId}
+                ))
+                const bundle = [userTx, signedArb]
 
-            const sendToFlashbots = async (targetBlock?: number) => {
-                return await this.sendBundle(bundle, targetBlock)
-            }
-            const sendToMempool = async () => {
-                return (await this.sendToMempool([bundle[1]]))[0]
-            }
-            return {
-                bundle,
-                /** Sends bundle containing original tx we're backrunning and the arb tx. */
-                sendToFlashbots,
-                /** Only sends the arb tx to the mempool, not the tx we're backrunning. */
-                sendToMempool,
+                const sendToFlashbots = async (targetBlock?: number) => {
+                    return await this.sendBundle(bundle, targetBlock)
+                }
+                const sendToMempool = async () => {
+                    return (await this.sendToMempool([bundle[1]]))[0]
+                }
+                return {
+                    bundle,
+                    /** Sends bundle containing original tx we're backrunning and the arb tx. */
+                    sendToFlashbots,
+                    /** Only sends the arb tx to the mempool, not the tx we're backrunning. */
+                    sendToMempool,
+                }
+            } catch (e) {
+                console.warn((e as Error).message)
+                return undefined
             }
         }
         else {
