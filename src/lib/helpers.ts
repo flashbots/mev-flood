@@ -1,5 +1,3 @@
-import { Token } from '@uniswap/sdk-core'
-import { computePairAddress } from '@uniswap/v2-sdk'
 import { BigNumber, Wallet, providers, utils, Transaction } from "ethers"
 import { getAddress, id as ethersId, keccak256, solidityPack, UnsignedTransaction } from "ethers/lib/utils"
 

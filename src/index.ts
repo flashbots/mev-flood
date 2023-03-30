@@ -3,7 +3,7 @@ import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
 import { BackrunOptions, generateBackrunTx } from './lib/backrun'
-import Matchmaker, { PendingShareTransaction, ShareTransactionOptions } from "@flashbots/matchmaker-ts"
+import Matchmaker, { PendingShareTransaction, ShareBundleParams, ShareTransactionOptions } from "@flashbots/matchmaker-ts"
 
 // lib
 import { populateTxFully, serializePendingTx, textColors } from './lib/helpers'
@@ -147,6 +147,14 @@ class MevFlood {
         }
     }
 
+    private async sendMevShareBundle(bundleParams: ShareBundleParams) {
+        if (this.matchmaker) {
+            return await this.matchmaker.sendShareBundle(bundleParams)
+        } else {
+            throw new Error("must call initFlashbots on MevFlood instance to send to mev-share")
+        }
+    }
+
     /**
      * Sends ETH to recipients from `this.adminWallet`.
      * @param recipients Addresses of accounts to receive ETH.
@@ -229,43 +237,6 @@ class MevFlood {
     }
 
     /**
-     * Backrun a pending transaction from mev-share.
-     * @param pendingTxHash Hash of the pending transaction.
-     * @param opts Options to modify the behavior of the backrun.
-     * @returns Backrun with callbacks to send it.
-     * @todo implement me pls 🥺
-     */
-    // async backrunShareTransaction(pendingTx: PendingShareTransaction, opts?: BackrunOptions) {
-    //     // TODO: new method to get the data I need from provided hints
-    //     // - default method if we have calldata
-    //     // - logs if the tx's calldata is not given
-    //     // - quit if neither are given
-    //     if (pendingTx.callData && this.deployment) {
-    //         const backrun = await generateShareBackrun(this.provider, this.deployment, this.adminWallet, pendingTx.callData, opts)
-    //         const sendToFlashbots = async (targetBlock?: number) => {
-    //             if (backrun?.bundle) {
-    //                 return this.sendBundle(backrun.bundle, targetBlock)
-    //             } else {
-    //                 throw new Error("no backrun bundle was generated")
-    //             }
-    //         }
-    //         const sendToMempool = async () => {
-    //             if (backrun) {
-    //                 return this.sendToMempool(backrun.signedTxs)
-    //             } else {
-    //                 throw new Error("no backrun was generated")
-    //             }
-    //         }
-    //         return {
-    //             backrun,
-    //             sendToFlashbots,
-    //             sendToMempool,
-    //         }
-    //     }
-    //     throw new Error(`🥺🥺🥺 tx ${pendingTx.txHash} might be full of juicy MEV but this function hasn't been implemented 🥺🥺🥺`)
-    // }
-
-    /**
      * Builds a backrun given a pending transaction.
      * @param pendingTx 
      * @returns Backrun with callbacks to send it.
@@ -278,7 +249,7 @@ class MevFlood {
             }
             // decode tx to get pair and amount
             try {
-                const userSwap = new PendingSwap(pendingTx.data)
+                const userSwap = PendingSwap.fromCalldata(pendingTx.data)
                 const backrunTx = await generateBackrunTx(this.provider, this.deployment, userSwap, opts)
                 if (!backrunTx) {
                     return undefined
@@ -312,6 +283,44 @@ class MevFlood {
         }
         else {
             throw new Error("Must initialize MevFlood with a liquid deployment to generate backruns.")
+        }
+    }
+
+    /**
+     * Backrun a pending transaction from mev-share.
+     * @param pendingTxHash Hash of the pending transaction.
+     * @param opts Options to modify the behavior of the backrun.
+     * @returns Backrun with callbacks to send it.
+     */
+    async backrunShareTransaction(pendingTx: PendingShareTransaction, opts?: BackrunOptions) {
+        if (this.deployment) {
+            const pendingSwap = PendingSwap.fromShareTx(pendingTx)
+            if (!pendingSwap) {
+                return undefined
+            }
+            const backrun = await generateBackrunTx(this.provider, this.deployment, pendingSwap, opts)
+            if (!backrun) {
+                return undefined
+            }
+            const signedBackrun = await this.adminWallet.signTransaction(
+                populateTxFully(
+                    backrun,
+                    opts?.nonce || await this.provider.getTransactionCount(this.adminWallet.address),
+                    {from: this.adminWallet.address, chainId: this.provider.network.chainId}
+            ))
+
+            const sendShareBundle = async (targetBlock: number) => {
+                const bundleParams: ShareBundleParams = {
+                    shareTxs: [pendingTx.txHash],
+                    backrun: [signedBackrun],
+                    targetBlock,
+                }
+                return await this.sendMevShareBundle(bundleParams)
+            }
+            return {
+                backrun,
+                sendShareBundle,
+            }
         }
     }
 

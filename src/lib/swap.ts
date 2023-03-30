@@ -1,6 +1,7 @@
 import { PendingShareTransaction } from '@flashbots/matchmaker-ts'
 import { BigNumber, Contract, providers, utils, Wallet } from 'ethers'
-import { coinToss, ETH, extract4Byte, MAX_U256, populateTxFully, randInRange } from './helpers'
+import { LogParams } from 'ethersV6'
+import { coinToss, ETH, extract4Byte, GWEI, MAX_U256, populateTxFully, randInRange } from './helpers'
 
 /**
  * Options for generating a new swap.
@@ -41,21 +42,58 @@ export interface IPendingSwap {
 }
 
 /**
- * Class to decode swap params from calldata.
+ * Class to decode swap params from pending transactions. The common interface for calling `generateBackrunTx`.
+ * 
+ * Instantiate by calling one of the static methods: {@link fromCalldata} or {@link fromShareTx}.
  */
 export class PendingSwap implements IPendingSwap {
-    public path: string[]
-    public amountIn: BigNumber
-    public factory: string
-    public recipient: string
-    public fromThis: boolean
-    constructor(calldata: string) {
-        const params = decodeSwapCalldata(calldata)
-        this.path = params[0]
-        this.amountIn = params[1]
-        this.factory = params[2]
-        this.recipient = params[3]
-        this.fromThis = params[4]
+    constructor (
+        public path: string[],
+        public amountIn: BigNumber,
+        public factory: string,
+        public recipient: string,
+        public fromThis: boolean,
+    ) {
+        this.amountIn = amountIn
+        this.path = path
+        this.factory = factory
+        this.recipient = recipient
+        this.fromThis = fromThis
+    }
+
+    /**
+     * Create a PendingSwap from raw calldata.
+     * @param calldata raw calldata of transaction
+     * @param swapDecoder optional override for decoding calldata; should return an array of params `[path, amountIn, factory, recipient, fromThis]` from ethers.utils.ABI_CODER.decode
+     * @returns 
+     */
+    static fromCalldata(calldata: string, swapDecoder?: (calldata: string) => utils.Result) {
+        const params = swapDecoder ? swapDecoder(calldata) : decodeSwapCalldata(calldata)
+        const path = params[0]
+        const amountIn = params[1]
+        const factory = params[2]
+        const recipient = params[3]
+        const fromThis = params[4]
+        return new PendingSwap(path, amountIn, factory, recipient, fromThis)
+    }
+
+    static fromShareTx(pendingTx: PendingShareTransaction, swapDecoder?: (calldata: string) => utils.Result) {
+        if (pendingTx.callData) {
+            try {
+                return PendingSwap.fromCalldata(pendingTx.callData, swapDecoder)
+            } catch (e) {
+                // ignore unknown function signature error, throw all others
+                if (!(e as Error).message.includes("Unknown function signature:")) {
+                    throw e
+                }
+            }
+        }
+        if (pendingTx.logs) {
+            const logData = decodeSwapLogs(pendingTx.logs)
+            // return new PendingSwap(hints.path, hints.amountIn, hints.factory, hints.recipient, hints.fromThis)
+        } else {
+            return undefined
+        }
     }
 }
 
@@ -77,10 +115,13 @@ const decodeSwapCalldata = (calldata: string) => {
     }
 }
 
-// TODO
-// export const decodeSwapHints = (shareTx: PendingShareTransaction) => {
 
-// }
+
+export const decodeSwapLogs = (logs: LogParams[]) => {
+    console.log("logs", logs)
+    // TODO: univ2 logs
+    throw new Error("unimplemented")
+}
 
 export const createRandomSwapParams = (
     uniFactoryAddress_A: string,
@@ -126,7 +167,7 @@ export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: 
                 false
             ),
             nonce,
-            {from: sender.address, gasLimit: 150000, chainId},
+            {from: sender.address, gasLimit: 150000, chainId, maxFeePerGas: GWEI.mul(80), maxPriorityFeePerGas: GWEI.mul(5)},
         )
     )
 }
@@ -152,6 +193,8 @@ export const approveIfNeeded = async (
                     from: wallet.address,
                     gasLimit: 50000,
                     chainId,
+                    maxFeePerGas: GWEI.mul(80),
+                    maxPriorityFeePerGas: GWEI.mul(5),
                 })
                 const signedTx = await wallet.signTransaction(approveTx)
                 signedApprovals.push(signedTx)
@@ -167,6 +210,8 @@ export const approveIfNeeded = async (
                         from: wallet.address,
                         gasLimit: 50000,
                         chainId,
+                        maxFeePerGas: GWEI.mul(80),
+                        maxPriorityFeePerGas: GWEI.mul(5),
                     })
                 const signedTx = await wallet.signTransaction(approveTx)
                 signedApprovals.push(signedTx)
@@ -205,12 +250,14 @@ export const mintIfNeeded = async (
 
     for (const wallet of walletSet) {
         let wethBalance: BigNumber = await contracts.weth.callStatic.balanceOf(wallet.address)
-        if (wethBalance.lte(wethAmount)) {
+        if (wethBalance.lt(wethAmount)) {
             let nonce = await wallet.connect(provider).getTransactionCount()
             const tx = populateTxFully(await contracts.weth.populateTransaction.deposit({value: wethAmount}), nonce, {
                 gasLimit: 50000,
                 from: wallet.address,
                 chainId: provider.network.chainId,
+                maxFeePerGas: GWEI.mul(80),
+                maxPriorityFeePerGas: GWEI.mul(5),
             })
             const signedDeposit = await wallet.signTransaction(tx)
             signedDeposits.push(signedDeposit)
@@ -218,12 +265,14 @@ export const mintIfNeeded = async (
 
         for (const d of contracts.dai) {
             let daiBalance: BigNumber = await d.callStatic.balanceOf(wallet.address)
-            if (daiBalance.lte(ETH.mul(50000))) {
+            if (daiBalance.lt(ETH.mul(50000))) {
                 // mint 50k DAI to wallet from admin account (DAI deployer)
                 const mintTx = await adminWallet.signTransaction(populateTxFully(await d.populateTransaction.mint(wallet.address, ETH.mul(50000)), adminNonce++, {
                     gasLimit: 60000,
                     from: adminWallet.address,
-                    chainId: provider.network.chainId
+                    chainId: provider.network.chainId,
+                    maxFeePerGas: GWEI.mul(80),
+                    maxPriorityFeePerGas: GWEI.mul(5),
                 }))
                 signedMints.push(mintTx)
             }

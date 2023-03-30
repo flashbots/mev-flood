@@ -1,12 +1,14 @@
+import Matchmaker from '@flashbots/matchmaker-ts'
 import { Mutex } from 'async-mutex'
 import { Wallet } from 'ethers'
+import { Wallet as WalletV6 } from 'ethersV6'
 import MevFlood from '.'
-import { getArbdArgs } from './lib/cliArgs'
+import { getArbdArgs, SendRoute } from './lib/cliArgs'
 import { logSendBundleResponse } from './lib/flashbots'
 import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
 import { approveIfNeeded, mintIfNeeded } from './lib/swap'
-import { getAdminWallet, getWalletSet } from './lib/wallets'
+import { getAdminWallet, getTestWallet, getWalletSet } from './lib/wallets'
 
 async function main() {
     // very primitive nonce management
@@ -33,8 +35,8 @@ async function main() {
     }
 
     // get cli args
-    const {walletIdx, minProfit, maxProfit, sendToFlashbots, mintWethAmount} = getArbdArgs()
-    const walletSet = getWalletSet(walletIdx, walletIdx + 1)
+    const {walletIdx, minProfit, maxProfit, sendRoute, mintWethAmount} = getArbdArgs()
+    const wallet = getTestWallet(walletIdx)
     const deployment = await loadDeployment({})
     const contracts = deployment.getDeployedContracts(PROVIDER)
 
@@ -42,26 +44,52 @@ async function main() {
     const flashbotsSigner = new Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") // hh[0]
     const adminWallet = getAdminWallet().connect(PROVIDER)
     let adminNonce = await adminWallet.getTransactionCount()
-    console.log("using wallets", walletSet.map(w => w.address))
+    console.log("using wallet", wallet.address)
 
-    const getFlood = async (admin: Wallet) => await new MevFlood(admin, PROVIDER, deployment).initFlashbots(flashbotsSigner)
+    const mevFlood = await new MevFlood(adminWallet, PROVIDER, deployment).initFlashbots(flashbotsSigner)
 
     // check wallet balance for each token, mint if needed
-    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount)
+    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, [wallet], contracts, mintWethAmount)
 
     // check atomicSwap allowance for each wallet, approve max_uint if needed
-    await approveIfNeeded(PROVIDER, walletSet, contracts)
+    await approveIfNeeded(PROVIDER, [wallet], contracts)
 
-    PROVIDER.on('pending', async (pendingTx: any) => {
-        // TODO: batch multiple txs to backrun instead of backrunning each one individually
-        for (const wallet of walletSet) {
-            const backrun = await (await getFlood(wallet)).backrun(pendingTx, {
+    if (sendRoute === SendRoute.MevShare) {
+        const matchmaker = new Matchmaker(new WalletV6(flashbotsSigner.privateKey), PROVIDER.network)
+        matchmaker.onShareTransaction(async pendingTx => {
+            const blockNum = await PROVIDER.getBlockNumber()
+            const backrun = await mevFlood.backrunShareTransaction(pendingTx, {
                 minProfit,
                 maxProfit,
                 nonce: await getNonce(wallet.address),
             })
             if (backrun) {
-                if (sendToFlashbots) {
+                try {
+                    console.log("sending backrun to flashbots")
+                    for (let i = 1; i < 5; i++) { // target next 4 blocks
+                        const res = await backrun.sendShareBundle(blockNum + i)
+                        if (!res) {
+                            resetNonce(wallet.address)
+                        }
+                    }
+                } catch (e) {
+                    if ((e as Error).message.includes("nonce too low")) {
+                        console.warn("nonce too low, resetting nonce")
+                        resetNonce(wallet.address)
+                    }
+                }
+            }
+        })
+    } else {
+        PROVIDER.on('pending', async (pendingTx: any) => {
+            // TODO: batch multiple txs to backrun instead of backrunning each one individually
+            const backrun = await mevFlood.backrun(pendingTx, {
+                minProfit,
+                maxProfit,
+                nonce: await getNonce(wallet.address),
+            })
+            if (backrun) {
+                if (sendRoute === SendRoute.Flashbots) {
                     try {
                         console.log("sending backrun to flashbots")
                         const res = await backrun.sendToFlashbots()
@@ -75,7 +103,7 @@ async function main() {
                             resetNonce(wallet.address)
                         }
                     }
-                } else {
+                } else if (sendRoute === SendRoute.Mempool) {
                     console.log("sending backrun to mempool")
                     try {
                         const res = await backrun.sendToMempool()
@@ -97,8 +125,8 @@ async function main() {
                 // TODO: reduce load on provider by only doing this once per block
                 resetNonce(wallet.address)
             }
-        }
-    })
+        })
+    }
 }
 
 main()

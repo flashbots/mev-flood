@@ -24,4 +24,4 @@ export const getWalletSet = (startIdx: number, endIdx: number) => {
 }
 
 export const getAdminWallet = () => new Wallet(env.ADMIN_PRIVATE_KEY)
-export const getTestWallet = () => new Wallet(env.TEST_PRIVATE_KEY)
+export const getTestWallet = (idx?: number) => new Wallet(idx ? minionWallets[idx].privateKey : env.TEST_PRIVATE_KEY)

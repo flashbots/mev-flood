@@ -1,6 +1,20 @@
 import { parseEther } from 'ethers/lib/utils'
 import { textColors, } from './helpers'
 
+/* author's note:
+
+    I'm sorry you have to see this. I promise I'll integrate a proper CLI framework soon.
+
+    This is what happens when you don't pay your tech debt.
+
+*/
+
+export enum SendRoute {
+    Flashbots,
+    Mempool,
+    MevShare,
+}
+
 export const getOption = (args: string[], flagIndex: number, argType?: "string" | "number" | "boolean") => {
     if (args.length > flagIndex + 1 || argType === "boolean") {
         // number is default type
@@ -326,8 +340,10 @@ export const getSwapdArgs = () => {
     const mintWethAmountShort = "-w"
     const flashbotsFlag = "--flashbots"
     const flashbotsShort = "-f"
+    const mevShareFlag = "--mev-share"
+    const mevShareShort = "-k"
 
-    const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`)"
+    const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`). Send to mempool by default."
     const usage = `\
     yarn swapd <first_wallet_index> [last_wallet_index] [OPTIONS...]
 `
@@ -342,6 +358,7 @@ export const getSwapdArgs = () => {
     ${swapDaiForWethShort}\t${swapDaiForWethFlag}\t\tSwaps DAI for WETH if set.
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
     ${flashbotsShort}\t${flashbotsFlag}\t\tSend swaps as Flashbots bundles instead of sending to mempool.
+    ${mevShareShort}\t${mevShareFlag}\t\tSend swaps to mev-share. (overrides ${flashbotsFlag})
 `
     const examples = `\
     # run with a single wallet
@@ -361,6 +378,9 @@ export const getSwapdArgs = () => {
 
     # swap up to $5000 worth of ETH into DAI
     yarn swapd 13 ${maxUsdShort} 5000 ${swapWethForDaiFlag}
+
+    # send a random swap from wallet 13 via mev-share
+    yarn swapd 13 ${mevShareShort}
 `
     const helpMessage = genHelpMessage(description, usage, options, examples)
     // TODO: replace these horrible arg parsers
@@ -374,7 +394,7 @@ export const getSwapdArgs = () => {
     let daiIndex = 0
     let swapWethForDai = undefined
     let mintWethAmount = 20
-    let sendToFlashbots = false
+    let sendRoute = SendRoute.Mempool
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -417,10 +437,12 @@ export const getSwapdArgs = () => {
                 const flagIndex = getFlagIndex(args, mintWethAmountFlag, mintWethAmountShort)
                 mintWethAmount = getOption(args, flagIndex, "number") as number
             }
-            if (args.includes(flashbotsFlag)) {
-                sendToFlashbots = true
+            if (args.includes(flashbotsFlag) || args.includes(flashbotsShort)) {
+                sendRoute = SendRoute.Flashbots
             }
-
+            if (args.includes(mevShareFlag) || args.includes(mevShareShort)) {
+                sendRoute = SendRoute.MevShare
+            }
         }
     } else {
         console.error("one or two wallet indices are required")
@@ -440,7 +462,7 @@ export const getSwapdArgs = () => {
         daiIndex,
         swapWethForDai,
         mintWethAmount: parseEther(mintWethAmount.toString()),
-        sendToFlashbots,
+        sendRoute,
     }
 }
 
@@ -454,24 +476,30 @@ export const getArbdArgs = () => {
     const mintWethAmountFlag = "--mint-weth"
     const mintWethAmountShort = "-w"
     const mempoolFlag = "--mempool"
+    const mevShareFlag = "--mev-share"
+    const mevShareShort = "-k"
     const options = `\
     ${minProfitShort}\t${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in wei. (default=0 + gas cost)
     ${maxProfitShort}\t${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in wei. (default=inf)
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
-    ${mempoolFlag}\t\t\tSend backruns to mempool instead of sending a bundle to Flashbots (NOT recommended).
+    ${mevShareShort}\t${mevShareFlag}\t\tBackrun txs on mev-share.
+    ${mempoolFlag}\t\t\tSend backruns to mempool instead of sending a bundle to Flashbots (NOT recommended). Overrides ${mevShareFlag}.
 `
     const usage = `\
-    yarn arbd <first_wallet_index> [OPTIONS...]
+    yarn arbd <wallet_index> [OPTIONS...]
 `
     const examples = `\
     # run arb bot with wallet 13
     yarn arbd 13
 
     # run arb bot with minimum profit threshold of 0.2 ETH
-    yarn arbd -m 0.2
+    yarn arbd 13 ${minProfitShort} 0.2
 
     # run arb bot that only executes opportunities that profit between 1 - 10 ETH
-    yarn arbd -m 1 -M 10
+    yarn arbd 13 ${minProfitShort} 1 ${maxProfitShort} 10
+
+    # run arb bot on mev-share transactions
+    yarn arbd 13 ${mevShareShort}
 `
     const helpMessage = genHelpMessage(description, usage, options, examples)
 
@@ -479,7 +507,7 @@ export const getArbdArgs = () => {
     let minProfit = 0
     let maxProfit = undefined // unlimited if undefined
     let mintWethAmount = 20
-    let sendToFlashbots = true
+    let sendRoute = SendRoute.Flashbots
 
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -499,7 +527,9 @@ export const getArbdArgs = () => {
                 mintWethAmount = getOption(args, flagIndex) as number
             }
             if (args.includes(mempoolFlag)) {
-                sendToFlashbots = false
+                sendRoute = SendRoute.Mempool
+            } else if (args.includes(mevShareFlag) || args.includes(mevShareShort)) {
+                sendRoute = SendRoute.MevShare
             }
         }
     } else {
@@ -516,7 +546,7 @@ export const getArbdArgs = () => {
             parseEther(maxProfit.toString()) :
             undefined,
         mintWethAmount: parseEther(mintWethAmount.toString()),
-        sendToFlashbots,
+        sendRoute,
     }
 }
 
@@ -535,7 +565,7 @@ export const getFundWalletsArgs = () => {
     yarn script.fundWallets
 
     # fund wallets with 1 ETH
-    yarn script.fundWallets -e 1
+    yarn script.fundWallets ${ethShort} 1
 `
     const helpMessage = genHelpMessage(description, usage, options, examples)
     let eth: number | undefined = 50

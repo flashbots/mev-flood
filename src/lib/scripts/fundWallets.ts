@@ -30,8 +30,10 @@ const fundWallets = async (provider: providers.JsonRpcProvider, recipients: stri
             from: adminWallet.address,
             to: recipient,
             nonce: nonce + i,
-            gasPrice: GWEI.mul(15),
+            maxFeePerGas: GWEI.mul(100),
+            maxPriorityFeePerGas: GWEI.mul(5),
             gasLimit: 21000,
+            type: 2,
         }
         return tx
     })
@@ -41,11 +43,12 @@ const fundWallets = async (provider: providers.JsonRpcProvider, recipients: stri
     })
     const signedTxs = await Promise.all(signedTxPromises)
     console.log(signedTxs)
-    const sentTxPromises = signedTxs.map(async tx => (
-        await provider.sendTransaction(tx)
+    let sentTxs: any[] = []
+    signedTxs.forEach(tx => (
+        sentTxs.push(provider.sendTransaction(tx))
     ))
 
-    return await Promise.all(sentTxPromises)
+    return await Promise.all(sentTxs)
 }
 
 export default fundWallets
