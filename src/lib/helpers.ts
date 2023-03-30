@@ -1,14 +1,17 @@
 import { Token } from '@uniswap/sdk-core'
 import { computePairAddress } from '@uniswap/v2-sdk'
-import { BigNumber, Wallet, providers, utils } from "ethers"
-import { getAddress, id as ethersId, keccak256, solidityPack } from "ethers/lib/utils"
+import { BigNumber, Wallet, providers, utils, Transaction } from "ethers"
+import { getAddress, id as ethersId, keccak256, solidityPack, UnsignedTransaction } from "ethers/lib/utils"
 
 import UniswapV2PairLocal from '../contractsBuild/UniswapV2Pair.sol/UniswapV2Pair.json'
 
-export type TransactionRequest = providers.TransactionRequest
+// convenience
 export const GWEI = BigNumber.from(1e9)
 export const ETH = GWEI.mul(GWEI)
 export const MAX_U256 = BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+
+// convenient here, but confusing if exported
+type TransactionRequest = providers.TransactionRequest
 
 /**
  * Now in seconds (UTC).
@@ -161,4 +164,11 @@ function getCreate2PairAddress(
  */
 export const computeUniV2PairAddress = async (factoryAddress: string, tokenA: string, tokenB: string) => {
     return getCreate2PairAddress(factoryAddress, [tokenA, tokenB], UniswapV2PairLocal.bytecode.object)
+}
+
+export const serializePendingTx = (pendingTx: Transaction): string => {
+    if (pendingTx.type === 2) {
+        delete pendingTx.gasPrice
+    }
+    return utils.serializeTransaction(pendingTx as UnsignedTransaction, {r: pendingTx.r || "0x", s: pendingTx.s, v: pendingTx.v})
 }

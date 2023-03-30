@@ -2,11 +2,11 @@
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
 import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
-import { BackrunOptions, generateBackrun } from './lib/backrun'
+import { BackrunOptions, generateBackrunTx } from './lib/backrun'
 import Matchmaker, { PendingShareTransaction, ShareTransactionOptions } from "@flashbots/matchmaker-ts"
 
 // lib
-import { textColors } from './lib/helpers'
+import { populateTxFully, serializePendingTx, textColors } from './lib/helpers'
 import { ILiquidDeployment, LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
 import { approveIfNeeded, SwapOptions } from './lib/swap'
@@ -224,7 +224,7 @@ class MevFlood {
                 sendToMevShare: async (shareOptions: ShareTransactionOptions) => this.sendToMevShare(swaps.signedSwaps, shareOptions),
             }
         } else {
-            throw new Error("must initialize MevFlood with a liquid deployment to send swaps")
+            throw new Error("Must initialize MevFlood with a liquid deployment to send swaps")
         }
     }
 
@@ -235,13 +235,35 @@ class MevFlood {
      * @returns Backrun with callbacks to send it.
      * @todo implement me pls 🥺
      */
-    async backrunShareTransaction(pendingTx: PendingShareTransaction, opts?: BackrunOptions) {
-        // TODO: new method to get the data I need from provided hints
-        // - default method if we have calldata
-        // - logs if the tx's calldata is not given
-        // - quit if neither are given
-        throw new Error(`🥺🥺🥺 tx ${pendingTx.txHash} might be full of juicy MEV but this function hasn't been implemented 🥺🥺🥺`)
-    }
+    // async backrunShareTransaction(pendingTx: PendingShareTransaction, opts?: BackrunOptions) {
+    //     // TODO: new method to get the data I need from provided hints
+    //     // - default method if we have calldata
+    //     // - logs if the tx's calldata is not given
+    //     // - quit if neither are given
+    //     if (pendingTx.callData && this.deployment) {
+    //         const backrun = await generateShareBackrun(this.provider, this.deployment, this.adminWallet, pendingTx.callData, opts)
+    //         const sendToFlashbots = async (targetBlock?: number) => {
+    //             if (backrun?.bundle) {
+    //                 return this.sendBundle(backrun.bundle, targetBlock)
+    //             } else {
+    //                 throw new Error("no backrun bundle was generated")
+    //             }
+    //         }
+    //         const sendToMempool = async () => {
+    //             if (backrun) {
+    //                 return this.sendToMempool(backrun.signedTxs)
+    //             } else {
+    //                 throw new Error("no backrun was generated")
+    //             }
+    //         }
+    //         return {
+    //             backrun,
+    //             sendToFlashbots,
+    //             sendToMempool,
+    //         }
+    //     }
+    //     throw new Error(`🥺🥺🥺 tx ${pendingTx.txHash} might be full of juicy MEV but this function hasn't been implemented 🥺🥺🥺`)
+    // }
 
     /**
      * Builds a backrun given a pending transaction.
@@ -250,23 +272,26 @@ class MevFlood {
      */
     async backrun(pendingTx: Transaction, opts?: BackrunOptions) {
         if (this.deployment) {
-            const backrun = await generateBackrun(this.provider, this.deployment, this.adminWallet, pendingTx, opts)
+            const backrunTx = await generateBackrunTx(this.provider, this.deployment, pendingTx, opts)
+            if (!backrunTx) {
+                return undefined
+            }
+            const userTx = serializePendingTx(pendingTx)
+            const signedArb = await this.adminWallet.signTransaction(
+                populateTxFully(
+                    backrunTx,
+                    opts?.nonce || await this.provider.getTransactionCount(this.adminWallet.address),
+                    {from: this.adminWallet.address, chainId: this.provider.network.chainId}))
+            const bundle = [userTx, signedArb]
+
             const sendToFlashbots = async (targetBlock?: number) => {
-                if (backrun?.bundle) {
-                    return this.sendBundle(backrun.bundle, targetBlock)
-                } else {
-                    throw new Error("no backrun bundle was generated")
-                }
+                return await this.sendBundle(bundle, targetBlock)
             }
             const sendToMempool = async () => {
-                if (backrun) {
-                    return (await this.sendToMempool([backrun.signedArb]))[0]
-                } else {
-                    throw new Error("no backrun bundle was generated")
-                }
+                return (await this.sendToMempool([bundle[1]]))[0]
             }
             return {
-                backrun,
+                bundle,
                 /** Sends bundle containing original tx we're backrunning and the arb tx. */
                 sendToFlashbots,
                 /** Only sends the arb tx to the mempool, not the tx we're backrunning. */
@@ -274,7 +299,7 @@ class MevFlood {
             }
         }
         else {
-            throw new Error("backrun failed")
+            throw new Error("Must initialize MevFlood with a liquid deployment to generate backruns.")
         }
     }
 
@@ -287,7 +312,7 @@ class MevFlood {
         if (contracts){
             return await approveIfNeeded(this.provider, wallets, contracts)
         } else {
-            throw new Error("deployment required for approvals")
+            throw new Error("Must initialize MevFlood with a liquid deployment to send approvals.")
         }
     }
 }

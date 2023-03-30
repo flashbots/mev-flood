@@ -4,11 +4,10 @@ import fs from "fs/promises"
 
 // lib
 import contracts from './contracts';
-import { TransactionRequest } from './helpers'
 
 export type ContractDeployment = {
     contractAddress: string,
-    deployTx: TransactionRequest,
+    deployTx: providers.TransactionRequest,
     signedDeployTx: string,
 }
 

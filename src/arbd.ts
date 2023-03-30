@@ -44,7 +44,7 @@ async function main() {
     let adminNonce = await adminWallet.getTransactionCount()
     console.log("using wallets", walletSet.map(w => w.address))
 
-    const flood = async (admin: Wallet) => await new MevFlood(admin, PROVIDER, deployment).initFlashbots(flashbotsSigner)
+    const getFlood = async (admin: Wallet) => await new MevFlood(admin, PROVIDER, deployment).initFlashbots(flashbotsSigner)
 
     // check wallet balance for each token, mint if needed
     await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount)
@@ -55,12 +55,12 @@ async function main() {
     PROVIDER.on('pending', async (pendingTx: any) => {
         // TODO: batch multiple txs to backrun instead of backrunning each one individually
         for (const wallet of walletSet) {
-            const backrun = await (await flood(wallet)).backrun(pendingTx, {
+            const backrun = await (await getFlood(wallet)).backrun(pendingTx, {
                 minProfit,
                 maxProfit,
                 nonce: await getNonce(wallet.address),
             })
-            if (backrun.backrun) {
+            if (backrun) {
                 if (sendToFlashbots) {
                     try {
                         console.log("sending backrun to flashbots")
@@ -93,8 +93,7 @@ async function main() {
                         }
                     }
                 }
-            }
-            else {
+            } else {
                 // TODO: reduce load on provider by only doing this once per block
                 resetNonce(wallet.address)
             }

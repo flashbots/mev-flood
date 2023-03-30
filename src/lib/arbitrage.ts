@@ -1,5 +1,5 @@
 import { BigNumber } from 'mathjs'
-import math from "./math"
+import math, { numify } from "./math"
 
 const FEE = math.bignumber(0.997)
 
@@ -58,7 +58,7 @@ const calculateOptimalArbAmountIn = (
             FEE.mul(FEE).mul(priceA).div(reserveB_1)
         )
 
-        return math.divide(numerator, denominator) as BigNumber
+        return numerator.div(denominator)
     }
     else {
         const priceA = reserveA_0.div(reserveA_1)
@@ -69,7 +69,7 @@ const calculateOptimalArbAmountIn = (
         ).sub(1)
         const denominator = FEE.div(reserveA_1).add(FEE.mul(FEE).mul(priceA).div(reserveB_0))
 
-        return math.divide(numerator, denominator) as BigNumber
+        return numerator.div(denominator)
     }
 }
 
@@ -93,33 +93,28 @@ const not = (tokenNumber: 0 | 1) => {
     return Math.abs(tokenNumber - 1) as 0 | 1
 }
 
-type Pool = {
+export type Pool = {
     reserves0: BigNumber,
     reserves1: BigNumber,
     k: BigNumber,
 }
 
+export interface Reserves {
+    A: Pool,
+    B: Pool,
+}
+
 /**
 Simulates a backrun-arb given an initial state, returns the profit. 
 Assumes user is trading on exchange A.
- * @param reservesA_0: Reserves of token0 on exchange A.
- * @param reservesA_1: Reserves of token1 on exchange A.
- * @param kA: Product constant of pair on exchange A.
- * @param reservesB_0: Reserves of token0 on exchange B.
- * @param reservesB_1: Reserves of token1 on exchange B.
- * @param kB: Product constant of pair on exchange B.
+ * @param context: Initial state of the pairs being arbed.
  * @param userAmountIn: Amount of tokens the user sends for their swap.
  * @param userSwap0For1: Determines trade direction.
  * @param userExchange: Identifier of exchange that the user trades on; matches to param `reserves(A|B)_N`.
  * @returns profit is always denoted in terms of settlementToken (in return object).
  */
 export const calculateBackrunParams = (
-    reservesA_0: BigNumber,
-    reservesA_1: BigNumber,
-    kA: BigNumber,
-    reservesB_0: BigNumber,
-    reservesB_1: BigNumber,
-    kB: BigNumber,
+    context: Reserves,
     userAmountIn: BigNumber,
     userSwap0For1: boolean,
     userExchange: "A" | "B"
@@ -136,21 +131,21 @@ export const calculateBackrunParams = (
 
     const updateUserExchangeReserves = (reserves0: BigNumber, reserves1: BigNumber) => {
         if (userExchange === "A") {
-            reservesA_0 = reserves0
-            reservesA_1 = reserves1
+            context.A.reserves0 = reserves0
+            context.A.reserves1 = reserves1
         } else {
-            reservesB_0 = reserves0
-            reservesB_1 = reserves1
+            context.B.reserves0 = reserves0
+            context.B.reserves1 = reserves1
         }
     }
 
     const updateOtherExchangeReserves = (reserves0: BigNumber, reserves1: BigNumber) => {
         if (otherExchange === "A") {
-            reservesA_0 = reserves0
-            reservesA_1 = reserves1
+            context.A.reserves0 = reserves0
+            context.A.reserves1 = reserves1
         } else {
-            reservesB_0 = reserves0
-            reservesB_1 = reserves1
+            context.B.reserves0 = reserves0
+            context.B.reserves1 = reserves1
         }
     }
 
@@ -160,14 +155,18 @@ export const calculateBackrunParams = (
      * We do this because we need to know the difference between the exchange that the user is trading on, and our instantiated definition of "exchange A".
      */
     const getUserExchangeReserves = () => {
-        return userExchange === "A" ? {reserves0: reservesA_0, reserves1: reservesA_1, k: kA} : {reserves0: reservesB_0, reserves1: reservesB_1, k: kB}
+        return userExchange === "A" ?
+            context.A :
+            context.B
     }
 
     /**
      * Gets reserves of exchange that we sell our backrun-purchased tokens on.
      */
     const getOtherExchangeReserves = () => {
-        return userExchange === "A" ? {reserves0: reservesB_0, reserves1: reservesB_1, k: kB} : {reserves0: reservesA_0, reserves1: reservesA_1, k: kA}
+        return userExchange === "A" ?
+            context.B :
+            context.A
     }
 
     // settlementToken is the FINAL node in the arb path
