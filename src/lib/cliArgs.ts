@@ -1,5 +1,6 @@
+import { BigNumber } from 'ethers'
 import { parseEther } from 'ethers/lib/utils'
-import { textColors, } from './helpers'
+import { GWEI, textColors, } from './helpers'
 
 /* author's note:
 
@@ -342,6 +343,8 @@ export const getSwapdArgs = () => {
     const flashbotsShort = "-f"
     const mevShareFlag = "--mev-share"
     const mevShareShort = "-k"
+    const gasTipFlag = "--gas-tip"
+    const gasTipShort = "-g"
 
     const description = "randomly swap on every block with multiple wallets (defined in \`src/output/wallets.json\`). Send to mempool by default."
     const usage = `\
@@ -359,6 +362,7 @@ export const getSwapdArgs = () => {
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
     ${flashbotsShort}\t${flashbotsFlag}\t\tSend swaps as Flashbots bundles instead of sending to mempool.
     ${mevShareShort}\t${mevShareFlag}\t\tSend swaps to mev-share. (overrides ${flashbotsFlag})
+    ${gasTipShort}\t${gasTipFlag}\t\tGas tip (in gwei; added to base fee) to increase validator incentive to include your txs. (default=0)
 `
     const examples = `\
     # run with a single wallet
@@ -381,6 +385,9 @@ export const getSwapdArgs = () => {
 
     # send a random swap from wallet 13 via mev-share
     yarn swapd 13 ${mevShareShort}
+
+    # send swaps with 20 gwei gas tip
+    yarn swapd 13 ${gasTipShort} 20
 `
     const helpMessage = genHelpMessage(description, usage, options, examples)
     // TODO: replace these horrible arg parsers
@@ -395,6 +402,7 @@ export const getSwapdArgs = () => {
     let swapWethForDai = undefined
     let mintWethAmount = 20
     let sendRoute = SendRoute.Mempool
+    let gasTip = BigNumber.from(0)
     
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -443,6 +451,11 @@ export const getSwapdArgs = () => {
             if (args.includes(mevShareFlag) || args.includes(mevShareShort)) {
                 sendRoute = SendRoute.MevShare
             }
+            if (args.includes(gasTipFlag) || args.includes(gasTipShort)) {
+                const flagIndex = getFlagIndex(args, gasTipFlag, gasTipShort)
+                const gasTipNum = getOption(args, flagIndex) as number
+                gasTip = GWEI.mul(gasTipNum)
+            }
         }
     } else {
         console.error("one or two wallet indices are required")
@@ -463,6 +476,7 @@ export const getSwapdArgs = () => {
         swapWethForDai,
         mintWethAmount: parseEther(mintWethAmount.toString()),
         sendRoute,
+        gasTip,
     }
 }
 
@@ -478,12 +492,15 @@ export const getArbdArgs = () => {
     const mempoolFlag = "--mempool"
     const mevShareFlag = "--mev-share"
     const mevShareShort = "-k"
+    const gasTipFlag = "--gas-tip"
+    const gasTipShort = "-g"
     const options = `\
     ${minProfitShort}\t${minProfitFlag}\t\tMinimum profit an arbitrage should achieve, in wei. (default=0 + gas cost)
     ${maxProfitShort}\t${maxProfitFlag}\t\tMaximum profit an arbitrage should achieve, in wei. (default=inf)
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
     ${mevShareShort}\t${mevShareFlag}\t\tBackrun txs on mev-share.
     ${mempoolFlag}\t\t\tSend backruns to mempool instead of sending a bundle to Flashbots (NOT recommended). Overrides ${mevShareFlag}.
+    ${gasTipShort}\t${gasTipFlag}\t\tGas tip (in gwei; added to base fee) to increase validator incentive to include your txs. (default=0)
 `
     const usage = `\
     yarn arbd <wallet_index> [OPTIONS...]
@@ -500,6 +517,9 @@ export const getArbdArgs = () => {
 
     # run arb bot on mev-share transactions
     yarn arbd 13 ${mevShareShort}
+
+    # run arb bot with 20 gwei gas tip
+    yarn arbd 13 ${gasTipShort} 20
 `
     const helpMessage = genHelpMessage(description, usage, options, examples)
 
@@ -508,6 +528,7 @@ export const getArbdArgs = () => {
     let maxProfit = undefined // unlimited if undefined
     let mintWethAmount = 20
     let sendRoute = SendRoute.Flashbots
+    let gasTip = BigNumber.from(0)
 
     if (args.length > 0) {
         if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
@@ -531,6 +552,11 @@ export const getArbdArgs = () => {
             } else if (args.includes(mevShareFlag) || args.includes(mevShareShort)) {
                 sendRoute = SendRoute.MevShare
             }
+            if (args.includes(gasTipFlag) || args.includes(gasTipShort)) {
+                const flagIndex = getFlagIndex(args, gasTipFlag, gasTipShort)
+                const gasTipNum = getOption(args, flagIndex) as number
+                gasTip = GWEI.mul(gasTipNum)
+            }
         }
     } else {
         console.error("one or two wallet indices are required")
@@ -547,6 +573,7 @@ export const getArbdArgs = () => {
             undefined,
         mintWethAmount: parseEther(mintWethAmount.toString()),
         sendRoute,
+        gasTip,
     }
 }
 

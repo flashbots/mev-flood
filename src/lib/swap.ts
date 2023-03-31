@@ -1,5 +1,5 @@
 import { PendingShareTransaction } from '@flashbots/matchmaker-ts'
-import { BigNumber, Contract, providers, utils, Wallet } from 'ethers'
+import { BigNumber, Contract, PopulatedTransaction, Wallet, providers, utils } from 'ethers'
 import { LogParams } from 'ethersV6'
 import { coinToss, ETH, extract4Byte, GWEI, MAX_U256, populateTxFully, randInRange } from './helpers'
 
@@ -78,6 +78,7 @@ export class PendingSwap implements IPendingSwap {
     }
 
     static fromShareTx(pendingTx: PendingShareTransaction, swapDecoder?: (calldata: string) => utils.Result) {
+        console.log("parsing pending tx", pendingTx)
         if (pendingTx.callData) {
             try {
                 return PendingSwap.fromCalldata(pendingTx.callData, swapDecoder)
@@ -114,8 +115,6 @@ const decodeSwapCalldata = (calldata: string) => {
         throw new Error("Unknown function signature: " + fnSignature)
     }
 }
-
-
 
 export const decodeSwapLogs = (logs: LogParams[]) => {
     console.log("logs", logs)
@@ -155,21 +154,38 @@ export const createRandomSwapParams = (
     }
 }
 
-export const signSwap = async (atomicSwapContract: Contract, uniFactoryAddress: string, sender: Wallet, amountIn: BigNumber, path: string[], nonce: number, chainId: number): Promise<string> => {
+export const signSwap = async (
+    atomicSwapContract: Contract,
+    uniFactoryAddress: string,
+    sender: Wallet,
+    amountIn: BigNumber,
+    path: string[],
+    nonce: number,
+    chainId: number,
+    gasTip?: BigNumber,
+): Promise<{signedTx: string, tx: providers.TransactionRequest}> => {
     // use custom router to swap
-    return await sender.signTransaction(
-        populateTxFully(
-            await atomicSwapContract.populateTransaction.swap(
-                path,
-                amountIn,
-                uniFactoryAddress,
-                sender.address,
-                false
-            ),
-            nonce,
-            {from: sender.address, gasLimit: 150000, chainId, maxFeePerGas: GWEI.mul(80), maxPriorityFeePerGas: GWEI.mul(5)},
-        )
+    const tx = populateTxFully(
+        await atomicSwapContract.populateTransaction.swap(
+            path,
+            amountIn,
+            uniFactoryAddress,
+            sender.address,
+            false
+        ),
+        nonce,
+        {
+            from: sender.address,
+            gasLimit: 150000,
+            chainId,
+            maxFeePerGas: GWEI.mul(80).add(gasTip || 0),
+            maxPriorityFeePerGas: GWEI.mul(5).add(gasTip || 0)
+        },
     )
+    return {
+        signedTx: await sender.signTransaction(tx),
+        tx,
+    }
 }
 
 export const approveIfNeeded = async (
@@ -179,7 +195,9 @@ export const approveIfNeeded = async (
         atomicSwap: Contract,
         weth: Contract,
         dai: Contract[],
-    }) => {
+    },
+    gasTip?: BigNumber
+) => {
     let signedApprovals: string[] = []
     const chainId = provider.network.chainId
     for (const wallet of walletSet) {
@@ -193,8 +211,8 @@ export const approveIfNeeded = async (
                     from: wallet.address,
                     gasLimit: 50000,
                     chainId,
-                    maxFeePerGas: GWEI.mul(80),
-                    maxPriorityFeePerGas: GWEI.mul(5),
+                    maxFeePerGas: GWEI.mul(80).add(gasTip || 0),
+                    maxPriorityFeePerGas: GWEI.mul(5).add(gasTip || 0),
                 })
                 const signedTx = await wallet.signTransaction(approveTx)
                 signedApprovals.push(signedTx)
@@ -210,8 +228,8 @@ export const approveIfNeeded = async (
                         from: wallet.address,
                         gasLimit: 50000,
                         chainId,
-                        maxFeePerGas: GWEI.mul(80),
-                        maxPriorityFeePerGas: GWEI.mul(5),
+                        maxFeePerGas: GWEI.mul(80).add(gasTip || 0),
+                        maxPriorityFeePerGas: GWEI.mul(5).add(gasTip || 0),
                     })
                 const signedTx = await wallet.signTransaction(approveTx)
                 signedApprovals.push(signedTx)
@@ -244,6 +262,7 @@ export const mintIfNeeded = async (
     walletSet: Wallet[],
     contracts: {weth: Contract, dai: Contract[]},
     wethAmount: BigNumber,
+    gasTip?: BigNumber,
 ) => {
     let signedDeposits = []
     let signedMints = []
@@ -256,8 +275,8 @@ export const mintIfNeeded = async (
                 gasLimit: 50000,
                 from: wallet.address,
                 chainId: provider.network.chainId,
-                maxFeePerGas: GWEI.mul(80),
-                maxPriorityFeePerGas: GWEI.mul(5),
+                maxFeePerGas: GWEI.mul(80).add(gasTip || 0),
+                maxPriorityFeePerGas: GWEI.mul(5).add(gasTip || 0),
             })
             const signedDeposit = await wallet.signTransaction(tx)
             signedDeposits.push(signedDeposit)
@@ -271,8 +290,8 @@ export const mintIfNeeded = async (
                     gasLimit: 60000,
                     from: adminWallet.address,
                     chainId: provider.network.chainId,
-                    maxFeePerGas: GWEI.mul(80),
-                    maxPriorityFeePerGas: GWEI.mul(5),
+                    maxFeePerGas: GWEI.mul(80).add(gasTip || 0),
+                    maxPriorityFeePerGas: GWEI.mul(5).add(gasTip || 0),
                 }))
                 signedMints.push(mintTx)
             }

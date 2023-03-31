@@ -5,7 +5,7 @@ import { LiquidDeployment } from '../liquid'
 import { createRandomSwapParams, signSwap, SwapOptions, SwapParams } from '../swap'
 
 export const createSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployment: LiquidDeployment, nonceOffset?: number) => {
-    let signedSwaps: string[] = []
+    let signedSwaps: {signedTx: string, tx: providers.TransactionRequest}[] = []
     let swapParams: SwapParams[] = []
     for (const wallet of userWallets) {
         const atomicSwapContract = new Contract(deployment.atomicSwap.contractAddress, contracts.AtomicSwap.abi)

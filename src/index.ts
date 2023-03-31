@@ -1,6 +1,6 @@
 /** module exports for using mev-flood as a library */
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
-import { Wallet, providers, Transaction } from 'ethers'
+import { Wallet, providers, Transaction, BigNumber } from 'ethers'
 import fs from "fs/promises"
 import { BackrunOptions, generateBackrunTx } from './lib/backrun'
 import Matchmaker, { PendingShareTransaction, ShareBundleParams, ShareTransactionOptions } from "@flashbots/matchmaker-ts"
@@ -139,9 +139,17 @@ class MevFlood {
 
     private async sendToMevShare(signedTxs: string[], options: ShareTransactionOptions) {
         if (this.matchmaker) {
-            return await Promise.all(signedTxs.map(tx => 
-                this.matchmaker!.sendShareTransaction(tx, options)
-            ))
+            try {
+                return await Promise.all(signedTxs.map(tx => 
+                    this.matchmaker!.sendShareTransaction(tx, options)
+                ))
+            } catch (e) {
+                if (!(e as Error).message.includes("tx is already known")) {
+                    throw e
+                } else {
+                    console.warn("skipping tx already sent to flashbots")
+                }
+            }
         } else {
             throw new Error("must call initFlashbots on MevFlood instance to send to mev-share")
         }
@@ -225,11 +233,11 @@ class MevFlood {
             return {
                 swaps,
                 /** Send swaps as a bundle to Flashbots. */
-                sendToFlashbots: async (targetBlock?: number) => this.sendBundle(swaps.signedSwaps, targetBlock),
+                sendToFlashbots: async (targetBlock?: number) => this.sendBundle(swaps.signedSwaps.map(swap => swap.signedTx), targetBlock),
                 /** Send all swaps to mempool. */
-                sendToMempool: async () => this.sendToMempool(swaps.signedSwaps),
+                sendToMempool: async () => this.sendToMempool(swaps.signedSwaps.map(swap => swap.signedTx)),
                 /** Send all swaps to mev-share. */
-                sendToMevShare: async (shareOptions: ShareTransactionOptions) => this.sendToMevShare(swaps.signedSwaps, shareOptions),
+                sendToMevShare: async (shareOptions: ShareTransactionOptions) => this.sendToMevShare(swaps.signedSwaps.map(swap => swap.signedTx), shareOptions),
             }
         } else {
             throw new Error("Must initialize MevFlood with a liquid deployment to send swaps")
@@ -241,7 +249,7 @@ class MevFlood {
      * @param pendingTx 
      * @returns Backrun with callbacks to send it.
      */
-    async backrun(pendingTx: Transaction, opts?: BackrunOptions) {
+    async backrun(pendingTx: Transaction, sender: Wallet, opts?: BackrunOptions, gasTip?: BigNumber) {
         if (this.deployment) {
             if (pendingTx.to !== this.deployment.atomicSwap.contractAddress) {
                 console.warn(`backrun: tx ${pendingTx.hash} is not a swap. Skipping.`)
@@ -255,11 +263,17 @@ class MevFlood {
                     return undefined
                 }
                 const userTx = serializePendingTx(pendingTx)
-                const signedArb = await this.adminWallet.signTransaction(
+                const feeData = await this.provider.getFeeData()
+                const signedArb = await sender.signTransaction(
                     populateTxFully(
                         backrunTx,
-                        opts?.nonce || await this.provider.getTransactionCount(this.adminWallet.address),
-                        {from: this.adminWallet.address, chainId: this.provider.network.chainId}
+                        opts?.nonce || await this.provider.getTransactionCount(sender.address),
+                        {
+                            from: sender.address,
+                            chainId: this.provider.network.chainId,
+                            maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas.add(gasTip || 0) : undefined,
+                            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas.add(gasTip || 0) : undefined,
+                        }
                 ))
                 const bundle = [userTx, signedArb]
 
@@ -292,7 +306,7 @@ class MevFlood {
      * @param opts Options to modify the behavior of the backrun.
      * @returns Backrun with callbacks to send it.
      */
-    async backrunShareTransaction(pendingTx: PendingShareTransaction, opts?: BackrunOptions) {
+    async backrunShareTransaction(pendingTx: PendingShareTransaction, sender: Wallet, opts?: BackrunOptions, gasTip?: BigNumber) {
         if (this.deployment) {
             const pendingSwap = PendingSwap.fromShareTx(pendingTx)
             if (!pendingSwap) {
@@ -302,11 +316,19 @@ class MevFlood {
             if (!backrun) {
                 return undefined
             }
-            const signedBackrun = await this.adminWallet.signTransaction(
+            const feeData = await this.provider.getFeeData()
+            const fullTx = {
+                from: sender.address,
+                chainId: this.provider.network.chainId,
+                maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas.add(gasTip || 0) : undefined,
+                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas.add(gasTip || 0) : undefined,
+            }
+            console.log(fullTx)
+            const signedBackrun = await sender.signTransaction(
                 populateTxFully(
                     backrun,
-                    opts?.nonce || await this.provider.getTransactionCount(this.adminWallet.address),
-                    {from: this.adminWallet.address, chainId: this.provider.network.chainId}
+                    opts?.nonce || await this.provider.getTransactionCount(sender.address),
+                    fullTx
             ))
 
             const sendShareBundle = async (targetBlock: number) => {

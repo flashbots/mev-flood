@@ -203,7 +203,7 @@ describe("arbitrage integration tests", () => {
                 wethIndex === 0, "A"
             )
             // TODO: group multiple txs together to backrun all swaps
-            const backrun = await flood.backrun(swapRes[0], {userPairReserves: userReserves})
+            const backrun = await flood.backrun(swapRes[0], admin, {userPairReserves: userReserves})
             if (backrun) {
                 const backrunRes = await backrun.sendToMempool()
                 if (backrunRes) {

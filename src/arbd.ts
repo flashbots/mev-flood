@@ -35,7 +35,7 @@ async function main() {
     }
 
     // get cli args
-    const {walletIdx, minProfit, maxProfit, sendRoute, mintWethAmount} = getArbdArgs()
+    const {walletIdx, minProfit, maxProfit, sendRoute, mintWethAmount, gasTip} = getArbdArgs()
     const wallet = getTestWallet(walletIdx)
     const deployment = await loadDeployment({})
     const contracts = deployment.getDeployedContracts(PROVIDER)
@@ -49,28 +49,36 @@ async function main() {
     const mevFlood = await new MevFlood(adminWallet, PROVIDER, deployment).initFlashbots(flashbotsSigner)
 
     // check wallet balance for each token, mint if needed
-    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, [wallet], contracts, mintWethAmount)
+    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, [wallet], contracts, mintWethAmount, gasTip)
 
     // check atomicSwap allowance for each wallet, approve max_uint if needed
-    await approveIfNeeded(PROVIDER, [wallet], contracts)
+    await approveIfNeeded(PROVIDER, [wallet], contracts, gasTip)
 
     if (sendRoute === SendRoute.MevShare) {
+        console.log("watching mev-share for pending Share txs...")
         const matchmaker = new Matchmaker(new WalletV6(flashbotsSigner.privateKey), PROVIDER.network)
         matchmaker.onShareTransaction(async pendingTx => {
+            console.debug(`pending share tx ${pendingTx.txHash} detected`)
             const blockNum = await PROVIDER.getBlockNumber()
-            const backrun = await mevFlood.backrunShareTransaction(pendingTx, {
-                minProfit,
-                maxProfit,
-                nonce: await getNonce(wallet.address),
-            })
+            const backrun = await mevFlood.backrunShareTransaction(
+                pendingTx,
+                wallet,
+                {
+                    minProfit,
+                    maxProfit,
+                    nonce: await getNonce(wallet.address),
+                },
+                gasTip
+            )
             if (backrun) {
                 try {
-                    console.log("sending backrun to flashbots")
+                    console.log("sending backrun to mev-share")
                     for (let i = 1; i < 5; i++) { // target next 4 blocks
                         const res = await backrun.sendShareBundle(blockNum + i)
                         if (!res) {
                             resetNonce(wallet.address)
                         }
+                        console.log(`send mev-share bundle targeting block ${blockNum + i}`, res)
                     }
                 } catch (e) {
                     if ((e as Error).message.includes("nonce too low")) {
@@ -78,16 +86,24 @@ async function main() {
                         resetNonce(wallet.address)
                     }
                 }
+            } else {
+                console.log(`pending share tx ${pendingTx.txHash} not profitable, skipping`)
             }
         })
     } else {
+        console.log("watching mempool for pending txs...")
         PROVIDER.on('pending', async (pendingTx: any) => {
             // TODO: batch multiple txs to backrun instead of backrunning each one individually
-            const backrun = await mevFlood.backrun(pendingTx, {
-                minProfit,
-                maxProfit,
-                nonce: await getNonce(wallet.address),
-            })
+            const backrun = await mevFlood.backrun(
+                pendingTx,
+                wallet,
+                {
+                    minProfit,
+                    maxProfit,
+                    nonce: await getNonce(wallet.address),
+                },
+                gasTip
+            )
             if (backrun) {
                 if (sendRoute === SendRoute.Flashbots) {
                     try {

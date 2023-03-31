@@ -108,6 +108,7 @@ export const textColors = {
  * @param txRequest 
  * @param nonce 
  * @param fromOverride (default: `adminWallet.address`)
+ * // TODO: make this an internal method in MevFlood so it has access to a provider to get base fee
  */
  export const populateTxFully = (txRequest: TransactionRequest, nonce: number, overrides?: TransactionRequest): TransactionRequest => {
     return {

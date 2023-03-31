@@ -12,7 +12,20 @@ import { getAdminWallet, getWalletSet } from './lib/wallets'
 
 async function main() {
     // get cli args
-    const {startIdx, endIdx, numSwaps, numPairs, minUsd, maxUsd, daiIndex, swapWethForDai, exchange, mintWethAmount, sendRoute} = getSwapdArgs()
+    const {
+        startIdx,
+        endIdx,
+        numSwaps,
+        numPairs,
+        minUsd,
+        maxUsd,
+        daiIndex,
+        swapWethForDai,
+        exchange,
+        mintWethAmount,
+        sendRoute,
+        gasTip,
+    } = getSwapdArgs()
     console.log("sendRoute", sendRoute)
 
     const walletSet = getWalletSet(startIdx, endIdx)
@@ -33,11 +46,11 @@ async function main() {
 
     // check wallet balance for each token, mint if needed
     console.log("maybe minting...")
-    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount)
+    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount, gasTip)
 
     // check atomicSwap allowance for each wallet, approve max_uint if needed
     console.log("maybe approving...")
-    await approveIfNeeded(PROVIDER, walletSet, contracts)
+    await approveIfNeeded(PROVIDER, walletSet, contracts, gasTip)
 
     console.log("watching blocks...")
     PROVIDER.on('block', async blockNum => {
@@ -56,14 +69,28 @@ async function main() {
                     allSwaps.push(swaps)
                 }
             }
+
+            // simulate each tx
+            // for (const swaps of allSwaps) {
+            //     for (const swap of swaps.swaps.signedSwaps)
+            //     await PROVIDER.call(swap, )
+            // }
+
+            // send txs
             if (sendRoute === SendRoute.Flashbots) {
-                const res = await allSwaps.map(swaps => swaps.sendToFlashbots())
+                const res = await allSwaps.map(swaps => {
+                    try {
+                        return swaps.sendToFlashbots()
+                    } catch (e) {
+                        console.warn(e)
+                    }
+                })
                 const flashbotsResponses = await Promise.all(res)
                 flashbotsResponses.forEach(async res => {
                     await logSendBundleResponse(res)
                 })
             } else if (sendRoute === SendRoute.Mempool) {
-                const swapPromises = allSwaps.map(swaps => swaps.swaps.signedSwaps.map(tx => PROVIDER.sendTransaction(tx)))
+                const swapPromises = allSwaps.map(swaps => swaps.swaps.signedSwaps.map(swap => PROVIDER.sendTransaction(swap.signedTx)))
                 await Promise.all(swapPromises)
             } else {
                 const shareOptions: ShareTransactionOptions = {
