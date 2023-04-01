@@ -78,7 +78,6 @@ export class PendingSwap implements IPendingSwap {
     }
 
     static fromShareTx(pendingTx: PendingShareTransaction, swapDecoder?: (calldata: string) => utils.Result) {
-        console.log("parsing pending tx", pendingTx)
         if (pendingTx.callData) {
             try {
                 return PendingSwap.fromCalldata(pendingTx.callData, swapDecoder)

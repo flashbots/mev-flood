@@ -38,7 +38,7 @@ describe("arbitrage unit tests", () => {
         if (!backrunParams) {
             return undefined
         }
-        console.debug(`\nPROFIT\t\t${formatEther(backrunParams.profit.toFixed(0))} ${backrunParams.settlementToken === 0 ? labels.x : labels.y}`)
+        console.debug(`\PROCEEDS\t\t${formatEther(backrunParams.proceeds.toFixed(0))} ${backrunParams.settlementToken === 0 ? labels.x : labels.y}`)
         return backrunParams
     }
 
@@ -58,7 +58,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find the optimal backrun arb (opposite direction)', () => {
@@ -77,7 +77,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb (x -> y)', () => {
@@ -95,7 +95,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb (y -> x)', () => {
@@ -113,7 +113,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb ((x -> y) opposite exchange disparity)', () => {
@@ -131,7 +131,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb ((y -> x) opposite exchange disparity)', () => {
@@ -149,7 +149,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 })
 
@@ -220,7 +220,7 @@ describe("arbitrage integration tests", () => {
             console.log("balanceStart", balanceStart.toString())
             console.log("balanceNew", balanceNew.toString())
             console.log("balanceDiff", balanceDiff.toFixed(0))
-            console.log("profit estimated", backrunParams?.profit.toFixed(0))
+            console.log("proceeds estimated", backrunParams?.proceeds.toFixed(0))
 
             if (backrunParams) {
                 return {
@@ -252,7 +252,7 @@ describe("arbitrage integration tests", () => {
                 swapWethForDai: true,
             })
             if (arbResult) {
-                const profitDiff = math.abs(arbResult.balanceDiff.sub(arbResult.backrunParams.profit))
+                const profitDiff = math.abs(arbResult.balanceDiff.sub(arbResult.backrunParams.proceeds))
                 console.log("profitDiff", profitDiff)
                 assert(profitDiff.lt(arbResult.balanceDiff.div(20))) // 5% margin of error
             } else {

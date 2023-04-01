@@ -139,17 +139,14 @@ class MevFlood {
 
     private async sendToMevShare(signedTxs: string[], options: ShareTransactionOptions) {
         if (this.matchmaker) {
-            try {
-                return await Promise.all(signedTxs.map(tx => 
-                    this.matchmaker!.sendShareTransaction(tx, options)
-                ))
-            } catch (e) {
-                if (!(e as Error).message.includes("tx is already known")) {
-                    throw e
-                } else {
-                    console.warn("skipping tx already sent to flashbots")
-                }
-            }
+            return await Promise.all(
+                signedTxs.map(tx =>
+                    this.matchmaker!
+                    .sendShareTransaction(tx, options)
+                    .catch(e => console.error("sendShareTransaction failed:", e))
+                    // TODO: bubble errors up so sendToMevShare caller can handle it
+                )
+            )
         } else {
             throw new Error("must call initFlashbots on MevFlood instance to send to mev-share")
         }
@@ -230,6 +227,15 @@ class MevFlood {
     async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[], nonceOffset?: number) {
         if (this.deployment) {
             const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, nonceOffset)
+
+            // simulate each tx
+            for (const swap of swaps.signedSwaps) {
+                const simResult = await this.provider.call(swap.tx)
+                if (simResult !== "0x") {
+                    throw new Error(`Simulated swap failed: ${simResult}`)
+                }
+            }
+
             return {
                 swaps,
                 /** Send swaps as a bundle to Flashbots. */
@@ -258,12 +264,16 @@ class MevFlood {
             // decode tx to get pair and amount
             try {
                 const userSwap = PendingSwap.fromCalldata(pendingTx.data)
-                const backrunTx = await generateBackrunTx(this.provider, this.deployment, userSwap, opts)
+                const feeData = await this.provider.getFeeData()
+                const backrunTx = await generateBackrunTx(this.provider, this.deployment, userSwap, opts, {
+                    maxFeePerGas: feeData.maxFeePerGas || undefined,
+                    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || undefined,
+                    gasTip,
+                })
                 if (!backrunTx) {
                     return undefined
                 }
                 const userTx = serializePendingTx(pendingTx)
-                const feeData = await this.provider.getFeeData()
                 const signedArb = await sender.signTransaction(
                     populateTxFully(
                         backrunTx,
@@ -302,7 +312,7 @@ class MevFlood {
 
     /**
      * Backrun a pending transaction from mev-share.
-     * @param pendingTxHash Hash of the pending transaction.
+     * @param pendingTx Pending mev-share transaction.
      * @param opts Options to modify the behavior of the backrun.
      * @returns Backrun with callbacks to send it.
      */
@@ -312,24 +322,38 @@ class MevFlood {
             if (!pendingSwap) {
                 return undefined
             }
-            const backrun = await generateBackrunTx(this.provider, this.deployment, pendingSwap, opts)
+            const feeData = await this.provider.getFeeData()
+            const backrun = await generateBackrunTx(this.provider, this.deployment, pendingSwap, opts, {
+                maxFeePerGas: feeData.maxFeePerGas || undefined,
+                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || undefined,
+                gasTip,
+            })
             if (!backrun) {
                 return undefined
             }
-            const feeData = await this.provider.getFeeData()
-            const fullTx = {
-                from: sender.address,
-                chainId: this.provider.network.chainId,
-                maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas.add(gasTip || 0) : undefined,
-                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas.add(gasTip || 0) : undefined,
+
+            const fullTx = populateTxFully(
+                backrun,
+                opts?.nonce || await this.provider.getTransactionCount(sender.address),
+                {
+                    from: sender.address,
+                    chainId: this.provider.network.chainId,
+                    maxFeePerGas: feeData.maxFeePerGas?.add(gasTip || 0),
+                    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.add(gasTip || 0),
+                }
+            )
+
+            // simulate backrun tx on its own against latest block
+            try {
+                const backrunResult = await this.provider.call(fullTx)
+                console.log("backrun sim", backrunResult)
+            } catch (e) {
+                console.warn("backrun sim failed", e)
+                console.warn("backrun tx", backrun)
+                return undefined
             }
-            console.log(fullTx)
-            const signedBackrun = await sender.signTransaction(
-                populateTxFully(
-                    backrun,
-                    opts?.nonce || await this.provider.getTransactionCount(sender.address),
-                    fullTx
-            ))
+
+            const signedBackrun = await sender.signTransaction(fullTx)
 
             const sendShareBundle = async (targetBlock: number) => {
                 const bundleParams: ShareBundleParams = {

@@ -59,31 +59,25 @@ async function main() {
         try {
             for (let i = 0; i < numSwaps; i++) {
                 for (let j = 0; j < numPairs; j++) {
-                    const swaps = await flood.generateSwaps({
-                        minUSD: minUsd,
-                        maxUSD: maxUsd,
-                        swapOnA: exchange !== undefined ? exchange === "A" : undefined,
-                        swapWethForDai,
-                        daiIndex: numPairs > 1 ? j : daiIndex,
-                    }, walletSet, i)
-                    allSwaps.push(swaps)
+                    try {
+                        const swaps = await flood.generateSwaps({
+                            minUSD: minUsd,
+                            maxUSD: maxUsd,
+                            swapOnA: exchange !== undefined ? exchange === "A" : undefined,
+                            swapWethForDai,
+                            daiIndex: numPairs > 1 ? j : daiIndex,
+                        }, walletSet, i)
+                        allSwaps.push(swaps)
+                    } catch (e) {
+                        console.warn(`swap generation failed; i=${i} j=${j};`, e)
+                    }
                 }
             }
-
-            // simulate each tx
-            // for (const swaps of allSwaps) {
-            //     for (const swap of swaps.swaps.signedSwaps)
-            //     await PROVIDER.call(swap, )
-            // }
 
             // send txs
             if (sendRoute === SendRoute.Flashbots) {
                 const res = await allSwaps.map(swaps => {
-                    try {
-                        return swaps.sendToFlashbots()
-                    } catch (e) {
-                        console.warn(e)
-                    }
+                    return swaps.sendToFlashbots()
                 })
                 const flashbotsResponses = await Promise.all(res)
                 flashbotsResponses.forEach(async res => {
@@ -101,9 +95,18 @@ async function main() {
                         logs: true,
                     }
                 }
-                allSwaps.map(swaps => swaps.sendToMevShare(shareOptions))
+                await Promise.all(allSwaps.map(swaps => {
+                    return swaps.sendToMevShare(shareOptions).catch(e => {
+                        console.warn("sendToMevShare failed", e)
+                    })
+                })).catch(e => {
+                    console.warn("sendToMevShare failed", e)
+                })
             }
-        } catch (_) {/* ignore errors, just spam it */}
+        } catch (e) {
+            /* ignore errors, just spam it */
+            console.warn("swap process failed", e)
+        }
     })
 }
 

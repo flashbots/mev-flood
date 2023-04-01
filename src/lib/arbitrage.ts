@@ -111,14 +111,14 @@ Assumes user is trading on exchange A.
  * @param userAmountIn: Amount of tokens the user sends for their swap.
  * @param userSwap0For1: Determines trade direction.
  * @param userExchange: Identifier of exchange that the user trades on; matches to param `reserves(A|B)_N`.
- * @returns profit is always denoted in terms of settlementToken (in return object).
+ * @returns proceeds; amount_earned - amount_spent; is always denoted in terms of settlementToken (in return object).
  */
 export const calculateBackrunParams = (
     context: Reserves,
     userAmountIn: BigNumber,
     userSwap0For1: boolean,
     userExchange: "A" | "B"
-): {profit: BigNumber, settlementToken: 0 | 1, backrunAmount: BigNumber, userReserves: Pool, otherReserves: Pool} | undefined => {
+): {proceeds: BigNumber, settlementToken: 0 | 1, backrunAmount: BigNumber, userReserves: Pool, otherReserves: Pool} | undefined => {
     const otherExchange = userExchange === "A" ? "B" : "A"
 
     // convenience log
@@ -226,12 +226,12 @@ export const calculateBackrunParams = (
     // logPrices()
 
     // difference in tokens bought on exchange A and sold on exchange B
-    const profit = math.bignumber(backrunSell.amountOut.sub(backrunAmount))
+    const proceeds = math.bignumber(backrunSell.amountOut.sub(backrunAmount))
 
     return {
         settlementToken,
         backrunAmount,
-        profit,
+        proceeds,
         userReserves,
         otherReserves,
     }

@@ -1,9 +1,10 @@
-import { BigNumber, Contract, PopulatedTransaction, providers, Transaction, utils, Wallet } from 'ethers'
-import { formatEther, UnsignedTransaction } from 'ethers/lib/utils'
+import { BigNumber, Contract, PopulatedTransaction, providers, utils } from 'ethers'
+import { formatEther } from 'ethers/lib/utils'
 import { calculateBackrunParams, Pool } from './arbitrage'
 import contracts from './contracts'
+import { GWEI } from './helpers'
 import { LiquidContracts, LiquidDeployment } from './liquid'
-import math, { numify } from './math'
+import { numify } from './math'
 import { PendingSwap } from './swap'
 
 /** Reserves regarding two pools on which we'll trade. */
@@ -76,6 +77,7 @@ const getPairAddresses = (deployedContracts: LiquidContracts, token0: string, to
  * @param wallet Wallet from which to send backrun.
  * @param pendingTx Pending tx to try to backrun.
  * @param opts Optional; specifies options including pre-trade reserves (before the user makes their swap). Default: reads from chain.
+ * @param gasFees Optional; specifies gas fees to use for backrun tx. gasTip is added to each base & priority fee per gas.
  * @returns Bundle of transactions to backrun the user's swap, along with arb details.
  */
 export async function generateBackrunTx(
@@ -83,6 +85,11 @@ export async function generateBackrunTx(
     deployment: LiquidDeployment,
     userSwap: PendingSwap,
     opts?: BackrunOptions,
+    gasFees?: {
+        gasTip?: BigNumber,
+        maxFeePerGas?: BigNumber,
+        maxPriorityFeePerGas?: BigNumber,
+    },
 ): Promise<PopulatedTransaction | undefined> {
     // get reserves
     // TODO: side daemon that caches the reserves on new blocks
@@ -109,14 +116,19 @@ export async function generateBackrunTx(
     }
 
     // TODO: calculate gas cost dynamically (accurately)
-    const gasCost = math.bignumber(100000).mul(1e9).mul(40)
+    const gasUsed = 162000
+    const feeData = provider.getFeeData()
+    const baseFee = (gasFees?.maxFeePerGas || (await feeData).maxFeePerGas || GWEI.mul(40))
+    const prioFee = (gasFees?.maxPriorityFeePerGas || (await feeData).maxPriorityFeePerGas || GWEI.mul(2))
+    const gasCost = numify(baseFee.add(prioFee).add(gasFees?.gasTip || 0).mul(gasUsed))
     // normalize profit to ETH
     const reserves0 = backrunParams.otherReserves.reserves0
     const reserves1 = backrunParams.otherReserves.reserves1
     const price = wethIndex === 0 ? reserves1.div(reserves0) : reserves0.div(reserves1)
     const settlesInWeth = backrunParams.settlementToken === wethIndex
-    const profit = settlesInWeth ? backrunParams.profit : backrunParams.profit.div(price)
-    if (profit.gt(gasCost)) {
+    const proceeds = settlesInWeth ? backrunParams.proceeds : backrunParams.proceeds.div(price)
+    const profit = proceeds.sub(gasCost)
+    if (proceeds.gt(gasCost)) {
         if (opts?.maxProfit && profit.gt(numify(opts.maxProfit))) {
             console.warn("profit exceeds maxProfit setting")
             return undefined
@@ -125,7 +137,7 @@ export async function generateBackrunTx(
             console.warn(`profit ${formatEther(BigNumber.from(profit.toFixed(0)))} is less than minProfit setting ${formatEther(opts.minProfit)}`)
             return undefined
         }
-        console.debug(`BACKRUN. estimated proceeds: ${utils.formatEther(backrunParams.profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
+        console.debug(`BACKRUN. minimum estimated profit: ${utils.formatEther(profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
         const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
         const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
         const factoryStart = userSwap.factory

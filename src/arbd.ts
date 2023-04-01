@@ -55,7 +55,7 @@ async function main() {
     await approveIfNeeded(PROVIDER, [wallet], contracts, gasTip)
 
     if (sendRoute === SendRoute.MevShare) {
-        console.log("watching mev-share for pending Share txs...")
+        console.log("watching mev-share for pending txs...")
         const matchmaker = new Matchmaker(new WalletV6(flashbotsSigner.privateKey), PROVIDER.network)
         matchmaker.onShareTransaction(async pendingTx => {
             console.debug(`pending share tx ${pendingTx.txHash} detected`)
