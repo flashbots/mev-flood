@@ -392,10 +392,10 @@
     ts-node "^9.1.0"
     typescript "^4.1.2"
 
-"@flashbots/matchmaker-ts@^0.3.1":
-  version "0.3.1"
-  resolved "https://registry.yarnpkg.com/@flashbots/matchmaker-ts/-/matchmaker-ts-0.3.1.tgz#0f027d8a13b99cb6a01c571f627904cddde38df6"
-  integrity sha512-K9IRNlBGAwRo1Glp2SDdVOCZkTFXFWqcrS1C0FseUwe97DtfAdN1cc3eHq0GhPZqPqRyEPzEXqCAoevOBGQ/TA==
+"@flashbots/matchmaker-ts@^0.4.1":
+  version "0.4.1"
+  resolved "https://registry.yarnpkg.com/@flashbots/matchmaker-ts/-/matchmaker-ts-0.4.1.tgz#1acf404877af49afd904d97bff5c8d577c7fadb9"
+  integrity sha512-NezExKa3kALUYkRK91HH7gt8qglMcig1rNt6mNGLmV5bxNTP9liaxbiWgP2EU8GJZXaSuyZmtnabcgKwndp0cg==
   dependencies:
     async-mutex "^0.4.0"
     axios "^1.3.4"
@@ -1655,10 +1655,10 @@ ethers@^5.4.2:
     "@ethersproject/web" "5.7.1"
     "@ethersproject/wordlists" "5.7.0"
 
-ethers@^6.1.0, "ethersV6@npm:ethers@^6.1.0":
-  version "6.2.2"
-  resolved "https://registry.yarnpkg.com/ethers/-/ethers-6.2.2.tgz#80b5e972ca71fa159af85c4d60055f21866b15a3"
-  integrity sha512-uh+Dvy3ZfTHZi460h5XApTsPp/fUa372zD5nnXxCZgxbmWW0b/uWFOLE+pdgzcnEdFV1+3bm3P0R8w4jggGeeQ==
+ethers@^6.1.0, "ethersV6@npm:ethers@^6.2.3":
+  version "6.2.3"
+  resolved "https://registry.yarnpkg.com/ethers/-/ethers-6.2.3.tgz#9ddee438b5949e9724ba4c5d2c3b8deb5202ce96"
+  integrity sha512-l1Z/Yr+HrOk+7LTeYRHGMvYwVLGpTuVrT/kJ7Kagi3nekGISYILIby0f1ipV9BGzgERyy+w4emH+d3PhhcxIfA==
   dependencies:
     "@adraffy/ens-normalize" "1.9.0"
     "@noble/hashes" "1.1.2"
