@@ -18,11 +18,11 @@ const spam = async (mevFlood: MevFlood, targetBlockNumber: number, virtualNonce:
     const bundle = txBundles.map(txb => txb.swaps.signedSwaps.map(s => s.signedTx)).flat()
 
     if (sendRoute === SendRoute.Mempool) {
-        mevFlood.sendToMempool(bundle).catch(() => {/* completely ignore errors */})
+        mevFlood.sendToMempool(bundle).catch((e) => {console.warn(e)})
     } else if (sendRoute === SendRoute.MevShare) {
-        mevFlood.sendToMevShare(bundle, {hints: {calldata: true, logs: true}}).catch(() => {/* completely ignore errors */})
+        mevFlood.sendToMevShare(bundle, {hints: {calldata: true, logs: true}}).catch((e) => {console.warn(e)})
     } else {
-        mevFlood.sendBundle(bundle, targetBlockNumber).catch(() => {/* completely ignore errors */})
+        mevFlood.sendBundle(bundle, targetBlockNumber).catch((e) => {console.warn(e)})
     }
 }
 
