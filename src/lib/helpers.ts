@@ -115,7 +115,7 @@ export const textColors = {
         ...txRequest,
         maxFeePerGas: overrides?.maxFeePerGas || GWEI.mul(42),
         maxPriorityFeePerGas: overrides?.maxPriorityFeePerGas || GWEI.mul(3),
-        gasLimit: overrides?.gasLimit || 9000000,
+        gasLimit: overrides?.gasLimit || 1000000,
         from: overrides?.from,
         nonce,
         type: 2,

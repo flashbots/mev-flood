@@ -150,14 +150,17 @@ export async function generateBackrunTx(
         if (!pairStart || !pairEnd) {
             return undefined
         }
-        return await deployedContracts.atomicSwap.populateTransaction.arb(
-            tokenArb,
-            tokenSettle,
-            factoryStart,
-            factoryEnd,
-            pairStart,
-            pairEnd,
-            amountIn
-        )
+        return {
+            ...await deployedContracts.atomicSwap.populateTransaction.arb(
+                tokenArb,
+                tokenSettle,
+                factoryStart,
+                factoryEnd,
+                pairStart,
+                pairEnd,
+                amountIn
+            ),
+            gasLimit: BigNumber.from(gasUsed),
+        }
     }
 }
