@@ -1,8 +1,9 @@
+import { ShareTransactionOptions } from '@flashbots/matchmaker-ts'
 import { Wallet } from 'ethers'
 
 // lib
 import MevFlood from '.'
-import { getSwapdArgs } from './lib/cliArgs'
+import { getSwapdArgs, SendRoute } from './lib/cliArgs'
 import { logSendBundleResponse } from './lib/flashbots'
 import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
@@ -11,7 +12,21 @@ import { getAdminWallet, getWalletSet } from './lib/wallets'
 
 async function main() {
     // get cli args
-    const {startIdx, endIdx, numSwaps, numPairs, minUsd, maxUsd, daiIndex, swapWethForDai, exchange, mintWethAmount, sendToFlashbots} = getSwapdArgs()
+    const {
+        startIdx,
+        endIdx,
+        numSwaps,
+        numPairs,
+        minUsd,
+        maxUsd,
+        daiIndex,
+        swapWethForDai,
+        exchange,
+        mintWethAmount,
+        sendRoute,
+        gasTip,
+    } = getSwapdArgs()
+    console.log("sendRoute", sendRoute)
 
     const walletSet = getWalletSet(startIdx, endIdx)
     const deployment = await loadDeployment({})
@@ -30,38 +45,68 @@ async function main() {
     const flood = await new MevFlood(adminWallet, PROVIDER, deployment).initFlashbots(flashbotsSigner)
 
     // check wallet balance for each token, mint if needed
-    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount)
+    console.log("maybe minting...")
+    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount, gasTip)
 
     // check atomicSwap allowance for each wallet, approve max_uint if needed
-    await approveIfNeeded(PROVIDER, walletSet, contracts)
+    console.log("maybe approving...")
+    await approveIfNeeded(PROVIDER, walletSet, contracts, gasTip)
 
+    console.log("watching blocks...")
     PROVIDER.on('block', async blockNum => {
         console.log(`[BLOCK ${blockNum}]`)
         let allSwaps = []
         try {
             for (let i = 0; i < numSwaps; i++) {
                 for (let j = 0; j < numPairs; j++) {
-                    const swaps = await flood.generateSwaps({
-                        minUSD: minUsd,
-                        maxUSD: maxUsd,
-                        swapOnA: exchange !== undefined ? exchange === "A" : undefined,
-                        swapWethForDai,
-                        daiIndex: numPairs > 1 ? j : daiIndex,
-                    }, walletSet, i)
-                    allSwaps.push(swaps)
+                    try {
+                        const swaps = await flood.generateSwaps({
+                            minUSD: minUsd,
+                            maxUSD: maxUsd,
+                            swapOnA: exchange !== undefined ? exchange === "A" : undefined,
+                            swapWethForDai,
+                            daiIndex: numPairs > 1 ? j : daiIndex,
+                        }, walletSet, i)
+                        allSwaps.push(swaps)
+                    } catch (e) {
+                        console.warn(`swap generation failed; i=${i} j=${j};`, e)
+                    }
                 }
             }
-            if (sendToFlashbots) {
-                const res = await allSwaps.map(swaps => swaps.sendToFlashbots())
+
+            // send txs
+            if (sendRoute === SendRoute.Flashbots) {
+                const res = await allSwaps.map(swaps => {
+                    return swaps.sendToFlashbots()
+                })
                 const flashbotsResponses = await Promise.all(res)
                 flashbotsResponses.forEach(async res => {
                     await logSendBundleResponse(res)
                 })
-            } else {
-                const swapPromises = allSwaps.map(swaps => swaps.swaps.signedSwaps.map(tx => PROVIDER.sendTransaction(tx)))
+            } else if (sendRoute === SendRoute.Mempool) {
+                const swapPromises = allSwaps.map(swaps => swaps.swaps.signedSwaps.map(swap => PROVIDER.sendTransaction(swap.signedTx)))
                 await Promise.all(swapPromises)
+            } else {
+                const shareOptions: ShareTransactionOptions = {
+                    hints: {
+                        calldata: true,
+                        contractAddress: true,
+                        functionSelector: true,
+                        logs: true,
+                    }
+                }
+                await Promise.all(allSwaps.map(swaps => {
+                    return swaps.sendToMevShare(shareOptions).catch(e => {
+                        console.warn("sendToMevShare failed", e)
+                    })
+                })).catch(e => {
+                    console.warn("sendToMevShare failed", e)
+                })
             }
-        } catch (_) {/* ignore errors, just spam it */}
+        } catch (e) {
+            /* ignore errors, just spam it */
+            console.warn("swap process failed", e)
+        }
     })
 }
 

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "^0.5.0",
+    "@flashbots/matchmaker-ts": "^0.4.1",
     "@uniswap/sdk-core": "^3.0.0-alpha.3",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0",
@@ -24,7 +25,8 @@
     "async-mutex": "^0.4.0",
     "axios": "^0.27.2",
     "dotenv": "^16.0.1",
-    "ethers": "^5.0.0",
+    "ethers": "^5.4.2",
+    "ethersV6": "npm:ethers@^6.2.3",
     "mathjs": "^11.5.1",
     "readline-sync": "^1.4.10",
     "uuid": "^9.0.0"

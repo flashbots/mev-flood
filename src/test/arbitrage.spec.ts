@@ -3,6 +3,7 @@ import { ethers, Wallet } from 'ethers'
 import { formatEther } from 'ethers/lib/utils'
 import MevFlood from '..'
 import { calculateBackrunParams } from "../lib/arbitrage"
+import { CoreReserves } from '../lib/backrun'
 import math, { numify } from "../lib/math"
 import { PROVIDER } from '../lib/providers'
 import { SwapOptions } from '../lib/swap'
@@ -26,12 +27,10 @@ describe("arbitrage unit tests", () => {
         const kA = getK(params.A)
         const kB = getK(params.B)
         const backrunParams = calculateBackrunParams(
-            params.A.reserves0,
-            params.A.reserves1,
-            kA, // exchange A
-            params.B.reserves0,
-            params.B.reserves1,
-            kB, // exchange B
+            {
+                A: {reserves0: params.A.reserves0, reserves1: params.A.reserves1, k: kA},
+                B: {reserves0: params.B.reserves0, reserves1: params.B.reserves1, k: kB},
+            },
             params.amountIn,
             params.swap0For1,
             "A"
@@ -39,7 +38,7 @@ describe("arbitrage unit tests", () => {
         if (!backrunParams) {
             return undefined
         }
-        console.debug(`\nPROFIT\t\t${formatEther(backrunParams.profit.toFixed(0))} ${backrunParams.settlementToken === 0 ? labels.x : labels.y}`)
+        console.debug(`\PROCEEDS\t\t${formatEther(backrunParams.proceeds.toFixed(0))} ${backrunParams.settlementToken === 0 ? labels.x : labels.y}`)
         return backrunParams
     }
 
@@ -59,7 +58,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find the optimal backrun arb (opposite direction)', () => {
@@ -78,7 +77,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb (x -> y)', () => {
@@ -96,7 +95,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb (y -> x)', () => {
@@ -114,7 +113,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb ((x -> y) opposite exchange disparity)', () => {
@@ -132,7 +131,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 
     it('should find an obvious arb ((y -> x) opposite exchange disparity)', () => {
@@ -150,7 +149,7 @@ describe("arbitrage unit tests", () => {
         }
         console.debug(params)
         const br = testBackrunProfit(params)
-        assert(math.bignumber(br?.profit).gt(0))
+        assert(math.bignumber(br?.proceeds).gt(0))
     })
 })
 
@@ -186,27 +185,25 @@ describe("arbitrage integration tests", () => {
             await Promise.all(swapRes.map(r => r.wait(1)))
 
             // backrun
-            const backrunParams = calculateBackrunParams(
-                numify(reserves0A),
-                numify(reserves1A),
-                numify(kA),
-                numify(reserves0B),
-                numify(reserves1B),
-                numify(kB),
-                numify(swaps.swaps.swapParams[0].amountIn),
-                wethIndex === 0, "A"
-            )
-            // TODO: group multiple txs together to backrun all swaps
-            const backrun = await flood.backrun(swapRes[0], {userPairReserves: {
+            const userReserves = {
                 A: {
                     reserves0: reserves0A,
                     reserves1: reserves1A,
+                    k: kA,
                 },
                 B: {
                     reserves0: reserves0B,
                     reserves1: reserves1B,
+                    k: kB,
                 },
-            }})
+            }
+            const backrunParams = calculateBackrunParams(
+                new CoreReserves(userReserves),
+                numify(swaps.swaps.swapParams[0].amountIn),
+                wethIndex === 0, "A"
+            )
+            // TODO: group multiple txs together to backrun all swaps
+            const backrun = await flood.backrun(swapRes[0], admin, {userPairReserves: userReserves})
             if (backrun) {
                 const backrunRes = await backrun.sendToMempool()
                 if (backrunRes) {
@@ -223,7 +220,7 @@ describe("arbitrage integration tests", () => {
             console.log("balanceStart", balanceStart.toString())
             console.log("balanceNew", balanceNew.toString())
             console.log("balanceDiff", balanceDiff.toFixed(0))
-            console.log("profit estimated", backrunParams?.profit.toFixed(0))
+            console.log("proceeds estimated", backrunParams?.proceeds.toFixed(0))
 
             if (backrunParams) {
                 return {
@@ -255,7 +252,7 @@ describe("arbitrage integration tests", () => {
                 swapWethForDai: true,
             })
             if (arbResult) {
-                const profitDiff = math.abs(arbResult.balanceDiff.sub(arbResult.backrunParams.profit))
+                const profitDiff = math.abs(arbResult.balanceDiff.sub(arbResult.backrunParams.proceeds))
                 console.log("profitDiff", profitDiff)
                 assert(profitDiff.lt(arbResult.balanceDiff.div(20))) // 5% margin of error
             } else {

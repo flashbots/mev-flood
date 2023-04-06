@@ -1,14 +1,15 @@
-import { Token } from '@uniswap/sdk-core'
-import { computePairAddress } from '@uniswap/v2-sdk'
-import { BigNumber, Wallet, providers, utils } from "ethers"
-import { getAddress, id as ethersId, keccak256, solidityPack } from "ethers/lib/utils"
+import { BigNumber, Wallet, providers, utils, Transaction } from "ethers"
+import { getAddress, id as ethersId, keccak256, solidityPack, UnsignedTransaction } from "ethers/lib/utils"
 
 import UniswapV2PairLocal from '../contractsBuild/UniswapV2Pair.sol/UniswapV2Pair.json'
 
-export type TransactionRequest = providers.TransactionRequest
+// convenience
 export const GWEI = BigNumber.from(1e9)
 export const ETH = GWEI.mul(GWEI)
 export const MAX_U256 = BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+
+// convenient here, but confusing if exported
+type TransactionRequest = providers.TransactionRequest
 
 /**
  * Now in seconds (UTC).
@@ -107,6 +108,7 @@ export const textColors = {
  * @param txRequest 
  * @param nonce 
  * @param fromOverride (default: `adminWallet.address`)
+ * // TODO: make this an internal method in MevFlood so it has access to a provider to get base fee
  */
  export const populateTxFully = (txRequest: TransactionRequest, nonce: number, overrides?: TransactionRequest): TransactionRequest => {
     return {
@@ -161,4 +163,16 @@ function getCreate2PairAddress(
  */
 export const computeUniV2PairAddress = async (factoryAddress: string, tokenA: string, tokenB: string) => {
     return getCreate2PairAddress(factoryAddress, [tokenA, tokenB], UniswapV2PairLocal.bytecode.object)
+}
+
+export const serializePendingTx = (pendingTx: Transaction): string => {
+    if (pendingTx.type === 2) {
+        delete pendingTx.gasPrice
+    }
+    return utils.serializeTransaction(pendingTx as UnsignedTransaction, {r: pendingTx.r || "0x", s: pendingTx.s, v: pendingTx.v})
+}
+
+export const h256ToAddress = (u256: string) => {
+    // take contents after leading 0x and first 24 bytes
+    return `0x${u256.substring(26)}`
 }

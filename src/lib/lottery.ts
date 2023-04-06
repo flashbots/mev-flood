@@ -1,10 +1,10 @@
-import { BigNumber, Contract, ContractFactory, utils, Wallet } from "ethers"
+import { BigNumber, Contract, ContractFactory, Wallet, providers, utils } from "ethers"
 import { formatEther, formatUnits } from 'ethers/lib/utils'
 
 import contracts, { getContract } from './contracts'
 // TODO: remove all env invocations from lib; meant to be used outside of lib module
 import env from './env'
-import { GWEI, ETH, now, TransactionRequest, populateTxFully } from './helpers'
+import { GWEI, ETH, now, populateTxFully } from './helpers'
 import { PROVIDER } from './providers'
 import { getAdminWallet } from './wallets'
 
@@ -53,7 +53,7 @@ export const createDumbLotteryBundles = async (walletSet: Wallet[], bidGasPrice:
             chainId: env.CHAIN_ID,
             nonce: nonces[idx],
         }
-        const claimReq: TransactionRequest = {
+        const claimReq: providers.TransactionRequest = {
             ...claimTx,
             from: wallet.address,
             gasLimit: 100000,
@@ -108,7 +108,7 @@ export const createSmartLotteryTxs = async (walletSet: Wallet[]): Promise<string
 }
 
 /** create a transaction that always reverts */
-export const createRevertingUniTx = async (deadline?: number): Promise<TransactionRequest | undefined> => {
+export const createRevertingUniTx = async (deadline?: number): Promise<providers.TransactionRequest | undefined> => {
     // make a swap on uniswap v2 where we don't have the tokens
     const uniContract = getContract(contracts.UniV2Router, env.CHAIN_ID)
     if (!uniContract) {
@@ -144,7 +144,7 @@ export const createRevertingUniTx = async (deadline?: number): Promise<Transacti
  * @param sender Wallet connected to a provider.
  * @returns transaction that interacts with lottery contract
  */
- export const getSampleLotteryTx = async (sender: Wallet): Promise<TransactionRequest | undefined> => {
+ export const getSampleLotteryTx = async (sender: Wallet): Promise<providers.TransactionRequest | undefined> => {
     const contract = getContract(contracts.LotteryMEV, env.CHAIN_ID)
     if (!contract) {
         console.warn("lottery contract is undefined for this chain.")
