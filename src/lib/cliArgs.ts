@@ -630,12 +630,12 @@ export const getSpamArgs = () => {
     const overdriveFlag = "--overdrive"
 
     const options = `\
-    ${bundlesPerSecondShort}, ${bundlesPerSecondFlag}\t\tNumber of bundles to send each second. (default=1)
-    ${txsPerBundleShort}, ${txsPerBundleFlag}\t\t\tNumber of transactions per bundle. (default=2)
-    ${flashbotsFlag}\t\t\t\t\t\tSend transactions via flashbots bundle (default=true).
-    ${mempoolFlag}\t\t\t\t\t\tSend transactions directly to mempool (default=false).
-    ${mevShareFlag}\t\t\t\t\t\tSend transactions via mev-share (default=false).
-    ${overdriveFlag}\t\t\t\tNumber of parallel threads to spin up. (default=1) (changing this is not recommended, will cause nonce conflicts)
+    ${bundlesPerSecondShort}, ${bundlesPerSecondFlag}\tNumber of bundles to send each second. (default=1)
+    ${txsPerBundleShort}, ${txsPerBundleFlag}\tNumber of transactions per bundle. (default=2)
+    ${flashbotsFlag}\t\t\tSend transactions via flashbots bundle (default=true). Setting this flag overrides ${mempoolFlag} and ${mevShareFlag}.
+    ${mempoolFlag}\t\t\tSend transactions directly to mempool (default=false).
+    ${mevShareFlag}\t\t\tSend transactions via mev-share (default=false).
+    ${overdriveFlag}\t\t\tNumber of parallel threads to spin up. (default=1) (changing this is not recommended, will cause nonce conflicts)
 `
     const examples = `\
     # send 1 bundle per second w/ 2 txs per bundle from wallet 0
@@ -655,7 +655,9 @@ export const getSpamArgs = () => {
 
     const args = process.argv.slice(2)
     if (args.length > 0) {
-        if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
+        const flatArgs = args.reduce((prv, crr) => `${prv} ${crr}`)
+        console.log("flatArgs", flatArgs)
+        if (flatArgs.includes("help") || flatArgs.includes("--help") || flatArgs.includes("-h")) {
             console.log(helpMessage)
             process.exit(0)
         }
