@@ -1,7 +1,7 @@
 import MevFlood from '..'
 import { getExistingDeploymentFilename } from '../lib/liquid'
 import { PROVIDER } from '../lib/providers'
-import { getAdminWallet, getTestWallet } from '../lib/wallets'
+import { getAdminWallet } from '../lib/wallets'
 import { getSpamArgs, SendRoute } from '../lib/cliArgs'
 import { now } from '../lib/helpers'
 
