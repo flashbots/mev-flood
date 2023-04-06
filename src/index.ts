@@ -115,7 +115,7 @@ class MevFlood {
      * @param signedTxs Array of raw signed transactions.
      * @returns Pending transactions.
      */
-    private async sendToMempool(signedTxs: string[]) {
+    async sendToMempool(signedTxs: string[]) {
         let pendingTxs = []
         for (const tx of signedTxs) {
             pendingTxs.push(await this.provider.sendTransaction(tx))
@@ -128,7 +128,7 @@ class MevFlood {
      * @param signedTxs Array of raw signed transactions.
      * @returns Pending bundle response.
      */
-    private async sendBundle(signedTxs: string[], targetBlock?: number) {
+    async sendBundle(signedTxs: string[], targetBlock?: number) {
         if (this.flashbotsProvider) {
             const targetBlockNum = targetBlock || await this.provider.getBlockNumber() + 1
             return await this.flashbotsProvider.sendRawBundle(signedTxs, targetBlockNum)
@@ -137,7 +137,7 @@ class MevFlood {
         }
     }
 
-    private async sendToMevShare(signedTxs: string[], options: ShareTransactionOptions) {
+    async sendToMevShare(signedTxs: string[], options: ShareTransactionOptions) {
         if (this.matchmaker) {
             return await Promise.all(
                 signedTxs.map(tx =>
@@ -152,7 +152,7 @@ class MevFlood {
         }
     }
 
-    private async sendMevShareBundle(bundleParams: ShareBundleParams) {
+    async sendMevShareBundle(bundleParams: ShareBundleParams) {
         if (this.matchmaker) {
             return await this.matchmaker.sendShareBundle(bundleParams)
         } else {
@@ -226,7 +226,7 @@ class MevFlood {
      */
     async generateSwaps(swapParams: SwapOptions, fromWallets: Wallet[], nonceOffset?: number) {
         if (this.deployment) {
-            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, nonceOffset)
+            const swaps = await scripts.createSwaps(swapParams, this.provider, fromWallets, this.deployment, {offset: nonceOffset})
 
             // simulate each tx
             for (const swap of swaps.signedSwaps) {

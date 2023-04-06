@@ -89,7 +89,7 @@ async function main() {
             } else {
                 const shareOptions: ShareTransactionOptions = {
                     hints: {
-                        calldata: true,
+                        calldata: false,
                         contractAddress: true,
                         functionSelector: true,
                         logs: true,

@@ -1,6 +1,7 @@
 import { BigNumber } from 'ethers'
 import { parseEther } from 'ethers/lib/utils'
 import { GWEI, textColors, } from './helpers'
+import { getTestWallet } from './wallets'
 
 /* author's note:
 
@@ -611,5 +612,85 @@ export const getFundWalletsArgs = () => {
     }
     return {
         eth,
+    }
+}
+
+export const getSpamArgs = () => {
+    const description = "Spam transactions/bundles (WETH deposits). 0.1+ WETH required."
+    const usage = `\
+    yarn script.spam <sender_index> [OPTIONS]
+`
+    const bundlesPerSecondFlag = "--bundles-per-second"
+    const bundlesPerSecondShort = "-b"
+    const txsPerBundleFlag = "--txs-per-bundle"
+    const txsPerBundleShort = "-t"
+    const mempoolFlag = "--mempool"
+    const flashbotsFlag = "--flashbots"
+    const mevShareFlag = "--mev-share"
+    const overdriveFlag = "--overdrive"
+
+    const options = `\
+    ${bundlesPerSecondShort}, ${bundlesPerSecondFlag}\t\tNumber of bundles to send each second. (default=1)
+    ${txsPerBundleShort}, ${txsPerBundleFlag}\t\t\tNumber of transactions per bundle. (default=2)
+    ${flashbotsFlag}\t\t\t\t\t\tSend transactions via flashbots bundle (default=true).
+    ${mempoolFlag}\t\t\t\t\t\tSend transactions directly to mempool (default=false).
+    ${mevShareFlag}\t\t\t\t\t\tSend transactions via mev-share (default=false).
+    ${overdriveFlag}\t\t\t\tNumber of parallel threads to spin up. (default=1) (changing this is not recommended, will cause nonce conflicts)
+`
+    const examples = `\
+    # send 1 bundle per second w/ 2 txs per bundle from wallet 0
+    yarn script.spam 0
+
+    # send 10 bundles per second w/ 4 txs per bundle
+    yarn script.spam 0 ${bundlesPerSecondShort} 10 ${txsPerBundleShort} 4
+
+    # spin up 10 parallel threads, each sending 150 txs per second to mempool
+    yarn script.spam 0 ${bundlesPerSecondShort} 50 ${txsPerBundleShort} 3 ${mempoolFlag} --overdrive 10
+`
+    const helpMessage = genHelpMessage(description, usage, options, examples)
+    let bundlesPerSecond = 1
+    let txsPerBundle = 2
+    let sendRoute = SendRoute.Flashbots
+    let overdrive = 1
+
+    const args = process.argv.slice(2)
+    if (args.length > 0) {
+        if (args.reduce((prv, crr) => `${prv} ${crr}`).includes("help")) {
+            console.log(helpMessage)
+            process.exit(0)
+        }
+    } else {
+        console.error("sender index is required")
+        console.log(helpMessage)
+        process.exit(1)
+    }
+
+    if (args.includes(bundlesPerSecondFlag) || args.includes(bundlesPerSecondShort)) {
+        const bundlesPerSecondIndex = getFlagIndex(args, bundlesPerSecondFlag, bundlesPerSecondShort)
+        bundlesPerSecond = getOption(args, bundlesPerSecondIndex, "number") as number
+    }
+    if (args.includes(txsPerBundleFlag) || args.includes(txsPerBundleShort)) {
+        const txsPerBundleIndex = getFlagIndex(args, txsPerBundleFlag, txsPerBundleShort)
+        txsPerBundle = getOption(args, txsPerBundleIndex, "number") as number
+    }
+    if (args.includes(mempoolFlag)) {
+        sendRoute = SendRoute.Mempool
+    } else if (args.includes(mevShareFlag)) {
+        sendRoute = SendRoute.MevShare
+    }
+    if (args.includes(flashbotsFlag)) {
+        sendRoute = SendRoute.Flashbots
+    }
+    if (args.includes(overdriveFlag)) {
+        const overdriveIndex = getFlagIndex(args, overdriveFlag)
+        overdrive = getOption(args, overdriveIndex, "number") as number
+    }
+
+    return {
+        bundlesPerSecond,
+        overdrive,
+        txsPerBundle,
+        sendRoute,
+        wallet: getTestWallet(parseInt(args[0])),
     }
 }

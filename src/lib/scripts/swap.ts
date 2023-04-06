@@ -4,7 +4,7 @@ import contracts from '../contracts'
 import { LiquidDeployment } from '../liquid'
 import { createRandomSwapParams, signSwap, SwapOptions, SwapParams } from '../swap'
 
-export const createSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployment: LiquidDeployment, nonceOffset?: number) => {
+export const createSwaps = async (options: SwapOptions, provider: providers.JsonRpcProvider, userWallets: Wallet[], deployment: LiquidDeployment, nonce: {offset?: number, override?: number}) => {
     let signedSwaps: {signedTx: string, tx: providers.TransactionRequest}[] = []
     let swapParams: SwapParams[] = []
     for (const wallet of userWallets) {
@@ -19,7 +19,7 @@ export const createSwaps = async (options: SwapOptions, provider: providers.Json
         swapParams.push(swap)
         const wethForDai = swap.path[0].toLowerCase() === deployment.weth.contractAddress.toLowerCase()
         console.log(`[${wallet.address}] swapping ${formatEther(swap.amountIn)} ${wethForDai ? "WETH" : "DAI"} for ${wethForDai ? "DAI" : "WETH"}`)
-        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, (await wallet.connect(provider).getTransactionCount()) + (nonceOffset || 0), provider.network.chainId)
+        const signedSwap = await signSwap(atomicSwapContract, swap.uniFactory, wallet, swap.amountIn, swap.path, nonce.override || (await wallet.connect(provider).getTransactionCount()) + (nonce.offset || 0), provider.network.chainId)
         signedSwaps.push(signedSwap)
     }
     return {signedSwaps, swapParams}

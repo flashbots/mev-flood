@@ -137,7 +137,7 @@ export async function generateBackrunTx(
             console.warn(`profit ${formatEther(BigNumber.from(profit.toFixed(0)))} is less than minProfit setting ${formatEther(opts.minProfit)}`)
             return undefined
         }
-        console.debug(`BACKRUN. minimum estimated profit: ${utils.formatEther(profit.toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
+        console.debug(`BACKRUN. minimum estimated profit: ${utils.formatEther(profit.mul(settlesInWeth ? 1 : price).toFixed(0))} ${settlesInWeth ? "WETH" : "DAI"}`)
         const tokenArb = backrunParams.settlementToken === 1 ? token0 : token1
         const tokenSettle = backrunParams.settlementToken === 0 ? token0 : token1
         const factoryStart = userSwap.factory
