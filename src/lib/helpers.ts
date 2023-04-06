@@ -171,3 +171,8 @@ export const serializePendingTx = (pendingTx: Transaction): string => {
     }
     return utils.serializeTransaction(pendingTx as UnsignedTransaction, {r: pendingTx.r || "0x", s: pendingTx.s, v: pendingTx.v})
 }
+
+export const h256ToAddress = (u256: string) => {
+    // take contents after leading 0x and first 24 bytes
+    return `0x${u256.substring(26)}`
+}

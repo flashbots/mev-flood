@@ -318,7 +318,7 @@ class MevFlood {
      */
     async backrunShareTransaction(pendingTx: PendingShareTransaction, sender: Wallet, opts?: BackrunOptions, gasTip?: BigNumber) {
         if (this.deployment) {
-            const pendingSwap = PendingSwap.fromShareTx(pendingTx)
+            const pendingSwap = await PendingSwap.fromShareTx(pendingTx, this.provider)
             if (!pendingSwap) {
                 return undefined
             }

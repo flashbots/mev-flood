@@ -73,13 +73,16 @@ async function main() {
             if (backrun) {
                 try {
                     console.log("sending backrun to mev-share")
-                    for (let i = 1; i < 5; i++) { // target next 4 blocks
-                        const res = await backrun.sendShareBundle(blockNum + i)
-                        if (!res) {
-                            resetNonce(wallet.address)
-                        }
-                        console.log(`send mev-share bundle targeting block ${blockNum + i}`, res)
+                    let backruns = []
+                    for (let i = 1; i < 11; i++) { // target next 10 blocks
+                        const res = backrun.sendShareBundle(blockNum + i)
+                        backruns.push(res)
+                        console.log(`sent mev-share bundle targeting block ${blockNum + i}`)
                     }
+                    await Promise.all(backruns).catch(e => {
+                        console.warn("resetting nonce", (e as Error).message)
+                        resetNonce(wallet.address)
+                    })
                 } catch (e) {
                     if ((e as Error).message.includes("nonce too low")) {
                         console.warn("nonce too low, resetting nonce")

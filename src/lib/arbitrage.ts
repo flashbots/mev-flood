@@ -1,5 +1,5 @@
 import { BigNumber } from 'mathjs'
-import math, { numify } from "./math"
+import math from "./math"
 
 const FEE = math.bignumber(0.997)
 

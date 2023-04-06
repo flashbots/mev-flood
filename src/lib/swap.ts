@@ -1,7 +1,8 @@
 import { PendingShareTransaction } from '@flashbots/matchmaker-ts'
 import { BigNumber, Contract, PopulatedTransaction, Wallet, providers, utils } from 'ethers'
 import { LogParams } from 'ethersV6'
-import { coinToss, ETH, extract4Byte, GWEI, MAX_U256, populateTxFully, randInRange } from './helpers'
+import contracts from './contracts'
+import { coinToss, ETH, extract4Byte, GWEI, MAX_U256, populateTxFully, randInRange, h256ToAddress } from './helpers'
 
 /**
  * Options for generating a new swap.
@@ -41,6 +42,30 @@ export interface IPendingSwap {
     fromThis: boolean
 }
 
+type UniV2SwapLog = {
+    recipientAddress: string,
+    amount0In: BigNumber,
+    amount1In: BigNumber,
+    amount0Out: BigNumber,
+    amount1Out: BigNumber,
+    routerAddress: string,
+    pairAddress: string,
+}
+
+enum SwapException {
+    InvalidLogs = "Swap logs were detected, but could not be parsed",
+    NoSwapLogs = "No swap logs detected",
+    UnknownFunctionSignature = "Unknown function signature",
+}
+
+class SwapError extends Error {
+    public message: string
+    constructor(public exceptionId: SwapException, message?: string) {
+        super(`${exceptionId}${message && ": " + message}`)
+        this.message = message || exceptionId
+    }
+}
+
 /**
  * Class to decode swap params from pending transactions. The common interface for calling `generateBackrunTx`.
  * 
@@ -64,61 +89,136 @@ export class PendingSwap implements IPendingSwap {
     /**
      * Create a PendingSwap from raw calldata.
      * @param calldata raw calldata of transaction
-     * @param swapDecoder optional override for decoding calldata; should return an array of params `[path, amountIn, factory, recipient, fromThis]` from ethers.utils.ABI_CODER.decode
+     * @param swapDecoder optional override for decoding calldata
      * @returns 
      */
-    static fromCalldata(calldata: string, swapDecoder?: (calldata: string) => utils.Result) {
-        const params = swapDecoder ? swapDecoder(calldata) : decodeSwapCalldata(calldata)
-        const path = params[0]
-        const amountIn = params[1]
-        const factory = params[2]
-        const recipient = params[3]
-        const fromThis = params[4]
+    static fromCalldata(calldata: string, decodeCalldata?: (calldata: string) => IPendingSwap) {
+        const params = decodeCalldata ? decodeCalldata(calldata) : decodeSwapCalldata(calldata)
+        const { path, amountIn, factory, recipient, fromThis } = params
         return new PendingSwap(path, amountIn, factory, recipient, fromThis)
     }
 
-    static fromShareTx(pendingTx: PendingShareTransaction, swapDecoder?: (calldata: string) => utils.Result) {
+    /**
+     * Create a PendingSwap from a PendingShareTransaction; tries calldata, then logs if calldata fails.
+     * @param pendingTx pending share transaction
+     * @param provider ethers provider
+     * @param decodeCalldata optional override for decoding calldata
+     * @param decodeLogs optional override for decoding logs
+     * @returns PendingSwap or undefined if no swap detected
+     */
+    static async fromShareTx(
+        pendingTx: PendingShareTransaction,
+        provider: providers.JsonRpcProvider,
+        decodeCalldata?: (calldata: string) => IPendingSwap,
+        decodeLogs?: (logs: LogParams[]) => UniV2SwapLog,
+    ) {
         if (pendingTx.callData) {
             try {
-                return PendingSwap.fromCalldata(pendingTx.callData, swapDecoder)
+                return PendingSwap.fromCalldata(pendingTx.callData, decodeCalldata)
             } catch (e) {
                 // ignore unknown function signature error, throw all others
-                if (!(e as Error).message.includes("Unknown function signature:")) {
+                if (!(e as Error).message.includes(SwapException.UnknownFunctionSignature)) {
                     throw e
                 }
             }
         }
         if (pendingTx.logs) {
-            const logData = decodeSwapLogs(pendingTx.logs)
-            // return new PendingSwap(hints.path, hints.amountIn, hints.factory, hints.recipient, hints.fromThis)
+            const logData = decodeLogs ? decodeLogs(pendingTx.logs) : decodeSwapLogs(pendingTx.logs)
+            const zeroToOne = logData.amount0In.gt(0) && logData.amount1In.eq(0)
+            const pair = new Contract(logData.pairAddress, contracts.UniV2Pair.abi, provider)
+            const token0 = await pair.callStatic.token0()
+            const token1 = await pair.callStatic.token1()
+            const path = zeroToOne ? [token0, token1] : [token1, token0]
+            const amountIn = zeroToOne ? logData.amount0In : logData.amount1In
+            const factory = await pair.callStatic.factory()
+            return new PendingSwap(path, amountIn, factory, logData.recipientAddress, false)
         } else {
             return undefined
         }
     }
 }
 
-const decodeSwapCalldata = (calldata: string) => {
+/**
+ * Calldata decoder for swaps sent to the AtomicSwap router (see contracts/atomicSwap.sol).
+ * @param calldata calldata from tx
+ * @returns pending swap struct
+ */
+const decodeSwapCalldata = (calldata: string): IPendingSwap => {
     const fnSignature = extract4Byte(calldata)
     // we're expecting a call to `swap` on atomicSwap
     if (fnSignature === "0cc73263") {
         // swap detected
-        const decodedTxData = utils.defaultAbiCoder.decode([
+        const params = utils.defaultAbiCoder.decode([
             "address[] path",
             "uint256 amountIn",
             "address factory",
             "address recipient",
             "bool fromThis",
         ], `0x${calldata.substring(10)}`)
-        return decodedTxData
+        const path = params[0]
+        const amountIn = params[1]
+        const factory = params[2]
+        const recipient = params[3]
+        const fromThis = params[4]
+        return { path, amountIn, factory, recipient, fromThis }
     } else {
-        throw new Error("Unknown function signature: " + fnSignature)
+        throw new SwapError(SwapException.UnknownFunctionSignature, fnSignature)
     }
 }
 
-export const decodeSwapLogs = (logs: LogParams[]) => {
-    console.log("logs", logs)
-    // TODO: univ2 logs
-    throw new Error("unimplemented")
+/**
+ * Logs decoder for Uniswap V2 swaps.
+ * @param logs logs from transaction
+ * @returns decoded log struct
+ */
+const decodeSwapLogs = (logs: LogParams[]): UniV2SwapLog => {
+    /*
+    event Swap(
+        address indexed sender,
+        uint amount0In,
+        uint amount1In,
+        uint amount0Out,
+        uint amount1Out,
+        address indexed to
+    );
+    */
+   const swapTopic = utils.id("Swap(address,uint256,uint256,uint256,uint256,address)")
+
+    // parse swap logs
+    const swapLogs = logs.filter(log => log.topics[0] === swapTopic)
+    if (swapLogs.length > 0) {
+        try {
+            const swapLog = swapLogs[0]
+            const decodedLog = utils.defaultAbiCoder.decode([
+                "uint amount0In",
+                "uint amount1In",
+                "uint amount0Out",
+                "uint amount1Out",
+            ], swapLog.data)
+            const amount0In = decodedLog[0]
+            const amount1In = decodedLog[1]
+            const amount0Out = decodedLog[2]
+            const amount1Out = decodedLog[3]
+            const to = h256ToAddress(swapLog.topics[1])
+            const sender = h256ToAddress(swapLog.topics[2])
+            const pairAddress = swapLog.address
+            const logData = {
+                recipientAddress: sender,
+                amount0In,
+                amount1In,
+                amount0Out,
+                amount1Out,
+                routerAddress: to,
+                pairAddress
+            }
+            console.log("logData", logData)
+            return logData
+        } catch (e) {
+            throw new SwapError(SwapException.InvalidLogs, (e as Error).message)
+        }
+    } else {
+        throw new SwapError(SwapException.NoSwapLogs)
+    }
 }
 
 export const createRandomSwapParams = (
@@ -126,7 +226,8 @@ export const createRandomSwapParams = (
     uniFactoryAddress_B: string,
     daiAddresses: string[],
     wethAddress: string,
-    overrides: SwapOptions): SwapParams => {
+    overrides: SwapOptions
+): SwapParams => {
     
     // pick random uni factory
     const uniFactory = overrides.swapOnA !== undefined ? overrides.swapOnA ? uniFactoryAddress_A : uniFactoryAddress_B : coinToss() ? uniFactoryAddress_A : uniFactoryAddress_B
