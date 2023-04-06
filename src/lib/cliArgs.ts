@@ -656,7 +656,6 @@ export const getSpamArgs = () => {
     const args = process.argv.slice(2)
     if (args.length > 0) {
         const flatArgs = args.reduce((prv, crr) => `${prv} ${crr}`)
-        console.log("flatArgs", flatArgs)
         if (flatArgs.includes("help") || flatArgs.includes("--help") || flatArgs.includes("-h")) {
             console.log(helpMessage)
             process.exit(0)
