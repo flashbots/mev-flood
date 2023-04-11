@@ -11,6 +11,12 @@ export const MAX_U256 = BigNumber.from("0xffffffffffffffffffffffffffffffffffffff
 // convenient here, but confusing if exported
 type TransactionRequest = providers.TransactionRequest
 
+export type GasFeeOptions = {
+    gasTip?: BigNumber,
+    maxFeePerGas?: BigNumber,
+    maxPriorityFeePerGas?: BigNumber,
+}
+
 /**
  * Now in seconds (UTC).
  */
@@ -115,7 +121,7 @@ export const textColors = {
         ...txRequest,
         maxFeePerGas: overrides?.maxFeePerGas || GWEI.mul(42),
         maxPriorityFeePerGas: overrides?.maxPriorityFeePerGas || GWEI.mul(3),
-        gasLimit: overrides?.gasLimit || 1000000,
+        gasLimit: overrides?.gasLimit || txRequest.gasLimit || 5000000,
         from: overrides?.from,
         nonce,
         type: 2,

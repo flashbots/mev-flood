@@ -271,5 +271,5 @@ describe("arbitrage integration tests", () => {
                 console.error(e)
             }
         }
-    })
+    }).timeout(5000)
 })

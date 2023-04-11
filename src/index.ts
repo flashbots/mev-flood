@@ -6,7 +6,7 @@ import { BackrunOptions, generateBackrunTx } from './lib/backrun'
 import Matchmaker, { PendingShareTransaction, ShareBundleParams, ShareTransactionOptions } from "@flashbots/matchmaker-ts"
 
 // lib
-import { populateTxFully, serializePendingTx, textColors } from './lib/helpers'
+import { GWEI, populateTxFully, serializePendingTx, textColors } from './lib/helpers'
 import { ILiquidDeployment, LiquidDeployment, loadDeployment as loadDeploymentLib } from './lib/liquid'
 import scripts, { LiquidParams } from './lib/scripts'
 import { approveIfNeeded, SwapOptions, PendingSwap } from './lib/swap'
@@ -255,7 +255,7 @@ class MevFlood {
      * @param pendingTx 
      * @returns Backrun with callbacks to send it.
      */
-    async backrun(pendingTx: Transaction, sender: Wallet, opts?: BackrunOptions, gasTip?: BigNumber) {
+    async backrun(pendingTx: Transaction, sender: Wallet, opts?: BackrunOptions) {
         if (this.deployment) {
             if (pendingTx.to !== this.deployment.atomicSwap.contractAddress) {
                 console.warn(`backrun: tx ${pendingTx.hash} is not a swap. Skipping.`)
@@ -264,16 +264,21 @@ class MevFlood {
             // decode tx to get pair and amount
             try {
                 const userSwap = PendingSwap.fromCalldata(pendingTx.data)
-                const feeData = await this.provider.getFeeData()
-                const backrunTx = await generateBackrunTx(this.provider, this.deployment, userSwap, opts, {
-                    maxFeePerGas: feeData.maxFeePerGas || undefined,
-                    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || undefined,
-                    gasTip,
-                })
+                const backrunTx = await generateBackrunTx(this.provider, this.deployment, userSwap, opts)
                 if (!backrunTx) {
                     return undefined
                 }
+                const feeData = await this.provider.getFeeData()
                 const userTx = serializePendingTx(pendingTx)
+                const maxFeePerGas = 
+                    opts?.gasFees?.maxFeePerGas?.add(opts.gasFees.gasTip || 0) ||
+                    feeData?.maxFeePerGas?.add(opts?.gasFees?.gasTip || 0) ||
+                    GWEI.mul(75)
+                const maxPriorityFeePerGas = 
+                    opts?.gasFees?.maxPriorityFeePerGas?.add(opts.gasFees.gasTip || 0) ||
+                    feeData?.maxPriorityFeePerGas?.add(opts?.gasFees?.gasTip || 0) ||
+                    GWEI.mul(2)
+
                 const signedArb = await sender.signTransaction(
                     populateTxFully(
                         backrunTx,
@@ -281,8 +286,8 @@ class MevFlood {
                         {
                             from: sender.address,
                             chainId: this.provider.network.chainId,
-                            maxFeePerGas: feeData.maxFeePerGas ? feeData.maxFeePerGas.add(gasTip || 0) : undefined,
-                            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas.add(gasTip || 0) : undefined,
+                            maxFeePerGas,
+                            maxPriorityFeePerGas,
                         }
                 ))
                 const bundle = [userTx, signedArb]
@@ -316,18 +321,14 @@ class MevFlood {
      * @param opts Options to modify the behavior of the backrun.
      * @returns Backrun with callbacks to send it.
      */
-    async backrunShareTransaction(pendingTx: PendingShareTransaction, sender: Wallet, opts?: BackrunOptions, gasTip?: BigNumber) {
+    async backrunShareTransaction(pendingTx: PendingShareTransaction, sender: Wallet, opts?: BackrunOptions) {
         if (this.deployment) {
             const pendingSwap = await PendingSwap.fromShareTx(pendingTx, this.provider)
             if (!pendingSwap) {
                 return undefined
             }
             const feeData = await this.provider.getFeeData()
-            const backrun = await generateBackrunTx(this.provider, this.deployment, pendingSwap, opts, {
-                maxFeePerGas: feeData.maxFeePerGas || undefined,
-                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || undefined,
-                gasTip,
-            })
+            const backrun = await generateBackrunTx(this.provider, this.deployment, pendingSwap, opts)
             if (!backrun) {
                 return undefined
             }
@@ -338,8 +339,8 @@ class MevFlood {
                 {
                     from: sender.address,
                     chainId: this.provider.network.chainId,
-                    maxFeePerGas: feeData.maxFeePerGas?.add(gasTip || 0),
-                    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.add(gasTip || 0),
+                    maxFeePerGas: feeData.maxFeePerGas?.add(opts?.gasFees?.gasTip || 0),
+                    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.add(opts?.gasFees?.gasTip || 0),
                 }
             )
 

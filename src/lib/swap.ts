@@ -1,8 +1,11 @@
 import { PendingShareTransaction } from '@flashbots/matchmaker-ts'
 import { BigNumber, Contract, PopulatedTransaction, Wallet, providers, utils } from 'ethers'
 import { LogParams } from 'ethersV6'
+import { calculatePostTradeReserves } from './arbitrage'
 import contracts from './contracts'
-import { coinToss, ETH, extract4Byte, GWEI, MAX_U256, populateTxFully, randInRange, h256ToAddress } from './helpers'
+import { coinToss, ETH, extract4Byte, GWEI, MAX_U256, populateTxFully, randInRange, h256ToAddress, GasFeeOptions, computeUniV2PairAddress, sortTokens } from './helpers'
+import { numify } from './math'
+import { PROVIDER } from './providers'
 
 /**
  * Options for generating a new swap.
@@ -13,6 +16,7 @@ export type SwapOptions = {
     swapOnA?: boolean,
     daiIndex?: number,
     swapWethForDai?: boolean,
+    gasFees?: GasFeeOptions,
 }
 
 /**
@@ -23,7 +27,7 @@ export type SwapParams = {
     path: string[],
     tokenInName: string,
     tokenOutName: string,
-    uniFactory: string,
+    uniFactoryAddress: string,
 }
 
 /**
@@ -221,28 +225,83 @@ const decodeSwapLogs = (logs: LogParams[]): UniV2SwapLog => {
     }
 }
 
-export const createRandomSwapParams = (
+/**
+ * Gets DAI/ETH price from Uniswap V2.
+ */
+const getDaiPrice = async (provider: providers.JsonRpcProvider, daiAddress: string, wethAddress: string, factoryAddress: string): Promise<{price: number, reserves: {weth: BigNumber, dai: BigNumber, core: BigNumber[]}}> => {
+    const pair = new Contract(await computeUniV2PairAddress(factoryAddress, wethAddress, daiAddress), contracts.UniV2Pair.abi, provider)
+    const reserves: BigNumber[] = await pair.callStatic.getReserves()
+    const daiIsToken0 = sortTokens(wethAddress, daiAddress).token0 === daiAddress
+    return {
+        price: ((daiIsToken0 ?
+            reserves[0].div(reserves[1]) :
+            reserves[1].div(reserves[0]))
+            // .div(ETH)
+            ).toNumber(),
+        reserves: {
+            weth: daiIsToken0 ? reserves[1] : reserves[0],
+            dai: daiIsToken0 ? reserves[0] : reserves[1],
+            core: reserves,
+        }
+    }
+}
+
+const getPostTradeDaiPrice = async (
+    provider: providers.JsonRpcProvider,
+    contracts: {daiAddress: string, wethAddress: string, uniFactoryAddress: string},
+    path: string[],
+    amountInUSD: BigNumber
+) => {
+    const basePrice = await getDaiPrice(provider, contracts.daiAddress, contracts.wethAddress, contracts.uniFactoryAddress)
+    const x = basePrice.reserves.core[0]
+    const y = basePrice.reserves.core[1]
+
+    const daiIsToken0 = basePrice.reserves.core[0].eq(basePrice.reserves.dai)
+    const token0 = daiIsToken0 ? contracts.daiAddress : contracts.wethAddress
+
+    console.log("basePrice", basePrice.price.toFixed(0))
+    const postTradeReserves = calculatePostTradeReserves(
+        numify(x),
+        numify(y),
+        numify(x.mul(y)),
+        numify(path[0] === contracts.wethAddress ? amountInUSD.div(basePrice.price) : amountInUSD),
+        path[0] === token0)
+    return (daiIsToken0 ?
+        postTradeReserves.reserves0.div(postTradeReserves.reserves1) :
+        postTradeReserves.reserves1.div(postTradeReserves.reserves0)
+    ).toNumber()
+}
+
+export const createRandomSwapParams = async (
+    providerOrDaiPrice: providers.JsonRpcProvider | number,
     uniFactoryAddress_A: string,
     uniFactoryAddress_B: string,
     daiAddresses: string[],
     wethAddress: string,
-    overrides: SwapOptions
-): SwapParams => {
+    overrides: SwapOptions,
+): Promise<SwapParams> => {
     
     // pick random uni factory
-    const uniFactory = overrides.swapOnA !== undefined ? overrides.swapOnA ? uniFactoryAddress_A : uniFactoryAddress_B : coinToss() ? uniFactoryAddress_A : uniFactoryAddress_B
+    const uniFactoryAddress = overrides.swapOnA !== undefined ? overrides.swapOnA ? uniFactoryAddress_A : uniFactoryAddress_B : coinToss() ? uniFactoryAddress_A : uniFactoryAddress_B
     // pick random DAI contract
-    const daiContractAddress = daiAddresses[overrides.daiIndex || randInRange(0, daiAddresses.length)]
+    const daiAddress = daiAddresses[overrides.daiIndex || randInRange(0, daiAddresses.length)]
     // pick random path
-    const wethDaiPath = [wethAddress, daiContractAddress]
-    const daiWethPath = [daiContractAddress, wethAddress]
+    const wethDaiPath = [wethAddress, daiAddress]
+    const daiWethPath = [daiAddress, wethAddress]
     const path = overrides.swapWethForDai !== undefined ? 
         overrides.swapWethForDai ? wethDaiPath : daiWethPath
         : coinToss() ? wethDaiPath : daiWethPath
     // pick random amountIn: [500..10000] USD
     const amountInUSD = ETH.mul(randInRange(overrides.minUSD || 100, overrides.maxUSD || 5000))
-    // if weth out (path_0 == weth) then amount should be (1 ETH / 1300 DAI) * amountIn
-    const amountIn = path[0] == wethAddress ? amountInUSD.div(1300) : amountInUSD
+    // if weth out (path_0 == weth) then amount should be (1 ETH / (DAI/ETH price) DAI) * amountIn; e.g. number(1300)
+    const daiPrice = typeof providerOrDaiPrice === "number" ?
+        providerOrDaiPrice :
+        await getPostTradeDaiPrice(PROVIDER, {daiAddress, wethAddress, uniFactoryAddress}, path, amountInUSD)
+    console.log("daiPrice", daiPrice)
+    // calculatePostTradeReserves()
+    const amountIn = path[0] == wethAddress ?
+        amountInUSD.div(Math.floor(daiPrice)) :
+        amountInUSD
     const tokenInName = path[0] === wethAddress ? "WETH" : "DAI"
     const tokenOutName = path[1] === wethAddress ? "WETH" : "DAI"
     return {
@@ -250,7 +309,7 @@ export const createRandomSwapParams = (
         path,
         tokenInName,
         tokenOutName,
-        uniFactory,
+        uniFactoryAddress,
     }
 }
 
@@ -262,7 +321,7 @@ export const signSwap = async (
     path: string[],
     nonce: number,
     chainId: number,
-    gasTip?: BigNumber,
+    gasFees?: GasFeeOptions,
 ): Promise<{signedTx: string, tx: providers.TransactionRequest}> => {
     // use custom router to swap
     const tx = populateTxFully(
@@ -278,8 +337,8 @@ export const signSwap = async (
             from: sender.address,
             gasLimit: 150000,
             chainId,
-            maxFeePerGas: GWEI.mul(80).add(gasTip || 0),
-            maxPriorityFeePerGas: GWEI.mul(5).add(gasTip || 0)
+            maxFeePerGas: (gasFees?.maxFeePerGas || GWEI.mul(80)).add(gasFees?.gasTip || 0),
+            maxPriorityFeePerGas: (gasFees?.maxPriorityFeePerGas || GWEI.mul(5)).add(gasFees?.gasTip || 0)
         },
     )
     return {

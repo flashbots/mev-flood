@@ -67,8 +67,8 @@ async function main() {
                     minProfit,
                     maxProfit,
                     nonce: await getNonce(wallet.address),
+                    gasFees: {gasTip}
                 },
-                gasTip
             )
             if (backrun) {
                 try {
@@ -104,8 +104,8 @@ async function main() {
                     minProfit,
                     maxProfit,
                     nonce: await getNonce(wallet.address),
+                    gasFees: {gasTip}
                 },
-                gasTip
             )
             if (backrun) {
                 if (sendRoute === SendRoute.Flashbots) {

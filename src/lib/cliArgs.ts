@@ -363,7 +363,7 @@ export const getSwapdArgs = () => {
     ${mintWethAmountShort}\t${mintWethAmountFlag}\t\tAmount of WETH to mint from each wallet, if balance is lower than this amount.
     ${flashbotsShort}\t${flashbotsFlag}\t\tSend swaps as Flashbots bundles instead of sending to mempool.
     ${mevShareShort}\t${mevShareFlag}\t\tSend swaps to mev-share. (overrides ${flashbotsFlag})
-    ${gasTipShort}\t${gasTipFlag}\t\tGas tip (in gwei; added to base fee) to increase validator incentive to include your txs. (default=0)
+    ${gasTipShort}\t${gasTipFlag}\t\tGas tip (in gwei; added to base fee & priority fee per gas) to increase validator incentive to include your txs. (default=0)
 `
     const examples = `\
     # run with a single wallet

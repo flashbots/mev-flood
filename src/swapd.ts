@@ -54,7 +54,8 @@ async function main() {
 
     console.log("watching blocks...")
     PROVIDER.on('block', async blockNum => {
-        console.log(`[BLOCK ${blockNum}]`)
+        let feeData = await PROVIDER.getFeeData()
+        console.log(`[BLOCK ${blockNum}]`, feeData)
         let allSwaps = []
         try {
             for (let i = 0; i < numSwaps; i++) {
@@ -66,6 +67,11 @@ async function main() {
                             swapOnA: exchange !== undefined ? exchange === "A" : undefined,
                             swapWethForDai,
                             daiIndex: numPairs > 1 ? j : daiIndex,
+                            gasFees: {
+                                gasTip,
+                                maxFeePerGas: feeData.maxFeePerGas || undefined,
+                                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || undefined,
+                            }
                         }, walletSet, i)
                         allSwaps.push(swaps)
                     } catch (e) {

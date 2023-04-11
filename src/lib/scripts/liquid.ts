@@ -5,13 +5,14 @@ import {
     utils,
     constants,
     providers,
-    Wallet
+    Wallet,
+    BigNumber
 } from "ethers"
 import { formatEther, parseEther } from 'ethers/lib/utils'
 
 // lib
 import contracts, { ContractSpec } from "../contracts"
-import { computeUniV2PairAddress, ETH, populateTxFully, sortTokens } from '../helpers'
+import { computeUniV2PairAddress, ETH, GWEI, populateTxFully, sortTokens } from '../helpers'
 import { ContractDeployment, LiquidDeployment, loadDeployment } from '../liquid'
 
 export interface LiquidParams {
@@ -43,9 +44,13 @@ const generateLiquidDeployment = async (params: LiquidParams, provider: provider
     const adminMintAmount = params.wethMintAmountAdmin !== undefined ? parseEther(params.wethMintAmountAdmin.toString()) : undefined
     const userMintAmount = params.wethMintAmountUser !== undefined ? parseEther(params.wethMintAmountUser.toString()) : undefined
 
+    const feeData = await provider.getFeeData()
     const overrides = {
         from: adminWallet.address,
         chainId: provider.network.chainId,
+        type: 2,
+        maxFeePerGas: feeData.maxFeePerGas || GWEI.mul(42),
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || GWEI.mul(2),
     }
 
     /** Get signed tx to deploy a generic contract clone, as well as the address it will be deployed at.*/

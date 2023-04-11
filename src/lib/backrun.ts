@@ -2,7 +2,7 @@ import { BigNumber, Contract, PopulatedTransaction, providers, utils } from 'eth
 import { formatEther } from 'ethers/lib/utils'
 import { calculateBackrunParams, Pool } from './arbitrage'
 import contracts from './contracts'
-import { GWEI } from './helpers'
+import { GasFeeOptions, GWEI } from './helpers'
 import { LiquidContracts, LiquidDeployment } from './liquid'
 import { numify } from './math'
 import { PendingSwap } from './swap'
@@ -30,12 +30,13 @@ export class CoreReserves {
     }
 }
 
-/** Options interface for {@link generateBackrun} */
+/** Options interface for {@link generateBackrunTx} */
 export type BackrunOptions = {
     minProfit?: BigNumber,
     maxProfit?: BigNumber,
     userPairReserves?: Reserves,
     nonce?: number,
+    gasFees?: GasFeeOptions,
 }
 
 /** Gets reserves for a given pair on each exchange.
@@ -85,11 +86,6 @@ export async function generateBackrunTx(
     deployment: LiquidDeployment,
     userSwap: PendingSwap,
     opts?: BackrunOptions,
-    gasFees?: {
-        gasTip?: BigNumber,
-        maxFeePerGas?: BigNumber,
-        maxPriorityFeePerGas?: BigNumber,
-    },
 ): Promise<PopulatedTransaction | undefined> {
     // get reserves
     // TODO: side daemon that caches the reserves on new blocks
@@ -118,9 +114,14 @@ export async function generateBackrunTx(
     // TODO: calculate gas cost dynamically (accurately)
     const gasUsed = 162000
     const feeData = provider.getFeeData()
-    const baseFee = (gasFees?.maxFeePerGas || (await feeData).maxFeePerGas || GWEI.mul(40))
-    const prioFee = (gasFees?.maxPriorityFeePerGas || (await feeData).maxPriorityFeePerGas || GWEI.mul(2))
-    const gasCost = numify(baseFee.add(prioFee).add(gasFees?.gasTip || 0).mul(gasUsed))
+    const baseFee = (opts?.gasFees?.maxFeePerGas || (await feeData).maxFeePerGas || GWEI.mul(40))
+    const prioFee = (opts?.gasFees?.maxPriorityFeePerGas || (await feeData).maxPriorityFeePerGas || GWEI.mul(2))
+    const gasCost = numify(
+        baseFee
+        .add(prioFee)
+        .add(opts?.gasFees?.gasTip || 0)
+        .mul(gasUsed)
+    )
     // normalize profit to ETH
     const reserves0 = backrunParams.otherReserves.reserves0
     const reserves1 = backrunParams.otherReserves.reserves1
