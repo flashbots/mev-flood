@@ -4,7 +4,7 @@ A collection of tools to simulate MEV activity on EVM-based networks.
 
 ## the library
 
-This project's primary export is `MevFlood`, a library that can delpoy a UniswapV2 environment and automate swap traffic & backruns.
+This project's primary export is `MevFlood`, a library that can deploy a UniswapV2 environment and automate swap traffic & backruns.
 
 ```typescript
 import MevFlood from "mev-flood"
