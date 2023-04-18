@@ -1,9 +1,9 @@
 /** module exports for using mev-flood as a library */
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle'
-import { Wallet, providers, Transaction, BigNumber } from 'ethers'
+import { Wallet, providers, Transaction } from 'ethers'
 import fs from "fs/promises"
 import { BackrunOptions, generateBackrunTx } from './lib/backrun'
-import Matchmaker, { PendingShareTransaction, ShareBundleParams, ShareTransactionOptions } from "@flashbots/matchmaker-ts"
+import Matchmaker, { BundleParams, IPendingTransaction, TransactionOptions } from "@flashbots/matchmaker-ts"
 
 // lib
 import { GWEI, populateTxFully, serializePendingTx, textColors } from './lib/helpers'
@@ -50,7 +50,7 @@ class MevFlood {
             getFlashbotsUrl(this.provider.network.chainId),
             this.provider.network
         )
-        this.matchmaker = new Matchmaker(new ethersV6.Wallet(flashbotsSigner.privateKey), this.provider.network)
+        this.matchmaker = Matchmaker.fromNetwork(new ethersV6.Wallet(flashbotsSigner.privateKey), this.provider.network)
         return this
     }
 
@@ -137,12 +137,12 @@ class MevFlood {
         }
     }
 
-    async sendToMevShare(signedTxs: string[], options: ShareTransactionOptions) {
+    async sendToMevShare(signedTxs: string[], options: TransactionOptions) {
         if (this.matchmaker) {
             return await Promise.all(
                 signedTxs.map(tx =>
                     this.matchmaker!
-                    .sendShareTransaction(tx, options)
+                    .sendTransaction(tx, options)
                     .catch(e => console.error("sendShareTransaction failed:", e))
                     // TODO: bubble errors up so sendToMevShare caller can handle it
                 )
@@ -152,9 +152,9 @@ class MevFlood {
         }
     }
 
-    async sendMevShareBundle(bundleParams: ShareBundleParams) {
+    async sendMevShareBundle(bundleParams: BundleParams) {
         if (this.matchmaker) {
-            return await this.matchmaker.sendShareBundle(bundleParams)
+            return await this.matchmaker.sendBundle(bundleParams)
         } else {
             throw new Error("must call initFlashbots on MevFlood instance to send to mev-share")
         }
@@ -243,7 +243,7 @@ class MevFlood {
                 /** Send all swaps to mempool. */
                 sendToMempool: async () => this.sendToMempool(swaps.signedSwaps.map(swap => swap.signedTx)),
                 /** Send all swaps to mev-share. */
-                sendToMevShare: async (shareOptions: ShareTransactionOptions) => this.sendToMevShare(swaps.signedSwaps.map(swap => swap.signedTx), shareOptions),
+                sendToMevShare: async (shareOptions: TransactionOptions) => this.sendToMevShare(swaps.signedSwaps.map(swap => swap.signedTx), shareOptions),
             }
         } else {
             throw new Error("Must initialize MevFlood with a liquid deployment to send swaps")
@@ -321,7 +321,7 @@ class MevFlood {
      * @param opts Options to modify the behavior of the backrun.
      * @returns Backrun with callbacks to send it.
      */
-    async backrunShareTransaction(pendingTx: PendingShareTransaction, sender: Wallet, opts?: BackrunOptions) {
+    async backrunShareTransaction(pendingTx: IPendingTransaction, sender: Wallet, opts?: BackrunOptions) {
         if (this.deployment) {
             const pendingSwap = await PendingSwap.fromShareTx(pendingTx, this.provider)
             if (!pendingSwap) {
@@ -356,11 +356,16 @@ class MevFlood {
 
             const signedBackrun = await sender.signTransaction(fullTx)
 
-            const sendShareBundle = async (targetBlock: number) => {
-                const bundleParams: ShareBundleParams = {
-                    shareTxs: [pendingTx.txHash],
-                    backrun: [signedBackrun],
-                    targetBlock,
+            const sendShareBundle = async (targetBlock: number, maxBlock?: number) => {
+                const bundleParams: BundleParams = {
+                    inclusion: {
+                        block: targetBlock,
+                        maxBlock,
+                    },
+                    body: [
+                        {hash: pendingTx.hash},
+                        {tx: signedBackrun, canRevert: false},
+                    ],
                 }
                 return await this.sendMevShareBundle(bundleParams)
             }

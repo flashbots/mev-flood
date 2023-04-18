@@ -1,5 +1,5 @@
-import { PendingShareTransaction } from '@flashbots/matchmaker-ts'
-import { BigNumber, Contract, PopulatedTransaction, Wallet, providers, utils } from 'ethers'
+import Matchmaker, {IPendingTransaction} from '@flashbots/matchmaker-ts'
+import { BigNumber, Contract, Wallet, providers, utils } from 'ethers'
 import { LogParams } from 'ethersV6'
 import { calculatePostTradeReserves } from './arbitrage'
 import contracts from './contracts'
@@ -111,7 +111,7 @@ export class PendingSwap implements IPendingSwap {
      * @returns PendingSwap or undefined if no swap detected
      */
     static async fromShareTx(
-        pendingTx: PendingShareTransaction,
+        pendingTx: IPendingTransaction,
         provider: providers.JsonRpcProvider,
         decodeCalldata?: (calldata: string) => IPendingSwap,
         decodeLogs?: (logs: LogParams[]) => UniV2SwapLog,

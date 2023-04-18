@@ -1,4 +1,4 @@
-import Matchmaker from '@flashbots/matchmaker-ts'
+import Matchmaker, {StreamEvent, SupportedNetworks} from '@flashbots/matchmaker-ts'
 import { Mutex } from 'async-mutex'
 import { Wallet } from 'ethers'
 import { Wallet as WalletV6 } from 'ethersV6'
@@ -56,9 +56,15 @@ async function main() {
 
     if (sendRoute === SendRoute.MevShare) {
         console.log("watching mev-share for pending txs...")
-        const matchmaker = new Matchmaker(new WalletV6(flashbotsSigner.privateKey), PROVIDER.network)
-        matchmaker.onShareTransaction(async pendingTx => {
-            console.debug(`pending share tx ${pendingTx.txHash} detected`)
+        const key = flashbotsSigner.privateKey
+        const walletv6 = new WalletV6(key)
+        const chainId = PROVIDER.network.chainId
+        if (!SupportedNetworks.supportsChainId(chainId)) {
+            throw new Error("network not supported")
+        }
+        const matchmaker = new Matchmaker(walletv6, chainId === 1 ? SupportedNetworks.mainnet : SupportedNetworks.goerli)
+        matchmaker.on(StreamEvent.Transaction, async pendingTx => {
+            console.debug(`pending share tx ${pendingTx.hash} detected`)
             const blockNum = await PROVIDER.getBlockNumber()
             const backrun = await mevFlood.backrunShareTransaction(
                 pendingTx,
@@ -90,7 +96,7 @@ async function main() {
                     }
                 }
             } else {
-                console.log(`pending share tx ${pendingTx.txHash} not profitable, skipping`)
+                console.log(`pending share tx ${pendingTx.hash} not profitable, skipping`)
             }
         })
     } else {

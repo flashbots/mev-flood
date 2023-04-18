@@ -1,4 +1,4 @@
-import { ShareTransactionOptions } from '@flashbots/matchmaker-ts'
+import { TransactionOptions } from '@flashbots/matchmaker-ts'
 import { Wallet } from 'ethers'
 
 // lib
@@ -93,7 +93,7 @@ async function main() {
                 const swapPromises = allSwaps.map(swaps => swaps.swaps.signedSwaps.map(swap => PROVIDER.sendTransaction(swap.signedTx)))
                 await Promise.all(swapPromises)
             } else {
-                const shareOptions: ShareTransactionOptions = {
+                const shareOptions: TransactionOptions = {
                     hints: {
                         calldata: false,
                         contractAddress: true,
