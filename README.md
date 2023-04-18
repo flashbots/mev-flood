@@ -149,7 +149,6 @@ MevFlood contains an arbitrage engine that will attempt to create a transaction 
 await flood.initFlashbots(flashbotsSigner)
 
 provider.on('pending', async pendingTx => {
-  const pendingTx = provider.getPendingTransactions
   const backrun = await flood.backrun(pendingTx)
 
   // `sendToFlashbots` throws an error if `initFlashbots` hasn't been called on the MevFlood instance
