@@ -9,6 +9,7 @@ import { loadDeployment } from "./lib/liquid"
 import { PROVIDER } from './lib/providers'
 import { approveIfNeeded, mintIfNeeded } from './lib/swap'
 import { getAdminWallet, getWalletSet } from './lib/wallets'
+import { question } from 'readline-sync'
 
 async function main() {
     // get cli args
@@ -44,9 +45,21 @@ async function main() {
 
     const flood = await new MevFlood(adminWallet, PROVIDER, deployment).initFlashbots(flashbotsSigner)
 
+    const askToContinue = (prompt: string, err?: any) => {
+        const doContinue = question(`${prompt}. Do you want to continue? [y/N] `)
+        if (!doContinue.toLowerCase().includes("y")) {
+            throw err
+        }
+    }
+
     // check wallet balance for each token, mint if needed
     console.log("maybe minting...")
-    await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount, gasTip)
+    try {
+        await mintIfNeeded(PROVIDER, adminWallet, adminNonce, walletSet, contracts, mintWethAmount, gasTip)
+    } catch (e) {
+        // console.warn(e)
+        askToContinue("Mint step failed")
+    }
 
     // check atomicSwap allowance for each wallet, approve max_uint if needed
     console.log("maybe approving...")
