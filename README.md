@@ -329,7 +329,7 @@ yarn script.sendPrivateTx --help
 yarn script.cancelPrivateTx --help
 ```
 
-## setup
+## game setup
 
 ```sh
 yarn install
