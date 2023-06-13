@@ -390,4 +390,4 @@ class MevFlood {
     }
 }
 
-export = MevFlood
+export default MevFlood
