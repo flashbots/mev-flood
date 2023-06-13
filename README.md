@@ -2,9 +2,102 @@
 
 A collection of tools to simulate MEV activity on EVM-based networks.
 
+## the cli
+
+Quickly set up an environment and start sending swaps with the cli.
+
+### setup
+
+First, we need to initialize the environment and build our library:
+
+```sh
+cd core/
+yarn install
+# required for build:
+yarn script.createWallets
+yarn build
+cd ..
+```
+
+Next, build the CLI:
+
+```sh
+cd cli/
+yarn build
+```
+
+### cli usage
+
+**Start by deploying the smart contracts:**
+
+```sh
+./bin/run init
+```
+
+Run `init` with the `--help` flag to see all available overrides:
+
+```sh
+./bin/run init --help
+ENV: local
+Deploy smart contracts and provision liquidity on UniV2 pairs.
+
+USAGE
+  $ mevflood init [-r <value>] [-k <value>] [-a <value>] [-s <value>]
+
+FLAGS
+  -a, --wethMintAmount=<value>  [default: 1000] Integer amount of WETH to mint for
+                                the owner account.
+  -k, --privateKey=<value>      [default: 0xac0974bec39a17e36ba4a6b4d238ff944bacb4
+                                78cbed5efcae784d7bf4f2ff80] Private key used to
+                                send transactions and deploy contracts.
+  -r, --rpcUrl=<value>          [default: http://localhost:8545] HTTP JSON-RPC
+                                endpoint.
+  -s, --saveFile=<value>        Save the deployment details to a file.
+
+DESCRIPTION
+  Deploy smart contracts and provision liquidity on UniV2 pairs.
+```
+
+**Next, send random swaps with the `spam` command:**
+
+```sh
+./bun/run spam
+```
+
+Run `spam` with the `--help` flag to see all available overrides:
+
+```sh
+./bin/run spam --help
+ENV: local
+Send a constant stream of UniV2 swaps.
+
+USAGE
+  $ mevflood spam [-r <value>] [-k <value>] [-t <value>] [-b <value>] [-l <value>]
+
+FLAGS
+  -b, --bundlesPerSecond=<value>  [default: 1] Number of bundles to send per second.
+  -k, --privateKey=<value>        [default: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae
+                                  784d7bf4f2ff80] Private key used to send transactions and
+                                  deploy contracts.
+  -l, --loadFile=<value>          Load the deployment details from a file.
+  -r, --rpcUrl=<value>            [default: http://localhost:8545] HTTP JSON-RPC endpoint.
+  -t, --txsPerBundle=<value>      [default: 2] Number of transactions to include in each bundle.
+
+DESCRIPTION
+  Send a constant stream of UniV2 swaps.
+```
+
+Note: if you used the `-s` flag in the `init` command to save your deployment to a file, you should use that file for the `spam` command by specifying the `-l` flag:
+
+```sh
+./bin/run init -s deployment.json
+# ...
+./bin/run spam -l deployment.json
+```
+
 ## the library
 
-This project's primary export is `MevFlood`, a library that can deploy a UniswapV2 environment and automate swap traffic & backruns.
+This project's primary export is `MevFlood`, a library (in `core/`) that can delpoy a UniswapV2 environment and automate swap traffic & backruns.
 
 ```typescript
 import MevFlood from "mev-flood"
@@ -149,7 +242,6 @@ MevFlood contains an arbitrage engine that will attempt to create a transaction 
 await flood.initFlashbots(flashbotsSigner)
 
 provider.on('pending', async pendingTx => {
-  const pendingTx = provider.getPendingTransactions
   const backrun = await flood.backrun(pendingTx)
 
   // `sendToFlashbots` throws an error if `initFlashbots` hasn't been called on the MevFlood instance
@@ -237,7 +329,7 @@ yarn script.sendPrivateTx --help
 yarn script.cancelPrivateTx --help
 ```
 
-## setup
+## game setup
 
 ```sh
 yarn install
