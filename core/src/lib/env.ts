@@ -13,16 +13,20 @@ const env = {
     MEV_GETH_HTTP_URL: process.env.MEV_GETH_HTTP_URL || "",
 }
 
-let fail = false
-for (const [key, val] of Object.entries(env)) {
-    if (!val) {
-        console.error(`${key} is undefined`)
-        fail = true
+if (process.argv[1].includes("/mev-flood/core/")) {
+    // only check env if we're running a program from inside the core
+    // TODO: this is a hack, don't make env a compile-time constant
+    let fail = false
+    for (const [key, val] of Object.entries(env)) {
+        if (!val) {
+            console.error(`${key} is undefined`)
+            fail = true
+        }
     }
-}
-if (fail) {
-    console.error(`bad configuration in ${envPath}`)
-    process.exit(2)
+    if (fail) {
+        console.error(`bad configuration in ${envPath}`)
+        process.exit(2)
+    }
 }
 
 export default env
