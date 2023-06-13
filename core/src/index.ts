@@ -391,3 +391,5 @@ class MevFlood {
 }
 
 export default MevFlood
+
+export * as spam from "./lib/scripts/spam"

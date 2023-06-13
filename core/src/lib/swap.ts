@@ -1,11 +1,10 @@
-import Matchmaker, {IPendingTransaction} from '@flashbots/matchmaker-ts'
+import { IPendingTransaction } from '@flashbots/matchmaker-ts'
 import { BigNumber, Contract, Wallet, providers, utils } from 'ethers'
 import { LogParams } from 'ethersV6'
 import { calculatePostTradeReserves } from './arbitrage'
 import contracts from './contracts'
 import { coinToss, ETH, extract4Byte, GWEI, MAX_U256, populateTxFully, randInRange, h256ToAddress, GasFeeOptions, computeUniV2PairAddress, sortTokens } from './helpers'
 import { numify } from './math'
-import { PROVIDER } from './providers'
 
 /**
  * Options for generating a new swap.
@@ -259,7 +258,6 @@ const getPostTradeDaiPrice = async (
     const daiIsToken0 = basePrice.reserves.core[0].eq(basePrice.reserves.dai)
     const token0 = daiIsToken0 ? contracts.daiAddress : contracts.wethAddress
 
-    console.log("basePrice", basePrice.price.toFixed(0))
     const postTradeReserves = calculatePostTradeReserves(
         numify(x),
         numify(y),
@@ -296,8 +294,7 @@ export const createRandomSwapParams = async (
     // if weth out (path_0 == weth) then amount should be (1 ETH / (DAI/ETH price) DAI) * amountIn; e.g. number(1300)
     const daiPrice = typeof providerOrDaiPrice === "number" ?
         providerOrDaiPrice :
-        await getPostTradeDaiPrice(PROVIDER, {daiAddress, wethAddress, uniFactoryAddress}, path, amountInUSD)
-    console.log("daiPrice", daiPrice)
+        await getPostTradeDaiPrice(providerOrDaiPrice, {daiAddress, wethAddress, uniFactoryAddress}, path, amountInUSD)
     // calculatePostTradeReserves()
     const amountIn = path[0] == wethAddress ?
         amountInUSD.div(Math.floor(daiPrice)) :

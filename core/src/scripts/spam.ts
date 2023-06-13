@@ -8,14 +8,13 @@ import { spamLoop } from '../lib/scripts/spam'
 const {wallet, bundlesPerSecond, txsPerBundle, sendRoute, overdrive} = getSpamArgs()
 
 async function main() {
+    const connectedWallet = wallet.connect(PROVIDER)
     const mevFlood = await (
-        await new MevFlood(wallet, PROVIDER)
+        await new MevFlood(connectedWallet, PROVIDER)
         .withDeploymentFile(await getExistingDeploymentFilename())
     ).initFlashbots(getAdminWallet())
-    let targetBlockNumber = await PROVIDER.getBlockNumber() + 1
-    let virtualNonce = await wallet.connect(PROVIDER).getTransactionCount()
 
-    await spamLoop(mevFlood, PROVIDER, wallet, {targetBlockNumber, virtualNonce, txsPerBundle, sendRoute, bundlesPerSecond})
+    await spamLoop(mevFlood, connectedWallet, {txsPerBundle, sendRoute, bundlesPerSecond})
 }
 
 for (let i = 0; i < overdrive; i++) {

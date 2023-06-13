@@ -1,4 +1,4 @@
-import { Wallet, providers } from 'ethers'
+import { Wallet } from 'ethers'
 import MevFlood from '../..'
 import { SendRoute } from '../cliArgs'
 import { now } from '../helpers'
@@ -32,16 +32,20 @@ export const spam = async (
 }
 
 /** Spams continuously, updating the target block if needed. */
-export const spamLoop = async (mevFlood: MevFlood, provider: providers.JsonRpcProvider, wallet: Wallet, params: {
-    targetBlockNumber: number,
-    virtualNonce: number,
+export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     txsPerBundle: number,
     sendRoute: SendRoute,
     bundlesPerSecond: number,
 }) => {
+    try {
+        await wallet.provider.getBlockNumber()
+    } catch {
+        console.error("wallet must be connected to a provider")
+        process.exit(1)
+    }
     let lastBlockSampledAt = now()
-    let targetBlockNumber = await provider.getBlockNumber() + 1
-    let virtualNonce = await wallet.connect(provider).getTransactionCount()
+    let targetBlockNumber = await wallet.provider.getBlockNumber() + 1
+    let virtualNonce = await wallet.getTransactionCount()
     while (true) {
         spam(mevFlood, wallet, {targetBlockNumber, virtualNonce, txsPerBundle: 1, sendRoute: SendRoute.Mempool})
         await sleep(1000 / params.bundlesPerSecond)
