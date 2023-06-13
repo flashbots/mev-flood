@@ -19,7 +19,9 @@
   "dependencies": {
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
-    "@oclif/plugin-plugins": "^2.4.7"
+    "@oclif/plugin-plugins": "^2.4.7",
+    "ethers": "^5",
+    "ethersV6": "npm:ethers@^6.3.0"
   },
   "devDependencies": {
     "@oclif/test": "^2.3.22",
@@ -34,7 +36,6 @@
     "oclif": "^3",
     "shx": "^0.3.3",
     "ts-node": "^10.9.1",
-    "tslib": "^2.5.3",
     "typescript": "^4.9.5"
   },
   "oclif": {
