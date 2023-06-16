@@ -6,7 +6,30 @@ A collection of tools to simulate MEV activity on EVM-based networks.
 
 Quickly set up an environment and start sending swaps with the cli.
 
-### setup
+### easy setup (docker)
+
+```sh
+docker build -t mevflood .
+
+# see available commands
+docker run mevflood --help
+
+### assumes an Ethereum node is running on your machine at localhost:8545
+
+# deploy smart contracts & save deployment to file (cli/bin/deployment.json on localhost)
+docker run -v ${PWD}:/app mevflood init -r http://host.docker.internal:8545 -s deployment.json
+
+# start sending swaps using the deployment file created in the last step
+docker run --init -v ${PWD}:/app mevflood spam -r http://host.docker.internal:8545 -l deployment.json
+
+# press Ctrl+C to quit
+```
+
+See the [send swaps](#send-swaps) section for more details on sending random swaps with mev-flood.
+
+### manual setup
+
+_Steps to build locally:_
 
 First, we need to initialize the environment and build our library:
 
@@ -28,7 +51,7 @@ yarn build
 
 ### cli usage
 
-**Start by deploying the smart contracts:**
+#### deploy smart contracts
 
 ```sh
 ./bin/run init
@@ -58,7 +81,9 @@ DESCRIPTION
   Deploy smart contracts and provision liquidity on UniV2 pairs.
 ```
 
-**Next, send random swaps with the `spam` command:**
+#### send swaps
+
+_Next, send random swaps with the `spam` command:_
 
 ```sh
 ./bun/run spam
