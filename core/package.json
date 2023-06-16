@@ -38,6 +38,7 @@
     "test.math": "ts-mocha -p ./tsconfig.json src/test/math.spec.ts --debug",
     "test.uniswap": "ts-mocha -p ./tsconfig.json src/test/uniswap.spec.ts --debug",
     "build": "npx tsc",
+    "lint": "echo TODO",
     "cancel-dev": "npx ts-node src/cancellations.ts",
     "cancel": "node build/cancellations.js",
     "dumb-dev": "npx ts-node src/dumb-search.ts",
