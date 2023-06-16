@@ -21,6 +21,9 @@ jobs:
       - name: Install dependencies (core)
         working-directory: ./core
         run: yarn install
+      - name: Setup wallets for core build
+        working-directory: ./core
+        run: yarn script.createWallets
       - name: Build core
         working-directory: ./core
         run: yarn build
