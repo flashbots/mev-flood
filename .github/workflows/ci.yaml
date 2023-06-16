@@ -20,7 +20,7 @@ jobs:
           node-version: "${{ steps.nvmrc.outputs.NODE_VERSION }}"
       - name: Install dependencies (core)
         working-directory: ./core
-        run: yarn install (core)
+        run: yarn install
       - name: Build core
         working-directory: ./core
         run: yarn build
@@ -29,7 +29,7 @@ jobs:
         run: yarn lint
       - name: Install dependencies (cli)
         working-directory: ./cli
-        run: yarn install (cli)
+        run: yarn install
       - name: Build cli
         working-directory: ./cli
         run: yarn build
