@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . /app
 
 # Install app dependencies and build the application
-RUN cd core && yarn install && yarn script.createWallets && yarn build && cd ..
+RUN cd core && rm -f ./src/output/wallets.json && yarn install && yarn script.createWallets && yarn build && cd ..
 RUN cd cli && yarn install && yarn build && cd ..
 
 # Use an official Node runtime as a parent image for the runtime stage
@@ -21,6 +21,3 @@ WORKDIR /app/cli/bin
 COPY --from=builder /app /app
 
 ENTRYPOINT ["./run"]
-# Run the application
-CMD ["init"]
-CMD ["spam"]
