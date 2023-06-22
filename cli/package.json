@@ -19,7 +19,6 @@
   "dependencies": {
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
-    "@oclif/plugin-plugins": "^2.4.7",
     "ethers": "^5",
     "ethersV6": "npm:ethers@^6.3.0"
   },
@@ -42,8 +41,7 @@
     "dirname": "mevflood",
     "commands": "./dist/commands",
     "plugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-plugins"
+      "@oclif/plugin-help"
     ],
     "topicSeparator": " ",
     "topics": {
