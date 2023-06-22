@@ -8,28 +8,43 @@ Quickly set up an environment and start sending swaps with the cli.
 
 ### easy setup (docker)
 
-```sh
-docker build -t mevflood .
+**pull from dockerhub:**
 
+```sh
+docker pull flashbots/mev-flood
+
+# re-tag for convenience
+docker tag flashbots/mev-flood mevflood
+```
+
+**alernatively, build from source**:
+
+```sh
+git clone https://github.com/flashbots/mev-flood
+cd mev-flood/
+docker build -t mevflood .
+```
+
+**run the CLI with docker:**
+
+```sh
 # see available commands
 docker run mevflood --help
 
 ### assumes an Ethereum node is running on your machine at localhost:8545
 
-# deploy smart contracts & save deployment to file (cli/bin/deployment.json on localhost)
-docker run -v ${PWD}:/app mevflood init -r http://host.docker.internal:8545 -s deployment.json
+# deploy smart contracts & save deployment to file (./deployments/local.json on localhost)
+docker run -v ${PWD}:/app/cli/deployments mevflood init -r http://host.docker.internal:8545 -s local.json
 
 # start sending swaps using the deployment file created in the last step
-docker run --init -v ${PWD}:/app mevflood spam -r http://host.docker.internal:8545 -l deployment.json
+docker run --init -v ${PWD}:/app/cli/deployments mevflood spam -r http://host.docker.internal:8545 -l local.json
 
 # press Ctrl+C to quit
 ```
 
 See the [send swaps](#send-swaps) section for more details on sending random swaps with mev-flood.
 
-### manual setup
-
-_Steps to build locally:_
+### build/run locally
 
 First, we need to initialize the environment and build our library:
 
