@@ -2,7 +2,7 @@ import {Command, Flags} from '@oclif/core'
 import {floodFlags} from '../../helpers/flags'
 import {Wallet, providers} from 'ethers'
 import MevFlood from '../../../../core/build'
-import { getDeploymentDir } from '../../helpers/files'
+import {getDeploymentDir} from '../../helpers/files'
 
 export default class Init extends Command {
   static description = 'Deploy smart contracts and provision liquidity on UniV2 pairs.'
