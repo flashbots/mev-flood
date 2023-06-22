@@ -4,6 +4,7 @@ import {providers, Wallet} from 'ethers'
 import {floodFlags} from '../../helpers/flags'
 import MevFlood, {spam} from '../../../../core/build'
 import {SendRoute} from '../../../../core/build/lib/cliArgs'
+import { getDeploymentDir } from '../../helpers/files'
 
 export default class Hello extends Command {
   static description = 'Send a constant stream of UniV2 swaps.'
@@ -34,7 +35,7 @@ export default class Hello extends Command {
     const provider = new providers.JsonRpcProvider(flags.rpcUrl)
     await provider.ready
     const wallet = new Wallet(flags.privateKey, provider)
-    const deployment = flags.loadFile ? await MevFlood.loadDeployment(flags.loadFile) : undefined
+    const deployment = flags.loadFile ? await MevFlood.loadDeployment(getDeploymentDir(flags.loadFile)) : undefined
     const flood = new MevFlood(wallet, provider, deployment)
     this.log(`connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
 
