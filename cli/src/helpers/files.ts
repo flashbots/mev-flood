@@ -1,5 +1,3 @@
-// import * as url from 'node:url'
-// const __dirname = url.fileURLToPath(new URL('.', import.meta.url))
 import path from 'node:path'
 import fs from 'node:fs/promises'
 
