@@ -45,8 +45,11 @@
     ],
     "topicSeparator": " ",
     "topics": {
-      "hello": {
-        "description": "Say hello to the world and others"
+      "init": {
+        "description": "Deploy UniV2 smart contracts & tokens."
+      },
+      "spam": {
+        "description": "Spam the RPC node with swap transactions."
       }
     }
   },
