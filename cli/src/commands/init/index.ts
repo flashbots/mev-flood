@@ -2,6 +2,7 @@ import {Command, Flags} from '@oclif/core'
 import {floodFlags} from '../../helpers/flags'
 import {Wallet, providers} from 'ethers'
 import MevFlood from '../../../../core/build'
+import {getDeploymentDir} from '../../helpers/files'
 
 export default class Init extends Command {
   static description = 'Deploy smart contracts and provision liquidity on UniV2 pairs.'
@@ -34,7 +35,7 @@ export default class Init extends Command {
     await deployment.deployToMempool()
     this.log('liquidity deployed via mempool')
     if (flags.saveFile) {
-      await flood.saveDeployment(flags.saveFile)
+      await flood.saveDeployment(getDeploymentDir(flags.saveFile))
       this.log(`deployment saved to ${flags.saveFile}`)
     }
   }
