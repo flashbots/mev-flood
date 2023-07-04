@@ -61,6 +61,7 @@ Next, build the CLI:
 
 ```sh
 cd cli/
+yarn install
 yarn build
 ```
 
