@@ -27,11 +27,12 @@ export default class Init extends Command {
     const provider = new providers.JsonRpcProvider(flags.rpcUrl)
     const wallet = new Wallet(flags.privateKey, provider)
     const flood = new MevFlood(wallet, provider)
+    const userWallet = new Wallet(flags.userKey, provider)
     this.log(`connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
     const deployment = await flood.liquid({
       wethMintAmountAdmin: flags.wethMintAmountOwner,
       wethMintAmountUser: flags.wethMintAmountUser,
-    })
+    }, userWallet)
     await deployment.deployToMempool()
     this.log('liquidity deployed via mempool')
     if (flags.saveFile) {
