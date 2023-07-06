@@ -5,7 +5,7 @@ import { getAdminWallet } from '../lib/wallets'
 import { getSpamArgs } from '../lib/cliArgs'
 import { spamLoop } from '../lib/scripts/spam'
 
-const {wallet, bundlesPerSecond, txsPerBundle, sendRoute, overdrive} = getSpamArgs()
+const {wallet, secondsPerBundle, txsPerBundle, sendRoute, overdrive} = getSpamArgs()
 
 async function main() {
     const connectedWallet = wallet.connect(PROVIDER)
@@ -14,7 +14,7 @@ async function main() {
         .withDeploymentFile(await getExistingDeploymentFilename())
     ).initFlashbots(getAdminWallet())
 
-    await spamLoop(mevFlood, connectedWallet, {txsPerBundle, sendRoute, bundlesPerSecond})
+    await spamLoop(mevFlood, connectedWallet, {txsPerBundle, sendRoute, secondsPerBundle})
 }
 
 for (let i = 0; i < overdrive; i++) {

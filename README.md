@@ -42,6 +42,8 @@ docker run --init -v ${PWD}:/app/cli/deployments mevflood spam -r http://host.do
 # press Ctrl+C to quit
 ```
 
+| _If `host.docker.internal` doesn't work, try `172.17.0.1` (docker's default host proxy)_
+
 See the [send swaps](#send-swaps) section for more details on sending random swaps with mev-flood.
 
 ### build/run locally
@@ -77,21 +79,20 @@ Run `init` with the `--help` flag to see all available overrides:
 
 ```sh
 ./bin/run init --help
-ENV: local
+ENV: undefined
 Deploy smart contracts and provision liquidity on UniV2 pairs.
 
 USAGE
-  $ mevflood init [-r <value>] [-k <value>] [-a <value>] [-s <value>]
+  $ mevflood init [-r <value>] [-k <value>] [-u <value>] [-a <value>] [-s <value>]
 
 FLAGS
-  -a, --wethMintAmount=<value>  [default: 1000] Integer amount of WETH to mint for
-                                the owner account.
-  -k, --privateKey=<value>      [default: 0xac0974bec39a17e36ba4a6b4d238ff944bacb4
-                                78cbed5efcae784d7bf4f2ff80] Private key used to
-                                send transactions and deploy contracts.
-  -r, --rpcUrl=<value>          [default: http://localhost:8545] HTTP JSON-RPC
-                                endpoint.
+  -a, --wethMintAmount=<value>  [default: 1000] Integer amount of WETH to mint for the owner account.
+  -k, --privateKey=<value>      [default: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80] Private key used to send
+                                transactions and deploy contracts.
+  -r, --rpcUrl=<value>          [default: http://localhost:8545] HTTP JSON-RPC endpoint.
   -s, --saveFile=<value>        Save the deployment details to a file.
+  -u, --userKey=<value>         [default: 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d] Private key for the user
+                                wallet used to send transactions
 
 DESCRIPTION
   Deploy smart contracts and provision liquidity on UniV2 pairs.
@@ -102,33 +103,28 @@ DESCRIPTION
 _Next, send random swaps with the `spam` command:_
 
 ```sh
-./bun/run spam
-```
-
-Run `spam` with the `--help` flag to see all available overrides:
-
-```sh
 ./bin/run spam --help
-ENV: local
+ENV: undefined
 Send a constant stream of UniV2 swaps.
 
 USAGE
-  $ mevflood spam [-r <value>] [-k <value>] [-t <value>] [-b <value>] [-l <value>]
+  $ mevflood spam [-r <value>] [-k <value>] [-u <value>] [-t <value>] [-p <value>] [-l <value>]
 
 FLAGS
-  -b, --bundlesPerSecond=<value>  [default: 1] Number of bundles to send per second.
-  -k, --privateKey=<value>        [default: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae
-                                  784d7bf4f2ff80] Private key used to send transactions and
-                                  deploy contracts.
+  -k, --privateKey=<value>        [default: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80] Private key used to
+                                  send transactions and deploy contracts.
   -l, --loadFile=<value>          Load the deployment details from a file.
+  -p, --secondsPerBundle=<value>  [default: 12] Seconds to wait before sending another bundle.
   -r, --rpcUrl=<value>            [default: http://localhost:8545] HTTP JSON-RPC endpoint.
   -t, --txsPerBundle=<value>      [default: 2] Number of transactions to include in each bundle.
+  -u, --userKey=<value>           [default: 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d] Private key for the
+                                  user wallet used to send transactions
 
 DESCRIPTION
   Send a constant stream of UniV2 swaps.
 ```
 
-Note: if you used the `-s` flag in the `init` command to save your deployment to a file, you should use that file for the `spam` command by specifying the `-l` flag:
+Note: you must use the `-s` flag in the `init` command to save your deployment to a file, then use that file for the `spam` command by specifying the `-l` flag:
 
 ```sh
 ./bin/run init -s deployment.json
