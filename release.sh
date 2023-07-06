@@ -1,0 +1,2 @@
+cd ./cli
+yarn release

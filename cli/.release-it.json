@@ -1,0 +1,16 @@
+{
+    "git": {
+      "commitMessage": "release v${version}",
+      "tag": true,
+      "tagName": "v${version}",
+      "push": true
+    },
+    "github": {
+      "release": true,
+      "releaseName": "v${version}",
+      "autoGenerate": true
+    },
+    "npm": {
+      "publish": false
+    }
+}
