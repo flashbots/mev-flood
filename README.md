@@ -42,6 +42,8 @@ docker run --init -v ${PWD}:/app/cli/deployments mevflood spam -r http://host.do
 # press Ctrl+C to quit
 ```
 
+| _If `host.docker.internal` doesn't work, try `172.17.0.1` (docker's default host proxy)_
+
 See the [send swaps](#send-swaps) section for more details on sending random swaps with mev-flood.
 
 ### build/run locally
