@@ -8,7 +8,8 @@
     "github": {
       "release": true,
       "releaseName": "v${version}",
-      "autoGenerate": true
+      "autoGenerate": true,
+      "draft": true
     },
     "npm": {
       "publish": false
