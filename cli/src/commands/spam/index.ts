@@ -17,11 +17,11 @@ export default class Spam extends Command {
       required: false,
       default: 2,
     }),
-    bundlesPerSecond: Flags.integer({
-      char: 'b',
-      description: 'Number of bundles to send per second.',
+    secondsPerBundle: Flags.integer({
+      char: 'p',
+      description: 'Seconds to wait before sending another bundle.',
       required: false,
-      default: 1,
+      default: 12,
     }),
     loadFile: Flags.string({
       char: 'l',
@@ -42,7 +42,7 @@ export default class Spam extends Command {
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
       sendRoute: SendRoute.Mempool,
-      bundlesPerSecond: flags.bundlesPerSecond,
+      secondsPerBundle: flags.secondsPerBundle,
     })
   }
 }
