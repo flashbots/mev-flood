@@ -1,2 +1,4 @@
 core/node_modules
+core/build
 cli/node_modules
+cli/build
