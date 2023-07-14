@@ -22,7 +22,7 @@ docker tag flashbots/mev-flood mevflood
 ```sh
 git clone https://github.com/flashbots/mev-flood
 cd mev-flood/
-docker build -t mevflood .
+docker build -t mevflood:latest .
 ```
 
 **run the CLI with docker:**
