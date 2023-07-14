@@ -8,7 +8,7 @@ Quickly set up an environment and start sending swaps with the cli.
 
 ### easy setup (docker)
 
-**pull from dockerhub:**
+**pull from [dockerhub](https://hub.docker.com/r/flashbots/mev-flood):**
 
 ```sh
 docker pull flashbots/mev-flood
