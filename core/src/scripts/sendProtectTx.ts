@@ -1,8 +1,8 @@
-import { providers } from 'ethers'
+import { Wallet, providers } from 'ethers'
 import { getSendProtectTxArgs } from '../lib/cliArgs'
 import env from '../lib/env'
 import { createRevertingUniTx, getSampleLotteryTx } from '../lib/lottery'
-import { getAdminWallet } from '../lib/wallets'
+// import { getAdminWallet } from '../lib/wallets'
 
 async function main() {
     const args = getSendProtectTxArgs()
@@ -10,7 +10,8 @@ async function main() {
         return
     }
     const provider = new providers.JsonRpcProvider(env.PROTECT_URL)
-    const adminWallet = getAdminWallet().connect(provider)
+    // const adminWallet = getAdminWallet().connect(provider)
+    const adminWallet = new Wallet(process.env.ADMIN_PRIVATE_KEY!).connect(provider)
 
     const tx = args.dummy ? await createRevertingUniTx() : await getSampleLotteryTx(adminWallet)
     if (!tx) {

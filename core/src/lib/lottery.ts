@@ -115,16 +115,16 @@ export const createRevertingUniTx = async (deadline?: number): Promise<providers
         console.warn("uniContract is undefined")
         return undefined
     }
-    if (!contracts.DAI.address) {
+    if (!contracts.DAI.address(env.CHAIN_ID)) {
         console.warn(`DAI address is undefined for ${process.env.NODE_ENV}`)
     }
-    if (!contracts.WETH.address) {
+    if (!contracts.WETH.address(env.CHAIN_ID)) {
         console.warn(`WETH address is undefined for ${process.env.NODE_ENV}`)
     }
     const revertingTx = await uniContract.populateTransaction.swapExactTokensForTokens(
         BigNumber.from(420).mul(1e9).mul(1e9),
         BigNumber.from(420).mul(1e9).mul(1e9),
-        [contracts.DAI.address, contracts.WETH.address],
+        [contracts.DAI.address(env.CHAIN_ID), contracts.WETH.address(env.CHAIN_ID)],
         adminWallet.address,
         deadline || now() + 30
     )
