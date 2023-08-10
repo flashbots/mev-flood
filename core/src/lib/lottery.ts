@@ -126,7 +126,7 @@ export const createRevertingUniTx = async (deadline?: number): Promise<providers
         BigNumber.from(420).mul(1e9).mul(1e9),
         [contracts.DAI.address(env.CHAIN_ID), contracts.WETH.address(env.CHAIN_ID)],
         adminWallet.address,
-        deadline || now() + 30
+        deadline || now() + 12 // 1 block expiration (as if it matters here lol)
     )
     const gasLimit = 200000
     const gasPrice = GWEI.mul(100)

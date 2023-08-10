@@ -169,6 +169,7 @@ Example:
  */
  export const getSendProtectTxArgs = () => {
     let dummy = false
+    let forever = false
     const helpMessage = `send a sample Protect tx.
 
 Usage:
@@ -181,6 +182,9 @@ Example:
     # send uniswapV2 router tx to Protect (works on any chain)
     yarn script.sendProtectTx dummy
 
+    # do it forever
+    yarn script.sendProtectTx dummy forever
+
     # send lottery contract tx to Protect with fast mode
     yarn script.sendProtectTx fast
 
@@ -190,18 +194,22 @@ Example:
     yarn script.sendProtectTx dummy fast
 `
 
-    if (process.argv.length > 2) {
-        if (process.argv[2].includes("help")) {
+    const args = process.argv.slice(2)
+    if (args.length > 0) {
+        if (args.includes("help")) {
             console.log(helpMessage)
             return undefined
         } 
-        const args = `${process.argv[2]}&${process.argv[3]}`
         if (args.includes("dummy")) {
             dummy = true
+        }
+        if (args.includes("forever")) {
+            forever = true
         }
     }
     return {
         dummy,
+        forever,
     }
 }
 
