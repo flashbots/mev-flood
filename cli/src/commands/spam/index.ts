@@ -11,6 +11,12 @@ export default class Spam extends Command {
 
   static flags = {
     ...floodFlags,
+    sendRoute: Flags.string({
+      char: 's',
+      description: 'Route for the transactions ("mempool", "flashbots", "mevshare").',
+      required: false,
+      default: "mempool",
+    }),
     txsPerBundle: Flags.integer({
       char: 't',
       description: 'Number of transactions to include in each bundle.',
@@ -41,7 +47,7 @@ export default class Spam extends Command {
 
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
-      sendRoute: SendRoute.Mempool,
+      sendRoute: flags.sendRoute as SendRoute,
       secondsPerBundle: flags.secondsPerBundle,
     })
   }

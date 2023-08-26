@@ -46,12 +46,17 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     let lastBlockSampledAt = now()
     let targetBlockNumber = await wallet.provider.getBlockNumber() + 1
     let virtualNonce = await wallet.getTransactionCount()
+
     while (true) {
-        spam(mevFlood, wallet, {targetBlockNumber, virtualNonce, txsPerBundle: 1, sendRoute: SendRoute.Mempool})
-        await sleep(params.secondsPerBundle * 1000)
-        if (now() - lastBlockSampledAt > 12000) {
-            targetBlockNumber += 1
-            lastBlockSampledAt = now()
+        try {
+            spam(mevFlood, wallet, {targetBlockNumber, virtualNonce, txsPerBundle: 1, sendRoute: SendRoute.Mempool})
+            await sleep(params.secondsPerBundle * 1000)
+            if (now() - lastBlockSampledAt > 12000) {
+                targetBlockNumber += 1
+                lastBlockSampledAt = now()
+            }
+        } catch(e) {
+            console.error("error with spam tx error: ", e)
         }
     }
 }

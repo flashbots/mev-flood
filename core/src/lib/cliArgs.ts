@@ -12,9 +12,9 @@ import { getTestWallet } from './wallets'
 */
 
 export enum SendRoute {
-    Flashbots,
-    Mempool,
-    MevShare,
+    Flashbots = "flashbots",
+    Mempool = "mempool",
+    MevShare = "mevshare",
 }
 
 export const getOption = (args: string[], flagIndex: number, argType?: "string" | "number" | "boolean") => {
