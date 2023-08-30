@@ -5,6 +5,7 @@ import {floodFlags} from '../../helpers/flags'
 import MevFlood, {spam} from '../../../../core/build'
 import {SendRoute} from '../../../../core/build/lib/cliArgs'
 import {getDeploymentDir} from '../../helpers/files'
+import { TxStrategy } from '../../../../core/build/lib/scripts/spam'
 
 export default class Spam extends Command {
   static description = 'Send a constant stream of UniV2 swaps.'
@@ -28,6 +29,11 @@ export default class Spam extends Command {
       description: 'Load the deployment details from a file.',
       required: false,
     }),
+    revert: Flags.boolean({
+      description: 'Send reverting transactions.',
+      required: false,
+      default: false,
+    }),
   }
 
   async run(): Promise<void> {
@@ -38,11 +44,13 @@ export default class Spam extends Command {
     const deployment = flags.loadFile ? await MevFlood.loadDeployment(getDeploymentDir(flags.loadFile)) : undefined
     const flood = new MevFlood(wallet, provider, deployment)
     this.log(`connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
+    const txStrategy = flags.revert ? TxStrategy.UniV2Reverting : TxStrategy.UniV2
 
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
       sendRoute: SendRoute.Mempool,
       secondsPerBundle: flags.secondsPerBundle,
+      txStrategy,
     })
   }
 }

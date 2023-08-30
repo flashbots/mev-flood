@@ -270,6 +270,19 @@ const getPostTradeDaiPrice = async (
     ).toNumber()
 }
 
+/** Create params for a random swap w/ optional overrides.
+ *
+ * **Overrides**
+ *
+ * - random value between `minUSD` and `maxUSD` determines amountIn.
+ * - For "WETH in" swaps, amountIn is divided by market price of DAI/WETH.
+ * - `minUSD` - minimum amountIn in USD. Default: 100
+ * - `maxUSD` - maximum amountIn in USD. Default: minUSD + 1000
+ * - `swapOnA` - whether to swap on uniFactoryA or uniFactoryB. Default: random
+ * - `daiIndex` - index of DAI contract to use. Default: random
+ * - `swapWethForDai` - whether to swap WETH for DAI or DAI for WETH. Default: random
+ * - `gasFees` - gas fees to use for swap tx. Default: 80 gwei maxFeePerGas, 5 gwei maxPriorityFeePerGas
+ */
 export const createRandomSwapParams = async (
     providerOrDaiPrice: providers.JsonRpcProvider | number,
     uniFactoryAddress_A: string,
@@ -290,14 +303,16 @@ export const createRandomSwapParams = async (
         overrides.swapWethForDai ? wethDaiPath : daiWethPath
         : coinToss() ? wethDaiPath : daiWethPath
     // pick random amountIn: [500..10000] USD
-    const amountInUSD = ETH.mul(randInRange(overrides.minUSD || 100, overrides.maxUSD || 5000))
+    const min = overrides.minUSD || 100
+    const max = overrides.maxUSD || min + 1000
+    const amountInUSD = ETH.mul(randInRange(min, max))
     // if weth out (path_0 == weth) then amount should be (1 ETH / (DAI/ETH price) DAI) * amountIn; e.g. number(1300)
     const daiPrice = typeof providerOrDaiPrice === "number" ?
         providerOrDaiPrice :
         await getPostTradeDaiPrice(providerOrDaiPrice, {daiAddress, wethAddress, uniFactoryAddress}, path, amountInUSD)
     // calculatePostTradeReserves()
     const amountIn = path[0] == wethAddress ?
-        amountInUSD.div(Math.floor(daiPrice)) :
+        amountInUSD.div(Math.floor(daiPrice) || 1) :
         amountInUSD
     const tokenInName = path[0] === wethAddress ? "WETH" : "DAI"
     const tokenOutName = path[1] === wethAddress ? "WETH" : "DAI"
