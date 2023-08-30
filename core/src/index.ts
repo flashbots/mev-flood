@@ -232,7 +232,7 @@ class MevFlood {
             for (const swap of swaps.signedSwaps) {
                 const simResult = await this.provider.call(swap.tx)
                 if (simResult !== "0x") {
-                    throw new Error(`Simulated swap failed: ${simResult}`)
+                    console.warn(`Simulated swap failed: ${simResult}`)
                 }
             }
 
