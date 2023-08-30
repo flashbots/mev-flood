@@ -5,7 +5,7 @@ import {floodFlags} from '../../helpers/flags'
 import MevFlood, {spam} from '../../../../core/build'
 import {SendRoute} from '../../../../core/build/lib/cliArgs'
 import {getDeploymentDir} from '../../helpers/files'
-import { TxStrategy } from '../../../../core/build/lib/scripts/spam'
+import {TxStrategy} from '../../../../core/build/lib/scripts/spam'
 
 export default class Spam extends Command {
   static description = 'Send a constant stream of UniV2 swaps.'
