@@ -36,9 +36,9 @@ export default class Spam extends Command {
     }),
     sendTo: Flags.string({
       char: 's',
-      description: 'Where to send transactions. (' + Object.keys(SendRoute).filter(k => isNaN(Number(k))).map(k => k.toLowerCase()).reduce((a, b) => a + ', ' + b) + ')',
+      description: 'Where to send transactions. (' + Object.keys(SendRoute).filter(k => Number.isNaN(k)).map(k => k.toLowerCase()).reduce((a, b) => a + ', ' + b) + ')',
       required: false,
-      default: "mempool",
+      default: 'mempool',
     }),
   }
 
@@ -55,7 +55,7 @@ export default class Spam extends Command {
 
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
-      sendRoute: sendTo === "flashbots" ? SendRoute.Flashbots : sendTo === "mevshare" ? SendRoute.MevShare : SendRoute.Mempool,
+      sendRoute: sendTo === 'flashbots' ? SendRoute.Flashbots : (sendTo === 'mevshare' ? SendRoute.MevShare : SendRoute.Mempool),
       secondsPerBundle: flags.secondsPerBundle,
       txStrategy,
     })
