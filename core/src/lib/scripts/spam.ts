@@ -72,6 +72,7 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
         if (now() - lastBlockSampledAt > 12000) {
             targetBlockNumber += 1
             lastBlockSampledAt = now()
+            virtualNonce = await wallet.getTransactionCount()
         }
     }
 }
