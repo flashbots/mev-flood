@@ -1,6 +1,6 @@
 {
   "name": "mevflood",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "description": "mev-flood cli simulates mev activity",
   "author": "zeroXbrock",
   "bin": {
@@ -20,7 +20,8 @@
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
     "ethers": "^5",
-    "ethersV6": "npm:ethers@^6.3.0"
+    "ethersV6": "npm:ethers@^6.3.0",
+    "mev-flood": "../core"
   },
   "devDependencies": {
     "@oclif/test": "^2.3.22",

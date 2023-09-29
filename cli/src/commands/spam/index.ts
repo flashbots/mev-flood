@@ -16,7 +16,7 @@ export default class Spam extends Command {
       char: 't',
       description: 'Number of transactions to include in each bundle.',
       required: false,
-      default: 2,
+      default: 1,
     }),
     secondsPerBundle: Flags.integer({
       char: 'p',
@@ -34,6 +34,12 @@ export default class Spam extends Command {
       required: false,
       default: false,
     }),
+    sendTo: Flags.string({
+      char: 's',
+      description: 'Where to send transactions. (' + Object.values(SendRoute).map(k => k.toString().toLowerCase()).filter(v => v.length > 2 /* lazy way to get rid of numbers without parsing strings into ints */).reduce((a, b) => a + ', ' + b) + ')',
+      required: false,
+      default: 'mempool',
+    }),
   }
 
   async run(): Promise<void> {
@@ -45,10 +51,11 @@ export default class Spam extends Command {
     const flood = new MevFlood(wallet, provider, deployment)
     this.log(`connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
     const txStrategy = flags.revert ? TxStrategy.UniV2Reverting : TxStrategy.UniV2
+    const sendTo = flags.sendTo.toLowerCase()
 
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
-      sendRoute: SendRoute.Mempool,
+      sendRoute: sendTo === 'flashbots' ? SendRoute.Flashbots : (sendTo === 'mevshare' ? SendRoute.MevShare : SendRoute.Mempool),
       secondsPerBundle: flags.secondsPerBundle,
       txStrategy,
     })

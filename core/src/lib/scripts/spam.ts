@@ -64,7 +64,7 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     let lastBlockSampledAt = now()
     let targetBlockNumber = await wallet.provider.getBlockNumber() + 1
     while (true) {
-        spam(mevFlood, wallet, {targetBlockNumber, txsPerBundle: 1, sendRoute: params.sendRoute, txStrategy: params.txStrategy})
+        spam(mevFlood, wallet, {targetBlockNumber, txsPerBundle: params.txsPerBundle, sendRoute: params.sendRoute, txStrategy: params.txStrategy})
         await sleep(params.secondsPerBundle * 1000)
         if (now() - lastBlockSampledAt > 12000) {
             targetBlockNumber += 1
