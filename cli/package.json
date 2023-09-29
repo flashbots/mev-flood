@@ -1,6 +1,6 @@
 {
   "name": "mevflood",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "mev-flood cli simulates mev activity",
   "author": "zeroXbrock",
   "bin": {
