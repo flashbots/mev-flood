@@ -36,7 +36,7 @@ export default class Spam extends Command {
     }),
     sendTo: Flags.string({
       char: 's',
-      description: 'Where to send transactions. (' + Object.keys(SendRoute).filter(k => Number.isNaN(k)).map(k => k.toLowerCase()).reduce((a, b) => a + ', ' + b) + ')',
+      description: 'Where to send transactions. (' + Object.values(SendRoute).map(k => k.toString().toLowerCase()).reduce((a, b) => a + ', ' + b) + ')',
       required: false,
       default: 'mempool',
     }),

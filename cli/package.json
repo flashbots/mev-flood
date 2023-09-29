@@ -20,7 +20,8 @@
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
     "ethers": "^5",
-    "ethersV6": "npm:ethers@^6.3.0"
+    "ethersV6": "npm:ethers@^6.3.0",
+    "mev-flood": "../core"
   },
   "devDependencies": {
     "@oclif/test": "^2.3.22",
