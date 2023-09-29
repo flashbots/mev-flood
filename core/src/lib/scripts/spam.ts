@@ -19,7 +19,6 @@ export const spam = async (
     wallet: Wallet,
     params: {
         targetBlockNumber: number,
-        virtualNonce: number,
         txsPerBundle: number,
         sendRoute: SendRoute,
         txStrategy?: TxStrategy,
@@ -36,9 +35,8 @@ export const spam = async (
         .map((_, idx) => mevFlood.generateSwaps(
             swapParams,
             [wallet],
-            params.virtualNonce + idx
+            idx
         )))
-    params.virtualNonce = params.virtualNonce + txBundles.map(b => b.swaps.signedSwaps.length).reduce((a, b) => a + b, 0)
     const bundle = txBundles.map(txb => txb.swaps.signedSwaps.map(s => s.signedTx)).flat()
 
     if (params.sendRoute === SendRoute.Mempool) {
@@ -65,9 +63,8 @@ export const spamLoop = async (mevFlood: MevFlood, wallet: Wallet, params: {
     }
     let lastBlockSampledAt = now()
     let targetBlockNumber = await wallet.provider.getBlockNumber() + 1
-    let virtualNonce = await wallet.getTransactionCount()
     while (true) {
-        spam(mevFlood, wallet, {targetBlockNumber, virtualNonce, txsPerBundle: params.txsPerBundle, sendRoute: params.sendRoute, txStrategy: params.txStrategy})
+        spam(mevFlood, wallet, {targetBlockNumber, txsPerBundle: params.txsPerBundle, sendRoute: params.sendRoute, txStrategy: params.txStrategy})
         await sleep(params.secondsPerBundle * 1000)
         if (now() - lastBlockSampledAt > 12000) {
             targetBlockNumber += 1
