@@ -16,7 +16,7 @@ export default class Spam extends Command {
       char: 't',
       description: 'Number of transactions to include in each bundle.',
       required: false,
-      default: 2,
+      default: 1,
     }),
     secondsPerBundle: Flags.integer({
       char: 'p',
