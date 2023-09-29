@@ -36,7 +36,7 @@ export default class Spam extends Command {
     }),
     sendTo: Flags.string({
       char: 's',
-      description: 'Where to send transactions. (' + Object.keys(SendRoute).filter(k => Number.isNaN(k)).map(k => k.toLowerCase()).reduce((a, b) => a + ', ' + b) + ')',
+      description: 'Where to send transactions. (' + Object.values(SendRoute).map(k => k.toString().toLowerCase()).filter(v => v.length > 2 /* lazy way to get rid of numbers without parsing strings into ints */).reduce((a, b) => a + ', ' + b) + ')',
       required: false,
       default: 'mempool',
     }),
