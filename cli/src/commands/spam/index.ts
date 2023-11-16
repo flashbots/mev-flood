@@ -52,6 +52,9 @@ export default class Spam extends Command {
     this.log(`connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
     const txStrategy = flags.revert ? TxStrategy.UniV2Reverting : TxStrategy.UniV2
     const sendTo = flags.sendTo.toLowerCase()
+    if (sendTo === 'flashbots')
+      flood.initFlashbots(wallet)
+
 
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
