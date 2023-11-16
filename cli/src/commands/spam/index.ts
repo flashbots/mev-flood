@@ -55,7 +55,6 @@ export default class Spam extends Command {
     if (sendTo === 'flashbots')
       flood.initFlashbots(wallet)
 
-
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
       sendRoute: sendTo === 'flashbots' ? SendRoute.Flashbots : (sendTo === 'mevshare' ? SendRoute.MevShare : SendRoute.Mempool),
