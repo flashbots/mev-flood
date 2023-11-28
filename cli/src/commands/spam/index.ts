@@ -18,11 +18,11 @@ export default class Spam extends Command {
       required: false,
       default: 1,
     }),
-    secondsPerBundle: Flags.integer({
+    msPerBundle: Flags.integer({
       char: 'p',
-      description: 'Seconds to wait before sending another bundle.',
+      description: 'Milliseconds to wait before sending another bundle.',
       required: false,
-      default: 12,
+      default: 2000,
     }),
     loadFile: Flags.string({
       char: 'l',
@@ -56,7 +56,7 @@ export default class Spam extends Command {
     await spam.spamLoop(flood, wallet, {
       txsPerBundle: flags.txsPerBundle,
       sendRoute: sendTo === 'flashbots' ? SendRoute.Flashbots : (sendTo === 'mevshare' ? SendRoute.MevShare : SendRoute.Mempool),
-      secondsPerBundle: flags.secondsPerBundle,
+      msPerBundle: flags.msPerBundle,
       txStrategy,
     })
   }

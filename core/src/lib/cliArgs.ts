@@ -620,8 +620,8 @@ export const getSpamArgs = () => {
     const usage = `\
     yarn script.spam <sender_index> [OPTIONS]
 `
-    const secondsPerBundleFlag = "--seconds-per-bundle"
-    const secondsPerBundleShort = "-p"
+    const msPerBundleFlag = "--seconds-per-bundle"
+    const msPerBundleShort = "-p"
     const txsPerBundleFlag = "--txs-per-bundle"
     const txsPerBundleShort = "-t"
     const mempoolFlag = "--mempool"
@@ -630,7 +630,7 @@ export const getSpamArgs = () => {
     const overdriveFlag = "--overdrive"
 
     const options = `\
-    ${secondsPerBundleShort}, ${secondsPerBundleFlag}\tSeconds to wait before sending another bundle. (default=1)
+    ${msPerBundleShort}, ${msPerBundleFlag}\tSeconds to wait before sending another bundle. (default=1)
     ${txsPerBundleShort}, ${txsPerBundleFlag}\tNumber of transactions per bundle. (default=2)
     ${flashbotsFlag}\t\t\tSend transactions via flashbots bundle (default=true). Setting this flag overrides ${mempoolFlag} and ${mevShareFlag}.
     ${mempoolFlag}\t\t\tSend transactions directly to mempool (default=false).
@@ -642,13 +642,13 @@ export const getSpamArgs = () => {
     yarn script.spam 0
 
     # send 10 bundles per second w/ 4 txs per bundle
-    yarn script.spam 0 ${secondsPerBundleShort} 10 ${txsPerBundleShort} 4
+    yarn script.spam 0 ${msPerBundleShort} 10 ${txsPerBundleShort} 4
 
     # spin up 10 parallel threads, each sending 150 txs per second to mempool
-    yarn script.spam 0 ${secondsPerBundleShort} 50 ${txsPerBundleShort} 3 ${mempoolFlag} --overdrive 10
+    yarn script.spam 0 ${msPerBundleShort} 50 ${txsPerBundleShort} 3 ${mempoolFlag} --overdrive 10
 `
     const helpMessage = genHelpMessage(description, usage, options, examples)
-    let secondsPerBundle = 12
+    let msPerBundle = 12
     let txsPerBundle = 2
     let sendRoute = SendRoute.Flashbots
     let overdrive = 1
@@ -666,9 +666,9 @@ export const getSpamArgs = () => {
         process.exit(1)
     }
 
-    if (args.includes(secondsPerBundleFlag) || args.includes(secondsPerBundleShort)) {
-        const secondsPerBundleIndex = getFlagIndex(args, secondsPerBundleFlag, secondsPerBundleShort)
-        secondsPerBundle = getOption(args, secondsPerBundleIndex, "number") as number
+    if (args.includes(msPerBundleFlag) || args.includes(msPerBundleShort)) {
+        const msPerBundleIndex = getFlagIndex(args, msPerBundleFlag, msPerBundleShort)
+        msPerBundle = getOption(args, msPerBundleIndex, "number") as number
     }
     if (args.includes(txsPerBundleFlag) || args.includes(txsPerBundleShort)) {
         const txsPerBundleIndex = getFlagIndex(args, txsPerBundleFlag, txsPerBundleShort)
@@ -688,7 +688,7 @@ export const getSpamArgs = () => {
     }
 
     return {
-        secondsPerBundle,
+        msPerBundle,
         overdrive,
         txsPerBundle,
         sendRoute,

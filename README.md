@@ -114,7 +114,7 @@ FLAGS
   -k, --privateKey=<value>        [default: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80] Private key used to
                                   send transactions and deploy contracts.
   -l, --loadFile=<value>          Load the deployment details from a file.
-  -p, --secondsPerBundle=<value>  [default: 12] Seconds to wait before sending another bundle.
+  -p, --msPerBundle=<value>  [default: 12] Seconds to wait before sending another bundle.
   -r, --rpcUrl=<value>            [default: http://localhost:8545] HTTP JSON-RPC endpoint.
   -t, --txsPerBundle=<value>      [default: 2] Number of transactions to include in each bundle.
   -u, --userKey=<value>           [default: 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d] Private key for the
