@@ -30,8 +30,8 @@ export default class Init extends Command {
     const userWallet = new Wallet(flags.userKey, provider)
     this.log(`connected to ${flags.rpcUrl} with wallet ${wallet.address}`)
     const deployment = await flood.liquid({
-      wethMintAmountAdmin: flags.wethMintAmountOwner,
-      wethMintAmountUser: flags.wethMintAmountUser,
+      wethMintAmountAdmin: flags.wethMintAmount,
+      wethMintAmountUser: flags.wethMintAmount,
     }, userWallet)
     await deployment.deployToMempool()
     this.log('liquidity deployed via mempool')
